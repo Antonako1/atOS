@@ -1,0 +1,14 @@
+{
+  "name": "atos",
+  "version": "1.0.0",
+  "description": "OS",
+  "main": "main.js",
+  "scripts": {
+    "test": "console.log(\"This is test command\");"
+  },
+  "author": "koltti",
+  "license": "ISC",
+  "dependencies": {
+    "underscore": "^1.13.6"
+  }
+}
