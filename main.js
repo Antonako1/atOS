@@ -1,4 +1,4 @@
-// Imports consoleReadline
+// Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;
 
@@ -12,16 +12,16 @@ const moduleREMOVE= require("./src/remove.js");
 const remove = moduleREMOVE.remove;
 
 let fileType, fileName, fileData, fileToRead, result;
-
-  console.log("Starting atOS");
-  let count = 0;
-  const intervalId = setInterval(() => {
-    process.stdout.write('\r[' + '█'.repeat(count) + ' '.repeat(20 - count) + ']');
-    count++;
-    if (count > 20) {
-      clearInterval(intervalId);
-      console.log("\n");
-      console.log("             d8     ,88~-_   ,d88~~\\ ");
+// Start
+console.log("Starting atOS");
+let count = 0;
+const intervalId = setInterval(() => {
+  process.stdout.write('\r[' + '█'.repeat(count) + ' '.repeat(20 - count) + ']');
+  count++;
+  if (count > 20) {
+    clearInterval(intervalId);
+    console.log("\n");
+    console.log("             d8     ,88~-_   ,d88~~\\ ");
 console.log("  /~~~8e  _d88__  d888   \\  8888    ");
 console.log("      88b  888   88888    | `Y88b   ");
 console.log(" e88~-888  888   88888    |  `Y88b, ");
@@ -87,9 +87,6 @@ newInputCNSLE = function(){
 }
 
 newFile = function(currentCMD){
-    // TODO Ask to save, when saving ask for encryption.
-  
-    //! fileType, fileName, fileData
     // When making file
     if(currentCMD === "mkdir" || currentCMD === "write"){
       // Check current commands for correct filetypes

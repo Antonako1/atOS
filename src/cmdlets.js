@@ -3,9 +3,9 @@
 // All different commands
 const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read"];
 const fs = require('fs');
+const { isError } = require('underscore');
 // Different filetypes in .json files
 global.paths = []
-// AT-Krypt
 
 // String returned by readLineCNSLE()
 let returnValueReadLine = String();
@@ -27,17 +27,35 @@ readLineCNSLE = function(cmd, cmd2){
         returnValueReadLine = cmdlets;
         break;
         case "ls":
-            function checkInsideFolder(json) {
-                for(let i=0; i<json.filedata.length; i++){
-                    subfolder = json.filedata[i]
-                    console.log(subfolder);
-                    returnValueReadLine += subfolder.name;
+            function checkInsideFolder(json, path) {
+                if (json.path === path) {
+                for (let i = 0; i < json.filedata.length; i++) {
+                    const subfolder = json.filedata[i];
+                    if (subfolder.name === undefined) {
+                    continue;
+                    }
                     if (subfolder.filetype === "folder") {
-                        returnValueReadLine += "/ ";
-                    }else{returnValueReadLine += " "}
+                    console.log(subfolder.name + "/");
+                    } else {
+                    console.log(subfolder.name);
+                    }
+                }
+            
+                // Check if a new file was created in this folder
+                if (global.newFileName && global.newFileFolder === json.path) {
+                    console.log(global.newFileName);
+                }
+                } else {
+                for (let i = 0; i < json.filedata.length; i++) {
+                    const subfolder = json.filedata[i];
+                    if (subfolder.filetype === "folder") {
+                    checkInsideFolder(subfolder, path);
+                    }
+                }
                 }
             }
-            checkInsideFolder(global.data);              
+          
+            checkInsideFolder(global.data, global.root);              
             break;
         case "mkdir":
             break;
@@ -131,7 +149,11 @@ function BuildPath() {
             evalPath += "." + String(global.paths[i])
         }
     }
-    return eval("global.data." + evalPath)
+    if(eval("global.data." + evalPath) == undefined){
+        console.log("Something went wrong");
+    }else{
+        return eval("global.data." + evalPath)
+    }
 }
 module.exports = {
     readLineCNSLE: readLineCNSLE

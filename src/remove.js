@@ -11,8 +11,8 @@ remove = function(cmd){
 }
 
 function deleteOBJ(name, location) {
-    for (var i in location.filedata) {
-        var item = location.filedata[i];
+    for (let i in location.filedata) {
+        let item = location.filedata[i];
         if (item && item.name == name) {
             location.filedata.splice(i, 1);
             return name + " was deleted with success";
