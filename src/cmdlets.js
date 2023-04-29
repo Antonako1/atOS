@@ -1,7 +1,7 @@
 
 
 // All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read"];
+const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date"];
 const fs = require('fs');
 const { isError } = require('underscore');
 // Different filetypes in .json files
@@ -127,6 +127,13 @@ readLineCNSLE = function(cmd, cmd2){
             global.rootSecond = "root/" 
             global.root = "root/";
             global.rootText = "root/" + ">";
+              break;
+        case "date":
+              let date = new Date;
+              returnValueReadLine = date + " ";
+              break;
+        case "snake":
+              
               break;
         default:
             if(cmd == ""){
