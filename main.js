@@ -13,6 +13,7 @@ const remove = moduleREMOVE.remove;
 
 let fileType, fileName, fileData, fileToRead, result;
 // start
+console.clear();
 console.log("             d8     ,88~-_   ,d88~~\\ ");
 console.log("  /~~~8e  _d88__  d888   \\  8888    ");
 console.log("      88b  888   88888    | `Y88b   ");

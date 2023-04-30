@@ -182,8 +182,6 @@ readLineCNSLE = function(cmd, cmd2){
 }
 
 function BuildPath() {
-    global.data = fs.readFileSync('files/file.json', 'utf8');
-    global.data = JSON.parse(global.data);
   let data = global.data;
   for (let i in global.paths) {
     const path = global.paths[i];
@@ -193,8 +191,10 @@ function BuildPath() {
     console.log('data::: ' + i , data);
     console.log("\n");
     if (data === undefined) {
-      console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is undefined");
-      break;
+        console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is undefined");
+        global.data = fs.readFileSync('files/file.json', 'utf8');
+        global.data = JSON.parse(global.data);
+        break;
     }
   }
   return data;
