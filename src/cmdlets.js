@@ -14,6 +14,9 @@ const startGame = moduleSNAKE.startGame;
 const example = require("./example.js");
 const helloWorld = example.helloWorld;
 
+const rps = require("./gtn.js");
+const guessTheNumber = rps.guessTheNumber;
+
 
 // String returned by readLineCNSLE()
 let returnValueReadLine = String();
@@ -156,7 +159,7 @@ readLineCNSLE = function(cmd, cmd2){
             break;
         case "q":
             console.log("------------------");
-            console.log("|Shut down code 0|")
+            console.log("| Shuting Down.. |")
             console.log("------------------");
             process.exit(0)
             break;
@@ -168,6 +171,9 @@ readLineCNSLE = function(cmd, cmd2){
               break;
         case "tetris":
               // call
+              break;
+        case "gtn":
+              console.log(rps.guessTheNumber());
               break;
         default:
             if(cmd == ""){
