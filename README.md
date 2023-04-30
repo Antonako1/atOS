@@ -1,4 +1,4 @@
-## atOS
+## at subsystem for windows, linux and macintosh
  ### help: Displays commands
  ### ls: Shows items inside current folder
  ### mkdir: Creates new folder
@@ -9,4 +9,4 @@
  ### cd..: Goes back one folder
  ### cd folderName: Moves to folder
  ### write: Creates textfile
- ### read: Reads textfiel
+ ### read: Reads textfile
