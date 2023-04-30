@@ -55,6 +55,7 @@ const readline = require('readline').createInterface({
 
 global.folder = global.root;
 // New input after previous one was done
+
 newInputCNSLE = function(){
   readline.question(global.rootText + " " , command => {
     // Identify command
@@ -146,7 +147,8 @@ newFile = function(currentCMD){
 
 // In start, start console
 newInputCNSLE();
-
+a = function(){newInputCNSLE}
 module.exports = {
-  newInputCNSLE: newInputCNSLE
+  newInputCNSLE: newInputCNSLE,
+  a: a
 };

@@ -1,11 +1,13 @@
 
 
 // All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date"];
+const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date", "snake", "q"];
 const fs = require('fs');
 const { isError } = require('underscore');
 // Different filetypes in .json files
 global.paths = []
+const moduleSNAKE = require("./snake.js");
+const startGame = moduleSNAKE.startGame;
 
 // String returned by readLineCNSLE()
 let returnValueReadLine = String();
@@ -133,11 +135,19 @@ readLineCNSLE = function(cmd, cmd2){
               returnValueReadLine = date + " ";
               break;
         case "snake":
-              
+            startGame();
+            break;
+        case "q":
+            console.log("------------------");
+            console.log("|Shut down code 0|")
+            console.log("------------------");
+            process.exit(0)
+            break;
+        case "cls":
+              console.clear();
               break;
         default:
             if(cmd == ""){
-                returnValueReadLine = global.rootText;
             }else{
                 returnValueReadLine = "Unknown command. Type help for all commands"
             }
