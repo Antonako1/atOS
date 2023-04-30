@@ -14,7 +14,6 @@ if(crntCMD === "mkdir"){
     path: global.root,
     filetype: fileType,
     filedata: [
-      ""
     ]
   };
 }else if(crntCMD === "write"){

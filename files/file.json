@@ -8,13 +8,11 @@
       "path": "root/Users/",
       "filetype": "folder",
       "filedata": [
-        "",
         {
           "name": "Default",
           "path": "root/Users/Default/",
           "filetype": "folder",
           "filedata": [
-            ""
           ]
         }
       ]
@@ -24,7 +22,6 @@
       "path": "root/Documents/",
       "filetype": "folder",
       "filedata": [
-        "",
         {
           "name": "Notes.cr",
           "path": "root/Documents/Notes.cr",

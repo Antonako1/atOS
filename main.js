@@ -27,7 +27,7 @@ console.log("      88b  888   88888    | `Y88b   ");
 console.log(" e88~-888  888   88888    |  `Y88b, ");
 console.log("C888  888  888    Y888   /     8888 ");
 console.log(" \"88_-888  \"88_/   `88_-~   \\__88P' ");
-console.log("\n atOS is now running, press enter to continue");
+console.log("\n atOS is now running, press backspace to continue");
 console.log("type help for list of commands");                            
     }
   }, 100);

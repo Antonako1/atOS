@@ -115,9 +115,12 @@ readLineCNSLE = function(cmd, cmd2){
                 return "";
               } 
               global.paths.push(findPath(global.data, cmd2))
+              console.log('global.data 1::: ', global.data);
               global.data = BuildPath();
+              console.log('global.data 2::: ', global.data);
+              
               global.rootSecond = global.data.path
-              global.root = global.data.path
+              global.root = global.rootSecond
               global.rootText = global.root + ">";  
               break;
         case "read":
@@ -158,19 +161,24 @@ readLineCNSLE = function(cmd, cmd2){
     }
 }
 function BuildPath() {
-    var evalPath = "";
-    for (var i in global.paths) {
+    let evalPath = "";
+    for (let i in global.paths) {
         if (evalPath.length == 0) {
             evalPath = String(global.paths[i])
         } else {
             evalPath += "." + String(global.paths[i])
         }
+        console.log('global.paths[i]::: ', global.paths[i]);
     }
-    if(eval("global.data." + evalPath) == undefined){
-        console.log("Something went wrong");
-    }else{
-        return eval("global.data." + evalPath)
+    console.log('global.paths::: ', global.paths);
+    console.log('evalPath::: ', evalPath);
+    console.log('"path eval:: ' + eval("global.data." + evalPath));
+    if (eval("global.data." + evalPath) == undefined) {
+        console.log("Error: global.data." + evalPath + " is undefined");
+    } else {
+        return eval("global.data." + evalPath);
     }
+    
 }
 module.exports = {
     readLineCNSLE: readLineCNSLE
