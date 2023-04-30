@@ -32,7 +32,7 @@ if(crntCMD === "mkdir"){
     text: fileData
   };
 }
-// Pushes new files to files.json
+// Pushes new files to file.json
 function pushToPath(json, path, object) {
   if(json == null){
   }else{

@@ -5,7 +5,7 @@ const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "
 const fs = require('fs');
 const { isError } = require('underscore');
 const _ = require('lodash');
-// Different filetypes in .json files
+// Different file types in .json files
 global.paths = []
 const moduleSNAKE = require("./snake.js");
 const startGame = moduleSNAKE.startGame;
@@ -29,7 +29,7 @@ readLineCNSLE = function(cmd, cmd2){
     returnValueReadLine = " ";
     cmd = cmd.toLowerCase();
     cdm = cmd.trim();
-    // Switchcase for commands
+    // Switch case for commands
     switch (cmd) {
         case "help":
         returnValueReadLine = cmdlets;
@@ -98,7 +98,7 @@ readLineCNSLE = function(cmd, cmd2){
               cmd2 = cmd2.substring(3, cmd2.length)
               function findPath(obj, searchValue, depth = Infinity) {
                 var path = "";
-                if (depth === 0) {// stop searching when depth reaches 0
+                if (depth === 0) { // stop searching when depth reaches 0
                   return path;
                 }
                 for (let key in obj) {
@@ -196,7 +196,7 @@ function BuildPath() {
           global.data = fs.readFileSync('files/file.json', 'utf8');
           global.data = JSON.parse(global.data);
           data = global.data;
-        //   break;
+        //break;
       }
     // }
     return data;
