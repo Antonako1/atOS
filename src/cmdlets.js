@@ -9,6 +9,8 @@ const _ = require('lodash');
 global.paths = []
 const moduleSNAKE = require("./snake.js");
 const startGame = moduleSNAKE.startGame;
+const moduleTETRIS = require("./tetris.js");
+const startGameTetris = moduleTETRIS.startGameTetris;
 
 // Example
 const example = require("./example.js");
@@ -44,9 +46,9 @@ readLineCNSLE = function(cmd, cmd2){
                     continue;
                     }
                     if (subfolder.filetype === "folder") {
-                    returnValueReadLine += subfolder.name + "/ ";
+                        console.log(subfolder.name + "/ ")
                     } else {
-                    returnValueReadLine += subfolder.name + " ";
+                        console.log(subfolder.name + " ")
                     }
                 }
             
@@ -67,13 +69,16 @@ readLineCNSLE = function(cmd, cmd2){
             checkInsideFolder(global.data, global.root);              
             break;
         case "mkdir":
+            returnValueReadLine = "";
             break;
         case "write":
+            returnValueReadLine = "";
             break;
         case "cd":
             global.rootSecond = "root/" 
             global.root = "root/";
             global.rootText = "root/" + ">";
+            returnValueReadLine = "";
             break;
         case "cd..":
               global.paths.pop();
@@ -92,6 +97,7 @@ readLineCNSLE = function(cmd, cmd2){
 
                   global.rootSecond = global.root
                   global.rootText = global.root + ">";  
+                  returnValueReadLine = "";
               break;
         case "cd ":
             
@@ -136,42 +142,55 @@ readLineCNSLE = function(cmd, cmd2){
                 path = global.data;
                 }
 
+                returnValueReadLine = "";
 
               global.rootSecond = path
               global.root = global.rootSecond
               global.rootText = global.root + ">";  
               break;
         case "read":
+            returnValueReadLine = "";
             break;
         case "path":
+            returnValueReadLine = "";
             returnValueReadLine = "Current path is: " + global.root;
             break;
         case "rmv":  
             global.rootSecond = "root/" 
             global.root = "root/";
             global.rootText = "root/" + ">";
+            returnValueReadLine = "";
               break;
         case "date":
               let date = new Date;
               returnValueReadLine = date + " ";
               break;
         case "snake":
+            // If not working in cmd, use powershell
             startGame();
             break;
         case "q":
             console.log("-----------");
             console.log("|Shut down|");
             console.log("-----------");
+            returnValueReadLine = "";
             process.exit(0)
             break;
         case "cls":
               console.clear();
+              returnValueReadLine = "";
+
               break;
         case "example":
               console.log(helloWorld());
+              returnValueReadLine = "";
+
               break;
         case "tetris":
-              // call
+            // If not working in cmd, use powershell
+            startGameTetris();
+            returnValueReadLine = "";
+
               break;
         default:
             if(cmd == ""){
