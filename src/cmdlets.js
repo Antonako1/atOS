@@ -143,7 +143,8 @@ readLineCNSLE = function(cmd, cmd2){
                 }
 
                 returnValueReadLine = "";
-
+                global.data = fs.readFileSync('files/file.json', 'utf8');
+                global.data = JSON.parse(global.data);
               global.rootSecond = path
               global.root = global.rootSecond
               global.rootText = global.root + ">";  

@@ -5,7 +5,7 @@ const { pipeline } = require('stream');
 // Define global variables
 const width = 24;
 const height = 18;
-let board = [];
+let boardTetris = [];
 // All pieces
 let blocksArr = [];
 // Current active piece
@@ -39,9 +39,9 @@ reset = function(){
 
 startGameTetris = function(){
     console.log("Starting game");
-    // Set up the game board
+    // Set up the game boardTetris
     for(let i = 0; i < height; i++) {
-        board[i] = Array(width).fill('◼');
+        boardTetris[i] = Array(width).fill('◼');
     }
     // Spawn first block
     spawnCube();
@@ -95,100 +95,100 @@ spawnCube = function(){
 // All the different pieces
 straightDomino = function(){
     iPiece = true;
-    board[blockY][blockX-2] = tetris
+    boardTetris[blockY][blockX-2] = tetris
     blocksArrActive.push([blockY, blockX-2])
 
-    board[blockY][blockX-1] = tetris
+    boardTetris[blockY][blockX-1] = tetris
     blocksArrActive.push([blockY, blockX-1])
 
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY][blockX+1] = tetris
+    boardTetris[blockY][blockX+1] = tetris
     blocksArrActive.push([blockY, blockX+1])
 }
 squareDomino = function(){
     oPiece = true;
-    board[blockY][blockX-1] = tetris
+    boardTetris[blockY][blockX-1] = tetris
     blocksArrActive.push([blockY, blockX-1])
 
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY+1][blockX-1] = tetris
+    boardTetris[blockY+1][blockX-1] = tetris
     blocksArrActive.push([blockY+1, blockX-1])
 
-    board[blockY+1][blockX] = tetris
+    boardTetris[blockY+1][blockX] = tetris
     blocksArrActive.push([blockY+1, blockX])
 }
 tDomino = function(){
     tPiece = true;
-    board[blockY][blockX-1] = tetris
+    boardTetris[blockY][blockX-1] = tetris
     blocksArrActive.push([blockY, blockX-1])
 
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY][blockX+1] = tetris
+    boardTetris[blockY][blockX+1] = tetris
     blocksArrActive.push([blockY, blockX+1])
 
-    board[blockY+1][blockX] = tetris
+    boardTetris[blockY+1][blockX] = tetris
     blocksArrActive.push([blockY+1, blockX])
 }
 jDomino = function(){
     jPiece = true;
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY+1][blockX] = tetris
+    boardTetris[blockY+1][blockX] = tetris
     blocksArrActive.push([blockY+1, blockX])
 
-    board[blockY+2][blockX] = tetris
+    boardTetris[blockY+2][blockX] = tetris
     blocksArrActive.push([blockY+2, blockX])
 
-    board[blockY+2][blockX-1] = tetris
+    boardTetris[blockY+2][blockX-1] = tetris
     blocksArrActive.push([blockY+2, blockX-1])
 }
 lDomino = function(){
     lPiece = true;
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY+1][blockX] = tetris
+    boardTetris[blockY+1][blockX] = tetris
     blocksArrActive.push([blockY+1, blockX])
 
-    board[blockY+2][blockX] = tetris
+    boardTetris[blockY+2][blockX] = tetris
     blocksArrActive.push([blockY+2, blockX])
 
-    board[blockY+2][blockX+1] = tetris
+    boardTetris[blockY+2][blockX+1] = tetris
     blocksArrActive.push([blockY+2, blockX+1])
 }
 sDomino = function(){
     sPiece = true;
-    board[blockY][blockX+1] = tetris
+    boardTetris[blockY][blockX+1] = tetris
     blocksArrActive.push([blockY, blockX+1])
 
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY+1][blockX] = tetris
+    boardTetris[blockY+1][blockX] = tetris
     blocksArrActive.push([blockY+1, blockX])
 
-    board[blockY+1][blockX-1] = tetris
+    boardTetris[blockY+1][blockX-1] = tetris
     blocksArrActive.push([blockY+1, blockX-1])
 }
 zDomino = function(){
     zPiece = true;
-    board[blockY][blockX-1] = tetris
+    boardTetris[blockY][blockX-1] = tetris
     blocksArrActive.push([blockY, blockX-1])
 
-    board[blockY][blockX] = tetris
+    boardTetris[blockY][blockX] = tetris
     blocksArrActive.push([blockY, blockX])
 
-    board[blockY+1][blockX] = tetris
+    boardTetris[blockY+1][blockX] = tetris
     blocksArrActive.push([blockY+1, blockX])
 
-    board[blockY+1][blockX+1] = tetris
+    boardTetris[blockY+1][blockX+1] = tetris
     blocksArrActive.push([blockY+1, blockX+1])
 }
 // Function that moves the pieces
@@ -306,21 +306,21 @@ rotate = function(){
 
 drawGame = function(){
     console.clear();
-    // Display the game board
+    // Display the game boardTetris
     for(let i = 0; i < height; i++) {
         for(let j = 0; j < width; j++) {
-            process.stdout.write(board[i][j]);
+            process.stdout.write(boardTetris[i][j]);
         }
         process.stdout.write('\n');
     }
 }
 
 moveAnimation = function(){
-    // First, clear the board of all tetris pieces
+    // First, clear the boardTetris of all tetris pieces
     for(let i = 0; i < height; i++) {
         for(let j = 0; j < width; j++) {
-          if(board[i][j] === tetris) {
-            board[i][j] = '◼';
+          if(boardTetris[i][j] === tetris) {
+            boardTetris[i][j] = '◼';
           }
         }
       }
@@ -340,13 +340,13 @@ moveAnimation = function(){
             reset();
             spawnCube();
         }else{
-            board[row][col] = tetris;
+            boardTetris[row][col] = tetris;
         }
         for(let i = 0; i < blocksArr.length; i++){
           let row = blocksArr[i][0];
           let col = blocksArr[i][1];
           if(row == 18){}else{
-              board[row][col] = tetris;
+              boardTetris[row][col] = tetris;
           }
         }
       }
