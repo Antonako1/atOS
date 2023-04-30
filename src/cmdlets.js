@@ -38,6 +38,7 @@ readLineCNSLE = function(cmd, cmd2){
         returnValueReadLine = cmdlets;
         break;
         case "ls":
+        returnValueReadLine = "";
             function checkInsideFolder(json, path) {
                 if (json.path === path) {
                 for (let i = 0; i < json.filedata.length; i++) {
@@ -46,9 +47,9 @@ readLineCNSLE = function(cmd, cmd2){
                     continue;
                     }
                     if (subfolder.filetype === "folder") {
-                    console.log(subfolder.name + "/");
+                    returnValueReadLine += subfolder.name + "/ ";
                     } else {
-                    console.log(subfolder.name);
+                    returnValueReadLine += subfolder.name + " ";
                     }
                 }
             
@@ -98,21 +99,23 @@ readLineCNSLE = function(cmd, cmd2){
         case "cd ":
             
               cmd2 = cmd2.substring(3, cmd2.length)
-              function findPath(obj, searchValue) {
-                var path = ""
+              function findPath(obj, searchValue, depth = Infinity) {
+                var path = "";
+                if (depth === 0) {// stop searching when depth reaches 0
+                  return path;
+                }
                 for (let key in obj) {
                   if (typeof obj[key] === "object") {
-                    if (Array.isArray(obj[key])) { // check if value is an array
+                    if (Array.isArray(obj[key])) {
                       for (let i = 0; i < obj[key].length; i++) { // search each item in array
-                        let result = findPath(obj[key][i], searchValue);
+                        let result = findPath(obj[key][i], searchValue, depth - 1); // decrement depth each time
                         if (result !== "") {
-                          // path = key + "[" + i + "]." + result;
                           path = key + "[" + i + "]";
                           return path;
                         }
                       }
                     } else { // search properties in object
-                      let result = findPath(obj[key], searchValue);
+                      let result = findPath(obj[key], searchValue, depth - 1);
                       if (result !== "") {
                         path = key + "." + result;
                         return path;
@@ -122,12 +125,13 @@ readLineCNSLE = function(cmd, cmd2){
                     return key;
                   }
                 }
-                return "";
-              } 
+                return path;
+              }
+              
               let path;
-              global.paths.push(findPath(global.data, cmd2))
+                                                        // Search depth
+              global.paths.push(findPath(global.data, cmd2, 999))
               global.data = BuildPath();
-              console.log('global.data 2::: ', global.data);
               try {
                     path = global.data.path;
                 } catch (error) {
@@ -158,9 +162,9 @@ readLineCNSLE = function(cmd, cmd2){
             startGame();
             break;
         case "q":
-            console.log("------------------");
-            console.log("| Shuting Down.. |")
-            console.log("------------------");
+            console.log("-----------");
+            console.log("|Shut down|");
+            console.log("-----------");
             process.exit(0)
             break;
         case "cls":
@@ -188,23 +192,22 @@ readLineCNSLE = function(cmd, cmd2){
 }
 
 function BuildPath() {
-    global.data = fs.readFileSync('files/file.json', 'utf8');
-    global.data = JSON.parse(global.data);
-  let data = global.data;
-  for (let i in global.paths) {
-    const path = global.paths[i];
-    console.log('global.paths[i]::: ', global.paths[i]);
-    data = _.get(data, path);
-    console.log('data, path::: ', data, "\n", path);
-    console.log('data::: ' + i , data);
-    console.log("\n");
-    if (data === undefined) {
-      console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is undefined");
-      break;
-    }
+    let i = 1;
+    let data = global.data;
+    // for (let i in global.paths) {
+      const path = global.paths[0];
+      data = _.get(data, path);
+      if (data === undefined) {
+          console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data);
+          global.data = fs.readFileSync('files/file.json', 'utf8');
+          global.data = JSON.parse(global.data);
+          data = global.data;
+        //   break;
+      }
+    // }
+    return data;
   }
-  return data;
-}
+  
 
   
   
