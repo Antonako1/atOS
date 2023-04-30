@@ -9,6 +9,11 @@ global.paths = []
 const moduleSNAKE = require("./snake.js");
 const startGame = moduleSNAKE.startGame;
 
+// Example
+const example = require("./example.js");
+const helloWorld = example.helloWorld;
+
+
 // String returned by readLineCNSLE()
 let returnValueReadLine = String();
 global.data = fs.readFileSync('files/file.json', 'utf8');
@@ -148,6 +153,9 @@ readLineCNSLE = function(cmd, cmd2){
             break;
         case "cls":
               console.clear();
+              break;
+        case "example":
+              console.log(helloWorld());
               break;
         default:
             if(cmd == ""){

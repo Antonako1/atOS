@@ -12,7 +12,7 @@ const moduleREMOVE= require("./src/remove.js");
 const remove = moduleREMOVE.remove;
 
 let fileType, fileName, fileData, fileToRead, result;
-// Start
+// Start and start animation
 console.log("Starting atOS");
 let count = 0;
 const intervalId = setInterval(() => {
@@ -42,10 +42,10 @@ Normal version of root, if it gets deleted
 }
 */
 
-
+// Import node readfile module
 const fs = require('fs');
 global.data = fs.readFileSync('files/file.json', 'utf8');
-  global.data = JSON.parse(global.data);
+global.data = JSON.parse(global.data);
 
 // Start new readline process
 const readline = require('readline').createInterface({
@@ -55,10 +55,9 @@ const readline = require('readline').createInterface({
 
 global.folder = global.root;
 // New input after previous one was done
-
 newInputCNSLE = function(){
   readline.question(global.rootText + " " , command => {
-    // Identify command
+    // Identify commands
     if(command.substring(0, 3) === "cd "){
       readLineCNSLE("cd ", command)
     }else{
