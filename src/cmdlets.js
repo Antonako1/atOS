@@ -46,9 +46,9 @@ readLineCNSLE = function(cmd, cmd2){
                     continue;
                     }
                     if (subfolder.filetype === "folder") {
-                        console.log(subfolder.name + "/ ")
+                        console.log("| " + subfolder.name + "/ ")
                     } else {
-                        console.log(subfolder.name + " ")
+                        console.log("| " + subfolder.name + " ")
                     }
                 }
             
