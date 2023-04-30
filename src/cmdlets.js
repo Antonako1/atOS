@@ -121,15 +121,15 @@ readLineCNSLE = function(cmd, cmd2){
                 }
                 return "";
               } 
+              let path;
               global.paths.push(findPath(global.data, cmd2))
               global.data = BuildPath();
-              let path;
-              
-                try {
-                path = global.data.path;
+              console.log('global.data 2::: ', global.data);
+              try {
+                    path = global.data.path;
                 } catch (error) {
                 console.log('An error occurred while accessing global.data.path:', error);
-                // Handle the error here
+                path = global.data;
                 }
 
 
@@ -182,14 +182,19 @@ readLineCNSLE = function(cmd, cmd2){
 }
 
 function BuildPath() {
+    global.data = fs.readFileSync('files/file.json', 'utf8');
+    global.data = JSON.parse(global.data);
   let data = global.data;
   for (let i in global.paths) {
     const path = global.paths[i];
-    prevData = data;
+    console.log('global.paths[i]::: ', global.paths[i]);
     data = _.get(data, path);
+    console.log('data, path::: ', data, "\n", path);
+    console.log('data::: ' + i , data);
+    console.log("\n");
     if (data === undefined) {
       console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is undefined");
-      return prevData;
+      break;
     }
   }
   return data;
