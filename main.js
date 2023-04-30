@@ -1,3 +1,12 @@
+/* 
+at Operating Systems develompents
+All rights reserved ©
+*/
+
+
+
+
+
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;

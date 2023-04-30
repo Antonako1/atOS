@@ -6,7 +6,7 @@ const height = 18;
 let board = [];
 let blocksArr = [];
 let intervalIds = [];
-let block = "◻";
+let tetris = "◻";
 let lastMove;
 
 // Defines spawnpoints
@@ -54,7 +54,8 @@ startGameTetris = function(){
 }
 
 spawnCube = function(){
-    board[blockY][blockX] = block;
+    board[blockY][blockX] = tetris;
+    blocksArr.push([blockY, blockX])
 }
 // Function that moves the pieces
 moveSquare = function(){
@@ -73,7 +74,7 @@ moveSquare = function(){
         }else{
             blockY += 1;
         }
-        board[blockY][blockX] = block;
+        board[blockY][blockX] = tetris;
         moveAnimation();
         drawGame();
 }
@@ -84,7 +85,7 @@ moveLEFT = function(){
     }else{
         blockX -= 1;
     }
-    board[blockY][blockX] = block;
+    board[blockY][blockX] = tetris;
     moveAnimation();
     drawGame();
 }
@@ -94,7 +95,7 @@ moveRIGHT = function(){
     }else{
         blockX += 1;
     }
-    board[blockY][blockX] = block;
+    board[blockY][blockX] = tetris;
     moveAnimation();
     drawGame();
 }
@@ -115,33 +116,9 @@ drawGame = function(){
 }
 
 moveAnimation = function(){
-    // for(let i = 0; i < snakeArea.length - snakeLength; i++){
-    //     if(snakeArea.length == 1) {
-    //         continue;
-    //     } else {
-    //         snakeArea.shift();
-    //     }
 
-    //     for(let row = 0; row < board.length; row++){
-    //         for(let col = 0; col < board[row].length; col++){
-    //             let piece = board[row][col];
-    //             if(piece === snake){
-    //                 let hasSnake = false;
-    //                 for(let k = 0; k < snakeArea.length; k++){
-    //                     let snakePiece = snakeArea[k];
-    //                     if(snakePiece[0] === row && snakePiece[1] === col){
-    //                         hasSnake = true;
-    //                         break;
-    //                     }
-    //                 }
-    //                 if(!hasSnake){
-    //                     board[row][col] = '◼';
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }
+
 
 
 
