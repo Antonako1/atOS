@@ -4,6 +4,7 @@
 const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris"];
 const fs = require('fs');
 const { isError } = require('underscore');
+const _ = require('lodash');
 // Different filetypes in .json files
 global.paths = []
 const moduleSNAKE = require("./snake.js");
@@ -92,6 +93,7 @@ readLineCNSLE = function(cmd, cmd2){
                   global.rootText = global.root + ">";  
               break;
         case "cd ":
+            
               cmd2 = cmd2.substring(3, cmd2.length)
               function findPath(obj, searchValue) {
                 var path = ""
@@ -120,11 +122,18 @@ readLineCNSLE = function(cmd, cmd2){
                 return "";
               } 
               global.paths.push(findPath(global.data, cmd2))
-              console.log('global.data 1::: ', global.data);
               global.data = BuildPath();
-              console.log('global.data 2::: ', global.data);
+              let path;
               
-              global.rootSecond = global.data.path
+                try {
+                path = global.data.path;
+                } catch (error) {
+                console.log('An error occurred while accessing global.data.path:', error);
+                // Handle the error here
+                }
+
+
+              global.rootSecond = path
               global.root = global.rootSecond
               global.rootText = global.root + ">";  
               break;
@@ -171,26 +180,23 @@ readLineCNSLE = function(cmd, cmd2){
         return returnValueReadLine;
     }
 }
+
 function BuildPath() {
-    let evalPath = "";
-    for (let i in global.paths) {
-        if (evalPath.length == 0) {
-            evalPath = String(global.paths[i])
-        } else {
-            evalPath += "." + String(global.paths[i])
-        }
-        console.log('global.paths[i]::: ', global.paths[i]);
+  let data = global.data;
+  for (let i in global.paths) {
+    const path = global.paths[i];
+    prevData = data;
+    data = _.get(data, path);
+    if (data === undefined) {
+      console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is undefined");
+      return prevData;
     }
-    console.log('global.paths::: ', global.paths);
-    console.log('evalPath::: ', evalPath);
-    console.log('"path eval:: ' + eval("global.data." + evalPath));
-    if (eval("global.data." + evalPath) == undefined) {
-        console.log("Error: global.data." + evalPath + " is undefined");
-    } else {
-        return eval("global.data." + evalPath);
-    }
-    
+  }
+  return data;
 }
+
+  
+  
 module.exports = {
     readLineCNSLE: readLineCNSLE
 };
