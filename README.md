@@ -10,3 +10,5 @@
  ### cd folderName: Moves to folder
  ### write: Creates textfile
  ### read: Reads textfile
+ ### snake: Opens a game of snake
+ ### tetris: Opens a game of tetris
