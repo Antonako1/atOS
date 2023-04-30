@@ -17,22 +17,40 @@
           "filedata": [
             "",
             {
-              "name": "testi",
-              "path": "root/Users/Default/testi/",
+              "name": "Moro",
+              "path": "root/Users/Default/Moro/",
               "filetype": "folder",
               "filedata": [
                 "",
                 {
-                  "name": "testi2",
-                  "path": "root/Users/Default/testi/testi2/",
+                  "name": "abs",
+                  "path": "root/Users/Default/Moro/abs/",
                   "filetype": "folder",
                   "filedata": [
                     "",
                     {
-                      "name": "lol.cr",
-                      "path": "root/Users/Default/testi/testi2/lol.cr",
-                      "filetype": "txt",
-                      "text": "oAlrmvaSk914?=(3_d=pisQ2+J+12Ap*~23a1"
+                      "name": "ag",
+                      "path": "root/Users/Default/Moro/abs/ag/",
+                      "filetype": "folder",
+                      "filedata": [
+                        "",
+                        {
+                          "name": "ag",
+                          "path": "root/Users/Default/Moro/abs/ag/ag/",
+                          "filetype": "folder",
+                          "filedata": [
+                            "",
+                            {
+                              "name": "bab",
+                              "path": "root/Users/Default/Moro/abs/ag/ag/bab/",
+                              "filetype": "folder",
+                              "filedata": [
+                                ""
+                              ]
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 }

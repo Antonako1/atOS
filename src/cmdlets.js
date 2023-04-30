@@ -95,21 +95,23 @@ readLineCNSLE = function(cmd, cmd2){
         case "cd ":
             
               cmd2 = cmd2.substring(3, cmd2.length)
-              function findPath(obj, searchValue) {
-                var path = ""
+              function findPath(obj, searchValue, depth = Infinity) {
+                var path = "";
+                if (depth === 0) {// stop searching when depth reaches 0
+                  return path;
+                }
                 for (let key in obj) {
                   if (typeof obj[key] === "object") {
-                    if (Array.isArray(obj[key])) { // check if value is an array
+                    if (Array.isArray(obj[key])) {
                       for (let i = 0; i < obj[key].length; i++) { // search each item in array
-                        let result = findPath(obj[key][i], searchValue);
+                        let result = findPath(obj[key][i], searchValue, depth - 1); // decrement depth each time
                         if (result !== "") {
-                          // path = key + "[" + i + "]." + result;
                           path = key + "[" + i + "]";
                           return path;
                         }
                       }
                     } else { // search properties in object
-                      let result = findPath(obj[key], searchValue);
+                      let result = findPath(obj[key], searchValue, depth - 1);
                       if (result !== "") {
                         path = key + "." + result;
                         return path;
@@ -119,10 +121,12 @@ readLineCNSLE = function(cmd, cmd2){
                     return key;
                   }
                 }
-                return "";
-              } 
+                return path;
+              }
+              
               let path;
-              global.paths.push(findPath(global.data, cmd2))
+                                                        // Search depth
+              global.paths.push(findPath(global.data, cmd2, 999))
               global.data = BuildPath();
               console.log('global.data 2::: ', global.data);
               try {
@@ -182,23 +186,27 @@ readLineCNSLE = function(cmd, cmd2){
 }
 
 function BuildPath() {
-  let data = global.data;
-  for (let i in global.paths) {
-    const path = global.paths[i];
-    console.log('global.paths[i]::: ', global.paths[i]);
-    data = _.get(data, path);
-    console.log('data, path::: ', data, "\n", path);
-    console.log('data::: ' + i , data);
-    console.log("\n");
-    if (data === undefined) {
-        console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is undefined");
-        global.data = fs.readFileSync('files/file.json', 'utf8');
-        global.data = JSON.parse(global.data);
-        break;
-    }
+    let i = 1;
+    let data = global.data;
+    // for (let i in global.paths) {
+        console.log('global.paths::: ', global.paths.length);
+      const path = global.paths[0];
+      console.log('global.paths[i]::: ', i , global.paths[0]);
+      data = _.get(data, path);
+      console.log('data, path::: ', data, " And ", path);
+      console.log('data::: ' + i , data);
+      console.log("\n");
+      if (data === undefined) {
+          console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data);
+          global.data = fs.readFileSync('files/file.json', 'utf8');
+          global.data = JSON.parse(global.data);
+          data = global.data;
+        //   break;
+      }
+    // }
+    return data;
   }
-  return data;
-}
+  
 
   
   
