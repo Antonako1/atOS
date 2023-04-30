@@ -105,8 +105,6 @@ newFile = function(currentCMD){
               }else if(question === "n" || question === "no"){
                 writeData(fileType, fileName, fileData, currentCMD, false);
                 readLineCNSLE("cd..")
-                console.log(" GLOVAL ROOT: " + global.root);
-                console.log(" GLOVAL ROOT 2 : " + global.rootSecond);
                 readLineCNSLE("cd " + fileName)
                 newInputCNSLE();
               }

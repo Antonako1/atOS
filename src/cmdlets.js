@@ -128,7 +128,6 @@ readLineCNSLE = function(cmd, cmd2){
                                                         // Search depth
               global.paths.push(findPath(global.data, cmd2, 999))
               global.data = BuildPath();
-              console.log('global.data 2::: ', global.data);
               try {
                     path = global.data.path;
                 } catch (error) {
@@ -189,13 +188,8 @@ function BuildPath() {
     let i = 1;
     let data = global.data;
     // for (let i in global.paths) {
-        console.log('global.paths::: ', global.paths.length);
       const path = global.paths[0];
-      console.log('global.paths[i]::: ', i , global.paths[0]);
       data = _.get(data, path);
-      console.log('data, path::: ', data, " And ", path);
-      console.log('data::: ' + i , data);
-      console.log("\n");
       if (data === undefined) {
           console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data);
           global.data = fs.readFileSync('files/file.json', 'utf8');

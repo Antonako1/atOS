@@ -15,47 +15,7 @@
           "path": "root/Users/Default/",
           "filetype": "folder",
           "filedata": [
-            "",
-            {
-              "name": "Moro",
-              "path": "root/Users/Default/Moro/",
-              "filetype": "folder",
-              "filedata": [
-                "",
-                {
-                  "name": "abs",
-                  "path": "root/Users/Default/Moro/abs/",
-                  "filetype": "folder",
-                  "filedata": [
-                    "",
-                    {
-                      "name": "ag",
-                      "path": "root/Users/Default/Moro/abs/ag/",
-                      "filetype": "folder",
-                      "filedata": [
-                        "",
-                        {
-                          "name": "ag",
-                          "path": "root/Users/Default/Moro/abs/ag/ag/",
-                          "filetype": "folder",
-                          "filedata": [
-                            "",
-                            {
-                              "name": "bab",
-                              "path": "root/Users/Default/Moro/abs/ag/ag/bab/",
-                              "filetype": "folder",
-                              "filedata": [
-                                ""
-                              ]
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+            ""
           ]
         }
       ]
