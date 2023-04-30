@@ -229,11 +229,11 @@ checkDead = function(y, x){
     let coords = [y, x];
     for (let i = 0; i < snakeArea.length; i++) {
         if (snakeArea[i][0] === coords[0] && snakeArea[i][1] === coords[1]) {
-            console.log("You died with " + snakeLength + " apples eaten");
             intervalIds.forEach(id => clearInterval(id));
             // clear the array
             intervalIds = [];
             setTimeout(() => {
+                console.log("You died with " + snakeLength + " apple(s) eaten");
                 console.log(global.rootText + " ");
             }, 200);
             return true;
