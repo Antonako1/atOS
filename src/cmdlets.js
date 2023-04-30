@@ -1,7 +1,7 @@
 
 
 // All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date", "snake", "q"];
+const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris"];
 const fs = require('fs');
 const { isError } = require('underscore');
 // Different filetypes in .json files
@@ -156,6 +156,9 @@ readLineCNSLE = function(cmd, cmd2){
               break;
         case "example":
               console.log(helloWorld());
+              break;
+        case "tetris":
+              // call
               break;
         default:
             if(cmd == ""){

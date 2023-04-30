@@ -144,7 +144,7 @@ newFile = function(currentCMD){
   
   
 
-// In start, start console
+// On start, start console
 newInputCNSLE();
 a = function(){newInputCNSLE}
 module.exports = {
