@@ -35,6 +35,7 @@ readLineCNSLE = function(cmd, cmd2){
         returnValueReadLine = cmdlets;
         break;
         case "ls":
+        returnValueReadLine = "";
             function checkInsideFolder(json, path) {
                 if (json.path === path) {
                 for (let i = 0; i < json.filedata.length; i++) {
@@ -43,9 +44,9 @@ readLineCNSLE = function(cmd, cmd2){
                     continue;
                     }
                     if (subfolder.filetype === "folder") {
-                    console.log(subfolder.name + "/");
+                    returnValueReadLine += subfolder.name + "/ ";
                     } else {
-                    console.log(subfolder.name);
+                    returnValueReadLine += subfolder.name + " ";
                     }
                 }
             
@@ -158,9 +159,9 @@ readLineCNSLE = function(cmd, cmd2){
             startGame();
             break;
         case "q":
-            console.log("------------------");
-            console.log("|Shut down code 0|")
-            console.log("------------------");
+            console.log("-----------");
+            console.log("|Shut down|");
+            console.log("-----------");
             process.exit(0)
             break;
         case "cls":
