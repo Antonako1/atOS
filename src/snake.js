@@ -11,8 +11,8 @@ let apple = "()";
 let snakeLength = 1;
 let snakeX = 10;
 let snakeY = 5;
-let intervalIds = [];
-let lastMove = null;
+let intervalIds1 = [];
+let lastMoveSnake = null;
 startGame = function(){
 // ◻   
 // Initialize snake
@@ -30,18 +30,18 @@ displayBoard();
 
     readline.emitKeypressEvents(process.stdin);
     process.stdin.setRawMode(true);
-    lastMove = "up";
+    lastMoveSnake = "up";
     const listener = process.stdin.on('keypress', (str, key) => {
         if (key.name === 'up') {
-          lastMove = "up";
+          lastMoveSnake = "up";
         } else if (key.name === 'down') {
           
-          lastMove = "down";
+          lastMoveSnake = "down";
         } else if (key.name === 'left') {
           
-          lastMove = "left";
+          lastMoveSnake = "left";
         } else if (key.name === 'right') {
-          lastMove = "right";
+          lastMoveSnake = "right";
         }else if(key.name === "q"){
             process.stdin.pause();
         }
@@ -50,7 +50,7 @@ displayBoard();
       moveSquare();
 
     }, 300);
-    intervalIds.push(moving);
+    intervalIds1.push(moving);
     let spawnFrequency = 3000; // Initial spawn frequency
     let intervalApple = setInterval(() => {
         spawnApples();
@@ -69,12 +69,12 @@ displayBoard();
             spawnFrequency = 250;
         }
     }, spawnFrequency);
-    intervalIds.push(intervalApple);
+    intervalIds1.push(intervalApple);
       
     
 }
 moveSquare = function(){
-    switch(lastMove) {
+    switch(lastMoveSnake) {
         case "up":
             moveUP();
             break;
@@ -236,9 +236,9 @@ checkDead = function(y, x){
     let coords = [y, x];
     for (let i = 0; i < snakeArea.length; i++) {
         if (snakeArea[i][0] === coords[0] && snakeArea[i][1] === coords[1]) {
-            intervalIds.forEach(id => clearInterval(id));
+            intervalIds1.forEach(id => clearInterval(id));
             // clear the array
-            intervalIds = [];
+            intervalIds1 = [];
             setTimeout(() => {
                 console.log("You died with " + snakeLength + " apple(s) eaten");
                 console.log(global.rootText + " ");
