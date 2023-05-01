@@ -13,7 +13,9 @@ global.paths = []
 
 // const tetris = require("./tetris.js");
 // const startGameTetris = tetris.startGameTetris;
-const { startGameTetris } = require('./tetris/tetris.js');
+const tetris = require("./tetris/tetris.js");
+const startGameTetris = tetris.startGameTetris;
+// const { startGameTetris } = require('./tetris/tetris.js');
 
 
 

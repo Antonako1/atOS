@@ -44,7 +44,7 @@ reset = function(){
 
 spawnCube = function(x){
     // Define array of different domino types
-    const dominoTypes = [straightDomino /*, squareDomino, tDomino, jDomino, lDomino, sDomino, zDomino*/];
+    const dominoTypes = [straightDomino , squareDomino, tDomino, jDomino, lDomino, sDomino, zDomino];
     
     // Shuffle the array using Fisher-Yates algorithm
     for (let i = dominoTypes.length - 1; i > 0; i--) {
@@ -481,7 +481,7 @@ startGameTetris = function(){
     }, 300);
     intervalIds.push(moving);
 }
-// startGameTetris();
+startGameTetris();
 module.exports = {
     startGameTetris: startGameTetris
 };
