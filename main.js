@@ -58,6 +58,12 @@ global.folder = global.root;
 newInputCNSLE = function(){
   readline.question(global.rootText + " " , command => {
     // Identify commands
+    if(command === "timer"){
+      readline.question("Set timer for x min:  ",  time => {
+        console.log(timerMain(time));
+      })
+      return;
+    }
     if(command.substring(0, 3) === "cd "){
       readLineCNSLE("cd ", command)
     }else{
@@ -66,7 +72,7 @@ newInputCNSLE = function(){
     if(result == undefined){}else{
       console.log(result);
     }
-    if(command === "rmv"){
+    if(command === "rmv" || command === "del"){
       readline.question("File to be deleted: ", file => {
         console.log(remove(file));
         newInputCNSLE();

@@ -1,7 +1,7 @@
 
 
 // All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris"];
+const cmdlets = ["help", "ls", "mkdir", "cls", "rmv / del", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris", "timer"];
 const fs = require('fs');
 const _ = require('lodash');
 // Different filetypes in .json files
@@ -157,10 +157,12 @@ readLineCNSLE = function(cmd, cmd2){
             returnValueReadLine = "";
             returnValueReadLine = "Current path is: " + global.root;
             break;
-        case "rmv":  
+        case "rmv" || "del":  
             global.rootSecond = "root/" 
             global.root = "root/";
             global.rootText = "root/" + ">";
+            global.data = fs.readFileSync('files/file.json', 'utf8');
+            global.data = JSON.parse(global.data);
             returnValueReadLine = "";
               break;
         case "date":
