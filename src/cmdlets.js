@@ -11,8 +11,11 @@ global.paths = []
 // const moduleTETRIS = require("./runTetris.js");
 // const runTetris = moduleTETRIS.runTetris;
 
-const moduleTETRIS = require("./tetris/tetris.js");
-const startGameTetris = moduleTETRIS.startGameTetris;
+// const tetris = require("./tetris.js");
+// const startGameTetris = tetris.startGameTetris;
+const { startGameTetris } = require('./tetris/tetris.js');
+
+
 
 const moduleSnake = require("./runSnake");
 const runSnake = moduleSnake.runSnake;

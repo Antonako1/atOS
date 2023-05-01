@@ -9,7 +9,11 @@
   "author": "koltti",
   "license": "ISC",
   "dependencies": {
+    "chalk": "^5.2.0",
+    "colors": "^1.4.0",
+    "kleur": "^4.1.5",
     "lodash": "^4.17.21",
+    "play-sound": "^1.1.5",
     "underscore": "^1.13.6"
   }
 }
