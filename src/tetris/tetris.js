@@ -1,7 +1,6 @@
 // Import readline
 const readline = require('readline');
 const kleur = require('kleur');
-console.log(kleur.red('Hello, world!'));
 let kerroin = 0;
 // Define global variables
 const twidth = 18;
@@ -482,7 +481,7 @@ startGameTetris = function(){
     }, 300);
     intervalIds.push(moving);
 }
-startGameTetris();
+// startGameTetris();
 module.exports = {
     startGameTetris: startGameTetris
 };
