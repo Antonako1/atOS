@@ -163,9 +163,9 @@ displayBoard = function(){
     for(let i = 0; i < height; i++) {
         for(let j = 0; j < width; j++) {
             if (i === 0 || i === height - 1) {
-                process.stdout.write('_');
+                process.stdout.write('═');
             } else if (j === 0 || j === width - 1) {
-                process.stdout.write('|');
+                process.stdout.write('║');
             } else {
                 process.stdout.write(board[i][j]);
             }
