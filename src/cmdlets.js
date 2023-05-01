@@ -8,8 +8,12 @@ const _ = require('lodash');
 global.paths = []
 
 
-const moduleTETRIS = require("./tetris.js");
+// const moduleTETRIS = require("./runTetris.js");
+// const runTetris = moduleTETRIS.runTetris;
+
+const moduleTETRIS = require("./tetris/tetris.js");
 const startGameTetris = moduleTETRIS.startGameTetris;
+
 const moduleSnake = require("./runSnake");
 const runSnake = moduleSnake.runSnake;
 // Example
