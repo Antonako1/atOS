@@ -3,15 +3,15 @@
 // All different commands
 const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris"];
 const fs = require('fs');
-const { isError } = require('underscore');
 const _ = require('lodash');
 // Different filetypes in .json files
 global.paths = []
-const moduleSNAKE = require("./snake.js");
-const startGame = moduleSNAKE.startGame;
+
+
 const moduleTETRIS = require("./tetris.js");
 const startGameTetris = moduleTETRIS.startGameTetris;
-
+const moduleSnake = require("./runSnake");
+const runSnake = moduleSnake.runSnake;
 // Example
 const example = require("./example.js");
 const helloWorld = example.helloWorld;
@@ -169,7 +169,7 @@ readLineCNSLE = function(cmd, cmd2){
               break;
         case "snake":
             // If not working in cmd, use powershell
-            startGame();
+            runSnake();
             break;
         case "q":
             console.log("-----------");

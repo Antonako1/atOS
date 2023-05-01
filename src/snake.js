@@ -6,20 +6,20 @@ const height = 10;
 let board = [];
 let snakeArea = [];
 let apples = [];
-let snake = "◻"; 
-let apple = "Ó";
+let snake = "[]"; 
+let apple = "()";
 let snakeLength = 1;
 let snakeX = 10;
 let snakeY = 5;
 let intervalIds = [];
 let lastMove = null;
 startGame = function(){
-// ◻ ◼
+// ◻   
 // Initialize snake
 
 // Set up the game board
 for(let i = 0; i < height; i++) {
-    board[i] = Array(width).fill('◼');
+    board[i] = Array(width).fill('  ');
 }
 
 // Define the initial position of the snake
@@ -154,7 +154,7 @@ moveRIGHT = function(){
 }
 
 displayBoard = function(){
-    console.clear()
+    console.clear();
     console.log("Move using arrow keys");
 
     // Set interval to spawn apples
@@ -162,24 +162,31 @@ displayBoard = function(){
     // Display the game board
     for(let i = 0; i < height; i++) {
         for(let j = 0; j < width; j++) {
-            process.stdout.write(board[i][j]);
+            if (i === 0 || i === height - 1) {
+                process.stdout.write('_');
+            } else if (j === 0 || j === width - 1) {
+                process.stdout.write('|');
+            } else {
+                process.stdout.write(board[i][j]);
+            }
         }
         process.stdout.write('\n');
     }
 }
+
 ateApple = function(y, x){
     let coords = [y, x];
     for (let i = 0; i < apples.length; i++) {
         if (apples[i][0] === coords[0] && apples[i][1] === coords[1]) {
             snakeLength++;
             apples.splice(i, 0)
-            // board[apples[i][0]][apples[i][1]] = '◼';
+            // board[apples[i][0]][apples[i][1]] = '  ';
             return true;
         }
     }
     return false;
-} // ◻ ◼
-// Removes non-existent $snake pieces and replaces them with ◼
+} // ◻   
+// Removes non-existent $snake pieces and replaces them with   
 checkLength = function(){
     for(let i = 0; i < snakeArea.length - snakeLength; i++){
         if(snakeArea.length == 1) {
@@ -201,7 +208,7 @@ checkLength = function(){
                         }
                     }
                     if(!hasSnake){
-                        board[row][col] = '◼';
+                        board[row][col] = '  ';
                     }
                 }
             }
