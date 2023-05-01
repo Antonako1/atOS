@@ -7,17 +7,8 @@ const _ = require('lodash');
 // Different filetypes in .json files
 global.paths = []
 
-
-// const moduleTETRIS = require("./runTetris.js");
-// const runTetris = moduleTETRIS.runTetris;
-
-// const tetris = require("./tetris.js");
-// const startGameTetris = tetris.startGameTetris;
 const tetris = require("./tetris/tetris.js");
 const startGameTetris = tetris.startGameTetris;
-// const { startGameTetris } = require('./tetris/tetris.js');
-
-
 
 const moduleSnake = require("./runSnake");
 const runSnake = moduleSnake.runSnake;
@@ -198,7 +189,8 @@ readLineCNSLE = function(cmd, cmd2){
 
               break;
         case "tetris":
-            // If not working in cmd, use powershell
+                console.clear();
+            // If not working, use node and add startGameTetris(); to the tetris.js file bottom
             startGameTetris();
             returnValueReadLine = "";
 

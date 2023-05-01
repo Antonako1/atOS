@@ -1,10 +1,11 @@
 // Import readline
 const readline = require('readline');
-const kleur = require('kleur');
-let kerroin = 0;
+// play audio file
+
+
 // Define global variables
 const twidth = 18;
-const theight = 22;
+const theight = 35;
 const nextPieceWidth = 18;
 const nextPieceHeight = 8;
 let nextPieceBoard = [];
@@ -21,15 +22,8 @@ let points = 0;
 
 // Defines spawnpoints
 let blockY = 0;
-let blockX = 10;
+let blockX = 7;
 
-let iPiece = false;
-let oPiece = false;
-let tPiece = false;
-let jPiece = false;
-let lPiece = false;
-let sPiece = false;
-let zPiece = false;
 
 reset = function(){
     iPiece = false;
@@ -169,44 +163,24 @@ moveSquare = function(){
             moveRightTetris();
             break;
         case "faster":
-            movePiece();
+            movePiece(3);
             lastMove = "";
             break;
     }
     movePiece();
 }
-movePiece = function(){
+movePiece = function(x){
     // move the tetris piece down
-    if(blockY + 1 == 22){
+    if(blockY + x == 35){
         
     } else {
         // move the piece down one row
-        blockY += 1;
+        blockY += x;
         for(let i = 0; i < blocksArrActive.length; i++){
             blocksArrActive[i][0] += 1;
         }
         moveAnimation();
         drawGame();
-    }
-}
-checkCurrentPiece = function(par){
-    if (iPiece == true) {
-    } else if(oPiece == true) {
-    } else if(tPiece == true) {
-        // tDomino();
-
-    } else if(jPiece == true) {
-        // jDomino();
-
-    } else if(lPiece == true) {
-        // lDomino();        
-
-    } else if(sPiece == true) {
-        // sDomino();
-
-    } else if(zPiece == true) {
-        // zDomino();
-
     }
 }
 checkLegalLeft = function(){
@@ -315,44 +289,46 @@ rotate = function(){
 }
 drawGame = function(){
     console.clear();
-
     // Draw top box
-    console.log('╔' + '═'.repeat(twidth * 2 - 1)+ '═' + '╗');
+    let topBox = '╔' + '═'.repeat(twidth * 2 - 1)+ '═' + '╗';
+    let pointsLine = '║ Points: ' + points + ' '.repeat(twidth * 2 - 12 - points.toString().length) + '   ║';
+    let nextPieceBox = '';
     for (let k = 0; k < nextPieceHeight; k++) {
-        process.stdout.write('║');
+        nextPieceBox += '║';
         for (let m = 0; m < nextPieceWidth; m++) {
-            if(k < 1 && m <1){
-                process.stdout.write("Points: " + points)
-            }else{
-                process.stdout.write(nextPieceBoard[k][m]);            
-            }
+            nextPieceBox += nextPieceBoard[k][m];
         }
-        process.stdout.write('║\n');
+        nextPieceBox += '║\n';
     }
-    process.stdout.write('║                                    ║'); 
-    console.log();
-    // Display the top border
-    console.log('╠' + '═'.repeat(twidth * 2 - 1)+ '═' + '╣');
+    let topBorder = '╠' + '═'.repeat(twidth * 2 - 1)+ '═' + '╣';
     
     // Display the game boardTetris
+    let board = '';
     for(let i = 0; i < theight; i++) {
-        process.stdout.write('║');
+        board += '║';
         for(let j = 0; j < twidth; j++) {
-            process.stdout.write(boardTetris[i][j]);
+            board += boardTetris[i][j];
         }
-        process.stdout.write('║\n');
+        board += '║\n';
     }
     
     // Display the bottom border
-    console.log('╚' + '═'.repeat(twidth * 2 - 1) + '═'+ '╝');
+    let bottomBorder = '╚' + '═'.repeat(twidth * 2 - 1) + '═'+ '╝';
     
-    console.log("Move using arrow keys, Up arrow rotes");
+    // Print everything in its correct position
+    process.stdout.write(topBox + '\n');
+    process.stdout.write(pointsLine + '\n');
+    process.stdout.write(nextPieceBox);
+    process.stdout.write('║' + ' '.repeat(twidth * 2 - 36) + '║\n');
+    process.stdout.write(topBorder + '\n');
+    process.stdout.write(board);
+    process.stdout.write(bottomBorder + '\n');
+    
+    console.log("Move using arrow keys, Up arrow rotates");
     console.log("Down arrow makes piece move quicker");
     console.log("\n");
-    console.log("Press q to quit");
+    console.log("Press e to quit");
 }
-
-
 moveAnimation = function(){
     // First, clear the boardTetris of all tetris pieces
     for(let i = 0; i < theight; i++) {
@@ -362,12 +338,12 @@ moveAnimation = function(){
           }
         }
       }
-      
+      checkFail();
       // Then, draw the new position of the tetris pieces
       for(let i = 0; i < blocksArrActive.length; i++){
         let row = blocksArrActive[i][0];
         let col = blocksArrActive[i][1];
-        if(row == 21 || checkHitbox() == true){
+        if(row == 34 || checkHitbox() == true){
             // the piece has reached the bottom, spawn a new piece
             for(let k = 0; k < blocksArrActive.length; k++){
                 blocksArr.push(blocksArrActive[k])
@@ -388,18 +364,37 @@ moveAnimation = function(){
         for(let i = 0; i < blocksArr.length; i++){
             let row = blocksArr[i][0];
             let col = blocksArr[i][1];
-            if(row == 22){}else{
+            if(row == 35){}else{
+
                 boardTetris[row][col] = tetris;
             }
         }
     }
+    checkFail();
     checkForTetris();
 }
+let clearedRows = 0;
+
 checkForTetris = function(){
+    let newClearedRows = 0;
     for (let i = 0; i < theight; i++) {
         if (boardTetris[i].every((element) => element === tetris)) {
             boardTetris.splice(i, 1);
             boardTetris.unshift(new Array(twidth).fill("  "));
+            newClearedRows++;
+        }
+    }
+    if (newClearedRows > clearedRows) {
+        points += 500 * (newClearedRows - clearedRows);
+        clearedRows = newClearedRows;
+    }
+}
+
+checkFail = function(){
+    for (let j = 0; j < blocksArrActive.length; j++) {
+        if(blocksArrActive[j][0] >= 35){
+            pauseGame();
+            break;
         }
     }
 }
@@ -429,7 +424,6 @@ checkHitbox = function(){
   
 
 startGameTetris = function(){
-    
     console.log("Starting game");
 
     for(let i = 0; i<nextPieceHeight; i++){
@@ -440,16 +434,6 @@ startGameTetris = function(){
     for(let i = 0; i < theight; i++) {
         boardTetris[i] = Array(twidth).fill('  ');
     }
-      
-    // Define array of different domino types
-    const dominoTypes = [straightDomino, squareDomino, tDomino, jDomino, lDomino, sDomino, zDomino];
-    
-    // Shuffle the array using Fisher-Yates algorithm
-    for (let i = dominoTypes.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [dominoTypes[i], dominoTypes[j]] = [dominoTypes[j], dominoTypes[i]];
-    }
-    
     // Spawn the first element in the shuffled array
     spawnCube();
 
@@ -469,20 +453,25 @@ startGameTetris = function(){
             lastMove = "left";
         } else if (key.name === 'right') {
             lastMove = "right";
-        }else if(key.name === "q"){
-            intervalIds.forEach(id => clearInterval(id));
-            // clear the array
-            intervalIds = [];
-            process.stdin.pause();
+        }else if(key.name === "e"){
+            pauseGame();
         }
     });
     let moving = setInterval(() => {
-      moveSquare();
-    }, 300);
-    intervalIds.push(moving);
+        moveSquare(1);
+    }, 150);
+    intervalIds.push(moving);    
 }
-startGameTetris();
+// startGameTetris();
 module.exports = {
     startGameTetris: startGameTetris
 };
   
+pauseGame = function(){
+    intervalIds.forEach(id => clearInterval(id));
+    // clear the array
+    intervalIds = [];
+    setTimeout(() => {
+        console.log("Game over. " +points + " points");
+    }, 500);
+}
