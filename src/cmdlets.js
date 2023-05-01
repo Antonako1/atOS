@@ -1,7 +1,7 @@
 
 
 // All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv / del", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris", "timer"];
+const cmdlets = ["help", "ls", "mkdir", "cls", "rmv / del", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris", "timer", "timer check"];
 const fs = require('fs');
 const _ = require('lodash');
 // Different filetypes in .json files

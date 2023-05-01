@@ -20,6 +20,10 @@ const readData = moduleREADDATA.readData;
 const moduleREMOVE= require("./src/remove.js");
 const remove = moduleREMOVE.remove;
 
+const moduleTimer= require("./src/timer/timer.js");
+const timerMain = moduleTimer.timerMain;
+const checkTimer = moduleTimer.checkTimer;
+
 let fileType, fileName, fileData, fileToRead, result;
 // start
 console.clear();
@@ -59,9 +63,14 @@ newInputCNSLE = function(){
   readline.question(global.rootText + " " , command => {
     // Identify commands
     if(command === "timer"){
-      readline.question("Set timer for x min:  ",  time => {
-        console.log(timerMain(time));
+      readline.question("Set timer for x minutes:  ",  time => {
+        timerMain(time);
+        newInputCNSLE();
       })
+      return;
+    }else if(command === "timer check"){
+      checkTimer();
+      newInputCNSLE()
       return;
     }
     if(command.substring(0, 3) === "cd "){
