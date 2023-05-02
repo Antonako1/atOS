@@ -10,5 +10,8 @@
  ### cd folderName: Moves to folder
  ### write: Creates textfile
  ### read: Reads textfile
+ ### decrypt: Reads crypted textfile
+ ### timer: Sets up timer
+ ### timer check: Checks when timer is ready
  ### snake: Opens a game of snake
  ### tetris: Opens a game of tetris
