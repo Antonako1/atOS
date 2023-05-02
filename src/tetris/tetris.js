@@ -462,7 +462,7 @@ startGameTetris = function(){
     }, 150);
     intervalIds.push(moving);    
 }
-// startGameTetris();
+startGameTetris();
 module.exports = {
     startGameTetris: startGameTetris
 };
