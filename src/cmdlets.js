@@ -199,6 +199,8 @@ readLineCNSLE = function(cmd, cmd2){
               break;
         case "decrypt":
                 break;
+        case "find":
+                break;
         default:
             if(cmd == ""){
             }else{

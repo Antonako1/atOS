@@ -6,7 +6,7 @@ All rights reserved ©
 
 
 
-// todo decrypt ja read erikseen
+// todo fix "cd "
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;
@@ -19,6 +19,9 @@ const readData = moduleREADDATA.readData;
 
 const moduleREMOVE= require("./src/remove.js");
 const remove = moduleREMOVE.remove;
+
+const moduleFind= require("./src/findItem.js");
+const findItemMain = moduleFind.findItemMain;
 
 const moduleDecrypt= require("./src/decryptData.js");
 const decryptData = moduleDecrypt.decryptData;
@@ -89,6 +92,13 @@ newInputCNSLE = function(){
         console.log(remove(file));
         newInputCNSLE();
       })
+      return;
+    }
+    if(command === "find"){
+      readline.question(`File to find: `, fileToFind => {
+        console.log(findItemMain(fileToFind));
+        newInputCNSLE();
+      });
       return;
     }
     // Checks if it makes new file
