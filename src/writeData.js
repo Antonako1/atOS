@@ -21,9 +21,6 @@ if(crntCMD === "mkdir"){
   // crypt things
   if(crypt == true){
     fileData = atKrypt(fileData, 1)
-    fileName = fileName + ".cr"
-  }else{
-    fileName = fileName + ".txt"
   }
   objecti = {
     name: fileName,

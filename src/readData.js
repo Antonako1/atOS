@@ -1,14 +1,10 @@
 const fs = require('fs');
-const moduleATKRYPT= require("./AT-Krypt");
-const atDekrypt = moduleATKRYPT.atDekrypt;
+
 
 readData = function(fileName){
   let currentLocation = global.data;
   let text = readTextByName(fileName, currentLocation);
-  
-  if(fileName.includes(".cr")){
-    text = atDekrypt(text);
-  }
+
   return text;
 }
 

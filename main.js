@@ -6,7 +6,7 @@ All rights reserved ©
 
 
 
-
+// todo decrypt ja read erikseen
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;
@@ -19,6 +19,9 @@ const readData = moduleREADDATA.readData;
 
 const moduleREMOVE= require("./src/remove.js");
 const remove = moduleREMOVE.remove;
+
+const moduleDecrypt= require("./src/decryptData.js");
+const decryptData = moduleDecrypt.decryptData;
 
 const moduleTimer= require("./src/timer/timer.js");
 const timerMain = moduleTimer.timerMain;
@@ -89,7 +92,7 @@ newInputCNSLE = function(){
       return;
     }
     // Checks if it makes new file
-    newFile(command)
+    newFile(command);
     if(command === "read"){
       readline.question(`Filename: `, fileToRead => {
         console.log(readData(fileToRead));
@@ -97,6 +100,13 @@ newInputCNSLE = function(){
       });
       return;
     }
+    if(command === "decrypt"){
+        readline.question(`Filename: `, fileToRead => {
+          console.log(decryptData(fileToRead));
+          newInputCNSLE();
+        });
+        return;
+      }
     newInputCNSLE();
   });
 }

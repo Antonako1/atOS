@@ -27,16 +27,16 @@
       "filedata": [
         "",
         {
-          "name": "Notes.cr",
-          "path": "root/Documents/Notes.cr",
+          "name": "Notes",
+          "path": "root/Documents/Notes",
           "filetype": "txt",
           "text": ")\"!JFAPvam*)2#dfbo%0AbfgSAm,0oad+STR_O%0AbfgSAm,0^sdaG=A!kd)4mcakI1"
         }
       ]
     },
     {
-      "name": "test.txt",
-      "path": "root/test.txt",
+      "name": "test",
+      "path": "root/test",
       "filetype": "txt",
       "text": "test"
     }

@@ -1,14 +1,14 @@
 
 
 // All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv / del", "write", "path", "find", "cd", "read", "search", "date", "snake", "q", "tetris", "timer", "timer check"];
+const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "decrypt", "find", "date", "snake", "q", "tetris", "timer", "timer check"];
 const fs = require('fs');
 const _ = require('lodash');
 // Different filetypes in .json files
 global.paths = []
 
-const tetris = require("./tetris/tetris.js");
-const startGameTetris = tetris.startGameTetris;
+// const tetris = require("./tetris/tetris.js");
+// const startGameTetris = tetris.startGameTetris;
 
 const moduleSnake = require("./runSnake");
 const runSnake = moduleSnake.runSnake;
@@ -191,12 +191,14 @@ readLineCNSLE = function(cmd, cmd2){
 
               break;
         case "tetris":
-                console.clear();
+            // console.clear();
             // If not working, use node and add startGameTetris(); to the tetris.js file bottom
-            startGameTetris();
-            returnValueReadLine = "";
+            // startGameTetris();
+            console.log("Tetris not working, run it using node instead");
 
               break;
+        case "decrypt":
+                break;
         default:
             if(cmd == ""){
             }else{
