@@ -4,7 +4,7 @@ decryptData = function(name){
     let currentLocation = global.data;
     let text = readTextByName1(name, currentLocation);
     text = atDekrypt(text);
-    return text;
+    return "| "+text;
   }
   
   function readTextByName1(name, location) {
@@ -14,7 +14,7 @@ decryptData = function(name){
         if (item.filetype == "txt") {
           return item.text;
         } else {
-          throw new Error("Item is not a text file or it was not found");
+          throw new Error("|| Item is not a text file or it was not found");
         }
       } else if (item && item.filetype == "folder") {
         let result = readTextByName1(name, item);

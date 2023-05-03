@@ -4,7 +4,7 @@ readData = function(fileName){
   let currentLocation = global.data;
   let text = readTextByName(fileName, currentLocation);
 
-  return text;
+  return "| "+text;
 }
 
 function readTextByName(name, location) {

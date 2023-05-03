@@ -31,6 +31,26 @@
           "text": ")\"!JFAPvam*)2#dfbo%0AbfgSAm,0oad+STR_O%0AbfgSAm,0^sdaG=A!kd)4mcakI1"
         }
       ]
+    },
+    {
+      "name": "1",
+      "path": "root/1/",
+      "filetype": "folder",
+      "filedata": [
+        {
+          "name": "2",
+          "path": "root/1/2/",
+          "filetype": "folder",
+          "filedata": [
+            {
+              "name": "test",
+              "path": "root/1/2/test",
+              "filetype": "txt",
+              "text": "qQfos4%%#13aT5_Dya:77%qaKHjxj_Dya:lafDs($1"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

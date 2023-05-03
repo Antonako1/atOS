@@ -54,7 +54,7 @@ readLineCNSLE = function(cmd, cmd2){
             
                 // Check if a new file was created in this folder
                 if (global.newFileName && global.newFileFolder === json.path) {
-                    console.log(global.newFileName);
+                    console.log("| "+global.newFileName);
                 }
                 } else {
                 for (let i = 0; i < json.filedata.length; i++) {
@@ -75,8 +75,8 @@ readLineCNSLE = function(cmd, cmd2){
             returnValueReadLine = "";
             break;
         case "cd":
-        global.data = fs.readFileSync('files/file.json', 'utf8');
-                global.data = JSON.parse(global.data);
+            global.data = fs.readFileSync('files/file.json', 'utf8');
+            global.data = JSON.parse(global.data);
             global.rootSecond = "root/" 
             global.root = "root/";
             global.rootText = "root/" + ">";
@@ -135,12 +135,13 @@ readLineCNSLE = function(cmd, cmd2){
               
               let path;
                                                         // Search depth
-              global.paths.push(findPath(global.data, cmd2, 999))
+              global.paths.push(findPath(global.data, cmd2))
               global.data = BuildPath();
+              console.log('global.data::: ', global.data);
               try {
                     path = global.data.path;
                 } catch (error) {
-                console.log('An error occurred while accessing global.data.path:', error);
+                console.log('|| An error occurred while accessing global.data.path:', error);
                 path = global.data;
                 }
 
@@ -155,14 +156,9 @@ readLineCNSLE = function(cmd, cmd2){
             break;
         case "path":
             returnValueReadLine = "";
-            returnValueReadLine = "Current path is: " + global.root;
+            returnValueReadLine = "| Current path is: " + global.root;
             break;
         case "rmv" || "del":  
-            global.rootSecond = "root/" 
-            global.root = "root/";
-            global.rootText = "root/" + ">";
-            global.data = fs.readFileSync('files/file.json', 'utf8');
-            global.data = JSON.parse(global.data);
             returnValueReadLine = "";
               break;
         case "date":
@@ -186,7 +182,7 @@ readLineCNSLE = function(cmd, cmd2){
 
               break;
         case "example":
-              console.log(helloWorld());
+              console.log("| "+helloWorld());
               returnValueReadLine = "";
 
               break;
@@ -194,7 +190,7 @@ readLineCNSLE = function(cmd, cmd2){
             // console.clear();
             // If not working, use node and add startGameTetris(); to the tetris.js file bottom
             // startGameTetris();
-            console.log("Tetris not working, run it using node instead");
+            console.log("| Tetris not working, run it using node instead");
 
               break;
         case "decrypt":
@@ -204,7 +200,7 @@ readLineCNSLE = function(cmd, cmd2){
         default:
             if(cmd == "" || cmd == " "){
             }else{
-              console.log("Unknown command. Type help for all commands");
+              console.log("| Unknown command. Type help for all commands");
             }
             break;
     }
@@ -217,10 +213,9 @@ function BuildPath() {
     let i = 1;
     let data = global.data;
     const path = global.paths[0];
-    console.log('global.paths::: ', global.paths);
     data = _.get(data, path);
     if (data === undefined) {
-        console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data + " at cmdlets.js, buildPath()");
+        console.log("|| Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data + " at cmdlets.js, buildPath()");
         global.data = fs.readFileSync('files/file.json', 'utf8');
         global.data = JSON.parse(global.data);
         data = global.data;

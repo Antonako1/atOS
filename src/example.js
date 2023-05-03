@@ -6,7 +6,7 @@ const helloWorld = example.helloWorld;
 */
 // Make function
 helloWorld = function(){
-    return "Hello world!"
+    return "| Hello world!"
 }
 // Export functions
 module.exports = {

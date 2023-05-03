@@ -4,7 +4,7 @@ findItemMain = function(filesName){
     let currentLocation = global.data;
     text = searchJSONForValue(filesName, currentLocation);
     if(text === false){
-        text = "Item was not found. \"find\" is case sensitive"
+        text = "|| Item was not found. \"find\" is case sensitive"
     }
     return "| " + text[0];
   }
