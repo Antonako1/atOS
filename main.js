@@ -6,7 +6,7 @@ All rights reserved ©
 
 
 
-// todo fix "cd ", "rmv" == depth < 1;, save highscore games
+// todo "rmv" == depth < 1;, save highscore games
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;
