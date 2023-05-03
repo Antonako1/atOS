@@ -6,7 +6,7 @@ All rights reserved ©
 
 
 
-// todo fix "cd "
+// todo fix "cd ", "rmv" == depth < 1;, save highscore games
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;
@@ -46,8 +46,8 @@ console.log("type help for list of commands");
 Normal version of root, if it gets deleted
 {
   "name": "root",
-  "filetype": "folder",
   "path": "root/",
+  "filetype": "folder",
   "filedata": []
 }
 */
@@ -68,6 +68,7 @@ global.folder = global.root;
 newInputCNSLE = function(){
   readline.question(global.rootText + " " , command => {
     // Identify commands
+    // Timer question prompts
     if(command === "timer"){
       readline.question("Set timer for x minutes:  ",  time => {
         timerMain(time);
@@ -79,6 +80,7 @@ newInputCNSLE = function(){
       newInputCNSLE()
       return;
     }
+    // Change directory question prompt
     if(command.substring(0, 3) === "cd "){
       readLineCNSLE("cd ", command)
     }else{
@@ -87,6 +89,7 @@ newInputCNSLE = function(){
     if(result == undefined){}else{
       console.log(result);
     }
+    // Remove question prompt
     if(command === "rmv" || command === "del"){
       readline.question("File to be deleted: ", file => {
         console.log(remove(file));
@@ -94,6 +97,7 @@ newInputCNSLE = function(){
       })
       return;
     }
+    // Find question prompt
     if(command === "find"){
       readline.question(`File to find: `, fileToFind => {
         console.log(findItemMain(fileToFind));
@@ -103,6 +107,7 @@ newInputCNSLE = function(){
     }
     // Checks if it makes new file
     newFile(command);
+    // Read question prompt
     if(command === "read"){
       readline.question(`Filename: `, fileToRead => {
         console.log(readData(fileToRead));
@@ -110,6 +115,7 @@ newInputCNSLE = function(){
       });
       return;
     }
+    // Decrypt question prompt
     if(command === "decrypt"){
         readline.question(`Filename: `, fileToRead => {
           console.log(decryptData(fileToRead));

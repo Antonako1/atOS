@@ -1,9 +1,9 @@
 
 
-// All different commands
-const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "decrypt", "find", "date", "snake", "q", "tetris", "timer", "timer check"];
 const fs = require('fs');
 const _ = require('lodash');
+  // All different commands
+  const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "decrypt", "find", "date", "snake", "q", "tetris", "timer", "timer check"];
 // Different filetypes in .json files
 global.paths = []
 
@@ -102,7 +102,7 @@ readLineCNSLE = function(cmd, cmd2){
                   returnValueReadLine = "";
               break;
         case "cd ":
-            
+            global.paths = [];
               cmd2 = cmd2.substring(3, cmd2.length)
               function findPath(obj, searchValue, depth = Infinity) {
                 var path = "";
@@ -202,9 +202,9 @@ readLineCNSLE = function(cmd, cmd2){
         case "find":
                 break;
         default:
-            if(cmd == ""){
+            if(cmd == "" || cmd == " "){
             }else{
-                returnValueReadLine = "Unknown command. Type help for all commands"
+              console.log("Unknown command. Type help for all commands");
             }
             break;
     }
@@ -216,17 +216,15 @@ readLineCNSLE = function(cmd, cmd2){
 function BuildPath() {
     let i = 1;
     let data = global.data;
-    // for (let i in global.paths) {
-      const path = global.paths[0];
-      data = _.get(data, path);
-      if (data === undefined) {
-          console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data);
-          global.data = fs.readFileSync('files/file.json', 'utf8');
-          global.data = JSON.parse(global.data);
-          data = global.data;
-        //   break;
-      }
-    // }
+    const path = global.paths[0];
+    console.log('global.paths::: ', global.paths);
+    data = _.get(data, path);
+    if (data === undefined) {
+        console.log("Error: global.data." + global.paths.slice(0, i + 1).join(".") + " is " + data + " at cmdlets.js, buildPath()");
+        global.data = fs.readFileSync('files/file.json', 'utf8');
+        global.data = JSON.parse(global.data);
+        data = global.data;
+    }
     return data;
   }
   

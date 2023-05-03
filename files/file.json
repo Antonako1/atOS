@@ -3,13 +3,11 @@
   "path": "root/",
   "filetype": "folder",
   "filedata": [
-    "",
     {
       "name": "Users",
       "path": "root/Users/",
       "filetype": "folder",
       "filedata": [
-        "",
         {
           "name": "Default",
           "path": "root/Users/Default/",
