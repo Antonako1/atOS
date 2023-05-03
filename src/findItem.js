@@ -6,7 +6,7 @@ findItemMain = function(filesName){
     if(text === false){
         text = "Item was not found. \"find\" is case sensitive"
     }
-    return text;
+    return "| " + text[0];
   }
   
   function searchJSONForValue(value, data, paths = []) {
