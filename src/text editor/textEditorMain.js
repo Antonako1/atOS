@@ -3,14 +3,16 @@ const readline = require('readline');
 readline.emitKeypressEvents(process.stdin);
 process.stdin.setRawMode(true);
 
+let writeMode = false;
 let rowCount = 1;
+chooseFileToEdit = function(){
+    // absolute path or file.json path
+    return fileToReturn;
+}
 textEditorMainFunc = function(){
     console.clear();
-    readline.question("Start writing: ", file => {
-        console.log(file);
-        newInputCNSLE();
-    })
     hotKeys()
+    console.log(writeMode);
     return "1"
 }
 checkAndAddRow = function(){
@@ -20,16 +22,14 @@ checkAndAddRow = function(){
 hotKeys = function(){
     const listener = process.stdin.on('keypress', (str, key) => {
         // Rotates piece 1 to right
-        if (key.name === 'escape') {
-            console.log("ok")
-        }else if (key.name === "up"){
-            lastMove = "rotate";
-        } else if (key.name === 'left') {
-            lastMove = "left";
-        } else if (key.name === 'right') {
-            lastMove = "right";
+        if (key.name === 'escape' && writeMode === true) {
+            writemode = false;
+            console.log('writemode::: ', writemode);
         }else if(key.name === "0"){
-            process.exit(0)
+            listener._destroy();
+        }else if(key.name === "i" && writeMode === false){
+            writeMode = true;
+            console.log('writeMode::: ', writeMode);
         }
     });
 }
