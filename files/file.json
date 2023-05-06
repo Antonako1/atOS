@@ -33,22 +33,15 @@
       ]
     },
     {
-      "name": "1",
-      "path": "root/1/",
+      "name": "a",
+      "path": "root/a/",
       "filetype": "folder",
       "filedata": [
         {
-          "name": "2",
-          "path": "root/1/2/",
-          "filetype": "folder",
-          "filedata": [
-            {
-              "name": "test",
-              "path": "root/1/2/test",
-              "filetype": "txt",
-              "text": "qQfos4%%#13aT5_Dya:77%qaKHjxj_Dya:lafDs($1"
-            }
-          ]
+          "name": "b",
+          "path": "root/a/b",
+          "filetype": "txt",
+          "text": "oAlrmvaSk914?=kG.BzOaO9vMvAQ/Ap*~23a1"
         }
       ]
     }

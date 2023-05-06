@@ -8,7 +8,7 @@ writeData = function(fileType, fileName, fileData, crntCMD, crypt){
   global.data = JSON.parse(global.data);
   let objecti;
 // Make objects that will be pushed to .json
-if(crntCMD === "mkdir"){
+if(crntCMD.substring(0,6) === "mkdir "){
   objecti = {
     name: fileName,
     path: global.root,
@@ -16,7 +16,7 @@ if(crntCMD === "mkdir"){
     filedata: [
     ]
   };
-}else if(crntCMD === "write"){
+}else if(crntCMD.substring(0,6) === "write "){
   // crypt things
   if(crypt == true){
     fileData = atKrypt(fileData, 1)

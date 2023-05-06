@@ -65,7 +65,6 @@ readLineCNSLE = function(cmd, cmd2){
                 }
                 }
             }
-          
             checkInsideFolder(global.data, global.root);              
             break;
         case "mkdir":
@@ -137,7 +136,6 @@ readLineCNSLE = function(cmd, cmd2){
                                                         // Search depth
               global.paths.push(findPath(global.data, cmd2))
               global.data = BuildPath();
-              console.log('global.data::: ', global.data);
               try {
                     path = global.data.path;
                 } catch (error) {
@@ -158,8 +156,8 @@ readLineCNSLE = function(cmd, cmd2){
             returnValueReadLine = "";
             returnValueReadLine = "| Current path is: " + global.root;
             break;
-        case "rmv" || "del":  
-            returnValueReadLine = "";
+        case "rmv " || "del ":  
+        returnValueReadLine = "";
               break;
         case "date":
               let date = new Date;
@@ -199,8 +197,9 @@ readLineCNSLE = function(cmd, cmd2){
                 break;
         default:
             if(cmd == "" || cmd == " "){
+              
             }else{
-              console.log("| Unknown command. Type help for all commands");
+              console.log("|| Unknown command. Type help for all commands");
             }
             break;
     }
