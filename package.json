@@ -13,8 +13,5 @@
     "lodash": "^4.17.21",
     "play-sound": "^1.1.5",
     "underscore": "^1.13.6"
-  },
-  "devDependencies": {
-    "lua.vm.js": "^0.0.1"
   }
 }

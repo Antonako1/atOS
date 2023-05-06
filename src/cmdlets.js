@@ -3,7 +3,10 @@
 const fs = require('fs');
 const _ = require('lodash');
   // All different commands
-  const cmdlets = ["help", "ls", "mkdir", "cls", "rmv", "write", "path", "find", "cd", "read", "decrypt", "find", "date", "snake", "q", "tetris", "timer", "timer check"];
+  const cmdlets = ["help", "ls", "mkdir", "cls",
+   "rmv", "write", "path", "find", "cd", "read",
+   "decrypt", "find", "date", "snake", "q", "tetris",
+    "timer", "timer check", "luaRun"];
 // Different filetypes in .json files
 global.paths = []
 
@@ -194,6 +197,8 @@ readLineCNSLE = function(cmd, cmd2){
         case "decrypt":
                 break;
         case "find":
+                break;
+        case "luaRun":
                 break;
         default:
             if(cmd == "" || cmd == " "){
