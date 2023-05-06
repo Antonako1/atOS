@@ -6,7 +6,7 @@ const _ = require('lodash');
   const cmdlets = ["help", "ls", "mkdir", "cls",
    "rmv", "write", "path", "find", "cd", "read",
    "decrypt", "find", "date", "snake", "q", "tetris",
-    "timer", "timer check", "luaRun"];
+    "timer", "timer check"];
 // Different filetypes in .json files
 global.paths = []
 

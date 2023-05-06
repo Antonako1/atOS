@@ -20,9 +20,6 @@ const readData = moduleREADDATA.readData;
 const moduleREMOVE= require("./src/remove.js");
 const remove = moduleREMOVE.remove;
 
-const moduleLua= require("./src/luaRunMain.js");
-const luaRunMainFun = moduleLua.luaRunMainFun;
-
 const moduleFind= require("./src/findItem.js");
 const findItemMain = moduleFind.findItemMain;
 
@@ -111,15 +108,6 @@ newInputCNSLE = function(){
       console.log("|| Type name");
     }else{
       newFile(command);
-    }
-    // Lua file runner
-    if(command.substring(0,7) === "luaRun "){
-      readline.question("Path to Lua file", path => {
-        console.log(luaRunMainFun(command.substring(7, command.length), path));
-        cmdboo = true;
-        newInputCNSLE();
-      })
-      return;
     }
     // Read question prompt
     if(command.substring(0, 5) === "read "){
