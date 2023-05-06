@@ -51,7 +51,7 @@ Normal version of root, if it gets deleted
   "filedata": []
 }
 */
-
+const { exec } = require('child_process');
 // Import node readfile module
 const fs = require('fs');
 
@@ -109,6 +109,23 @@ newInputCNSLE = function(){
     }else{
       newFile(command);
     }
+
+    // todo LUA
+    if(command === "lua"){
+      readline.question("Lua" , fileName => {
+        command = "lua " + fileName
+        exec(command, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Command execution error: ${error}`);
+            return;
+          }
+
+          console.log(`Command output:\n${stdout}`);
+        });
+        newInputCNSLE();
+      })
+      return;
+    }
     // Read question prompt
     if(command.substring(0, 5) === "read "){
       console.log(readData(command.substring(5, command.length)));
@@ -136,6 +153,7 @@ newInputCNSLE = function(){
 newFile = function(currentCMD){
     // When making file
     if(currentCMD.substring(0,6) === "mkdir " || currentCMD.substring(0,6) === "write "){
+      console.log("thr");
       // Check current commands for correct filetypes
       if(currentCMD.substring(0,6) === "mkdir "){fileType = "folder"}
       else if(currentCMD.substring(0,6) === "write "){fileType = "txt"}
