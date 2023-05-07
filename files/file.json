@@ -2,6 +2,7 @@
   "name": "root",
   "path": "root/",
   "filetype": "folder",
+  "location": "hidden",
   "filedata": [
     {
       "name": "Users",

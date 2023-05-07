@@ -20,5 +20,15 @@ tdElements.forEach((td) => {
     td.addEventListener('click', function() {
         // Handle the click event here
         console.log('Clicked on element with ID:', this.id);
+
+        // Loop through file.json to find if it has items in it
+        for (let i in location.filedata) {
+            let item = location.filedata[i];
+            if (item && item.name == name) {
+                location.filedata.splice(i, 1);
+                return name + " was deleted with success";
+            }
+        }
+        return "No such file found"
     });
 });
