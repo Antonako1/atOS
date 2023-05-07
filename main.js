@@ -153,7 +153,6 @@ newInputCNSLE = function(){
 newFile = function(currentCMD){
     // When making file
     if(currentCMD.substring(0,6) === "mkdir " || currentCMD.substring(0,6) === "write "){
-      console.log("thr");
       // Check current commands for correct filetypes
       if(currentCMD.substring(0,6) === "mkdir "){fileType = "folder"}
       else if(currentCMD.substring(0,6) === "write "){fileType = "txt"}
@@ -171,14 +170,11 @@ newFile = function(currentCMD){
           fileData = contents;
           readline.question(`Do you want to crypt the text? y/n `, question => {
             question=question.toLowerCase(); 
-
             if(question === "y" || question === "yes"){
               writeData(fileType, fileName, fileData, currentCMD, true);
               newInputCNSLE();
             }else if(question === "n" || question === "no"){
               writeData(fileType, fileName, fileData, currentCMD, false);
-              readLineCNSLE("cd..")
-              readLineCNSLE("cd " + fileName)
               newInputCNSLE();
             }
           });

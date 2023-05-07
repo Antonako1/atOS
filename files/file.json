@@ -31,6 +31,32 @@
           "text": ")\"!JFAPvam*)2#dfbo%0AbfgSAm,0oad+STR_O%0AbfgSAm,0^sdaG=A!kd)4mcakI1"
         }
       ]
+    },
+    {
+      "name": "1",
+      "path": "root/1/",
+      "filetype": "folder",
+      "filedata": [
+        {
+          "name": "2",
+          "path": "root/1/2/",
+          "filetype": "folder",
+          "filedata": [
+            {
+              "name": "3",
+              "path": "root/1/2/3",
+              "filetype": "txt",
+              "text": "test"
+            },
+            {
+              "name": "4",
+              "path": "root/1/2/4",
+              "filetype": "txt",
+              "text": "381>>fkoeLaE^^71m2D*b^AafN:al_Dya:0Abfg9wvfdHKaf3L.aAOLa1"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

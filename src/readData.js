@@ -1,7 +1,6 @@
 const fs = require('fs');
 
 readData = function(fileName){
-  console.log('fileName:::'+fileName);
   let currentLocation = global.data;
   let text = readTextByName(fileName, currentLocation);
 
