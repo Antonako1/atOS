@@ -1,3 +1,24 @@
 body{
-    background-color: blue;
+    background-color: rgb(0, 174, 255);
+    margin: 0;
+    padding: 0;
+}
+footer{
+    background-color: rgb(163, 163, 163);
+    width: 100%;
+    height: 81px;
+}
+#backgroundMain{
+    border: 1px dashed red;
+    width: 100%;
+    height: 95%;
+    background-color: white;
+}
+#backgroundMain td{
+    width: 50px;
+    height: 50px;
+    border: 1px solid red;
+}
+#backgroundMain td:hover{
+    background-color: aqua;
 }
