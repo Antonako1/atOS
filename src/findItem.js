@@ -1,6 +1,6 @@
 const fs = require('fs');
 let text = "";
-findItemMain = function(filesName){
+function findItemMain(filesName){
     let currentLocation = global.data;
     text = searchJSONForValue(filesName, currentLocation);
     if(text === false){
@@ -31,3 +31,4 @@ findItemMain = function(filesName){
 module.exports = {
     findItemMain: findItemMain
 }
+// module.exports = findItemMain;

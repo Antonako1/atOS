@@ -112,6 +112,7 @@ readLineCNSLE = function(cmd, cmd2){
                   return path;
                 }
                 for (let key in obj) {
+                  if(obj.filetype === "txt"){return "err"}
                   if (typeof obj[key] === "object") {
                     if (Array.isArray(obj[key])) {
                       for (let i = 0; i < obj[key].length; i++) { // search each item in array

@@ -5,6 +5,7 @@ All rights reserved ©
 
 // todo add location to file.json. add move, 
 // todo fix "rmv" , save highscore games
+// todo fix cd txt file
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
 const readLineCNSLE = moduleCMDLETS.readLineCNSLE;

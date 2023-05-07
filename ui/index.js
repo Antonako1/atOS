@@ -32,3 +32,15 @@ tdElements.forEach((td) => {
         return "No such file found"
     });
 });
+
+const findItemMain = require('../src/findItem.js');
+// Find buttons event listener
+const findButton = document.getElementById('findButton');
+findButton.addEventListener('click', function() {
+  let txtData = document.getElementById('textFind').value;
+  console.log('txtData::: ', txtData);
+
+  let result = findItemMain(txtData);
+  console.log('result::: ', result);
+  document.getElementById('findResultString').innerHTML = result;
+});
