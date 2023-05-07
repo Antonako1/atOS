@@ -1,0 +1,12 @@
+{
+  "name": "ui_atos",
+  "version": "1.0.0",
+  "description": "ui",
+  "main": "UImain.js",
+  "scripts": {
+    "test": "console.log(\"Test command electron\");",
+    "start": "electron ."
+  },
+  "author": "koltti",
+  "license": "ISC"
+}

@@ -4,7 +4,8 @@
   "description": "OS",
   "main": "main.js",
   "scripts": {
-    "test": "console.log(\"This is test command\");"
+    "test": "console.log(\"This is test command\");",
+    "start": "electron ."
   },
   "author": "koltti",
   "license": "ISC",
@@ -13,16 +14,8 @@
     "lodash": "^4.17.21",
     "play-sound": "^1.1.5",
     "underscore": "^1.13.6"
-  }
-},
-{
-  "name": "nwjs-app",
-  "version": "1.0.0",
-  "main": "./ui/index.html",
-  "scripts": {
-    "start": "nw ."
   },
   "devDependencies": {
-    "nw": "^0.56.0-sdk"
+    "electron": "^24.2.0"
   }
 }

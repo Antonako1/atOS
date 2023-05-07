@@ -3,9 +3,6 @@ atOS - at Operating Systems develompents
 All rights reserved ©
 */
 
-
-
-
 // todo fix "rmv" , save highscore games
 // Imports consoleReadline and all others
 const moduleCMDLETS = require("./src/cmdlets.js");
