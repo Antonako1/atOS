@@ -201,9 +201,7 @@ readLineCNSLE = function(cmd, cmd2){
         case "luaRun":
                 break;
         default:
-            if(cmd == "" || cmd == " "){
-              
-            }else{
+            if(cmd == "" || cmd == " "){}else{
               console.log("|| Unknown command. Type help for all commands");
             }
             break;
