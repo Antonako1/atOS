@@ -3,10 +3,11 @@ let text = "";
 function findItemMain(filesName){
     let currentLocation = global.data;
     text = searchJSONForValue(filesName, currentLocation);
-    if(text === false){
+    if(text[0] == undefined){
         text = "|| Item was not found. \"find\" is case sensitive"
-    }
-    return "| " + text[0];
+        return text;
+      }
+      return "| " + text[0];
   }
   
   function searchJSONForValue(value, data, paths = []) {
@@ -24,7 +25,7 @@ function findItemMain(filesName){
       }
     }
     // if paths.length is 0, paths will be returned as false
-    return paths.length > 0 ? paths : false;
+    return paths.length >= 0 ? paths : false;
   }
   
   
