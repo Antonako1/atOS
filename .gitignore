@@ -9,3 +9,4 @@
 *.out
 ISO_DIR/
 build/
+dump_vesa_modes
