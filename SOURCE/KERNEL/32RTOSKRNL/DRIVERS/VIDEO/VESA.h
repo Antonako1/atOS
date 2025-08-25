@@ -43,7 +43,6 @@ REMARKS
 /*+++
 external definitions
 ---*/
-extern volatile U32 CURSOR; // Defined in KERNEL.c
 #define VIDEO_MODE_VESA 0x00000001 // VESA mode flag
 #define VIDEO_MODE_VBE  0x00000002 // VBE mode flag
 extern volatile U32 VIDEO_MODE; // Defined in KERNEL.c
@@ -77,36 +76,6 @@ typedef struct {
 #define VESA_CTRL_SIZE 512
 #define VESA_TARGET_MODE 0x107 // 1024x768x32bpp
 
-static inline BOOL vesa_check(void) {
-    print_string("[VESA]\n");
-    VESA_INFO* vesa = (VESA_INFO*)(VESA_LOAD_ADDRESS_PHYS);
-    // Check signature
-    if (vesa->Signature[0] != 'V' || vesa->Signature[1] != 'E' ||
-        vesa->Signature[2] != 'S' || vesa->Signature[3] != 'A') {
-        print_label_hex("No VESA Signature at", VESA_LOAD_ADDRESS_PHYS);
-        return FALSE;
-    }
-    
-    // print_string_len_label("  Signature", vesa->Signature, 4);
-    if (vesa->Version < 0x0200) {
-        print_string("  VESA version is too low, expected at least 2.0\n");
-        return FALSE;
-    }
-    print_label_hex("  VESA Version", vesa->Version);
-    print_label_hex("  OEM String Pointer", vesa->OEMStringPtr);
-    print_label_hex("  Capabilities", vesa->Capabilities);
-    print_label_hex("  Video Mode Pointer", vesa->VideoModePtr);
-    print_label_u32("  Total Memory (64KB blocks)", vesa->TotalMemory);
-
-    // U32 *mode_list = (U32*)(vesa->VideoModePtr & 0xFFFFF);
-    // for (int i = 0; mode_list[i] != 0xFFFF; i++) {
-    //     print_label_hex("  Supported Video Mode", mode_list[i]);
-    // }
-    for( U32 i = 0; i < 5; i++) {
-        print_label_hex("  Reserved", vesa->Reserved[i]);
-    }
-    
-    return TRUE;
-}
+BOOL vesa_check(void);
 
 #endif

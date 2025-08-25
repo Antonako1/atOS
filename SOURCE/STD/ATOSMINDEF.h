@@ -52,6 +52,7 @@ typedef float         F32;
 #define USHORT       U16
 #define INT          I32
 #define UINT         U32
+typedef U32          UINTPTR;
 
 typedef I8           BYTE;
 typedef U8           UBYTE;

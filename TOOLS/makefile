@@ -14,8 +14,11 @@ ISOFILE = atOS.iso
 TOOL_ISO = ISO9660.out
 TOOL_FAT = FAT16.out
 
+VBE_DIR = VBE
+TOOL_VBE = VBE.out
+
 # Targets
-all: iso fat
+all: iso fat vbe
 
 # ISO9660 Tool
 iso: $(ISO_DIR)/$(TOOL_ISO)
@@ -26,6 +29,15 @@ iso: $(ISO_DIR)/$(TOOL_ISO)
 	./$(TOOL_ISO) $(ISOFILE) "INNER/INNER2/INSIDE_1.txt"
 	./$(TOOL_ISO) $(ISOFILE) KERNEL.BIN
 
+vbe: $(VBE_DIR)/$(TOOL_VBE)
+	@echo "Running VBE tool..."
+	# Add logic here to run VBE if needed
+	./$(TOOL_VBE)
+
+$(VBE_DIR)/$(TOOL_VBE): $(VBE_DIR)/VBE.c
+	@echo "Building $(TOOL_VBE)..."
+	$(CC) $(CFLAGS) -o $(TOOL_VBE) $(VBE_DIR)/VBE.c
+	
 # FAT Tool (currently just a placeholder)
 fat: $(FAT_DIR)/$(TOOL_FAT)
 	@echo "Running FAT16 tool..."
@@ -48,4 +60,5 @@ help:
 	@echo "  all   - Build both ISO9660 and FAT16 tools"
 	@echo "  iso   - Build and run ISO9660 tool"
 	@echo "  fat   - Build and run FAT16 tool (placeholder)"
+	@echo "  vbe   - Build and run VBE tool (placeholder)"
 	@echo "  clean - Remove generated files"

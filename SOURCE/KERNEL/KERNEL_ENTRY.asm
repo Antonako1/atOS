@@ -23,7 +23,8 @@
 ;         VESA initialization and mode setting.
 ;         Reads E820 memory map and stores it in a table.
 ;         Initializes GDT and IDT into memory correctly
-;
+;     2025/08/25 - Antonako1
+;         Fixed GDT and IDT initialization
 ; REMARKS
 ;     None
 
