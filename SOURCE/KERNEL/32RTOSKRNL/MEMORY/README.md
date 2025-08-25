@@ -19,9 +19,9 @@
 | `0x00008000`  | `0x00008FFF` | E820 Table          | 4 KiB     | BIOS memory map                                          |
 | `0x00009000`  | `0x000091FF` | VESA Controller Info| 512 bytes | VESA BIOS Extensions controller info block    |
 | `0x00009200`  | `0x000092FF` | VBE Mode Info       | 256 bytes | VBE Mode information structure for target mode|
-| `0x00009300`  | `0x000093FF` | GDT                 | 256 bytes  | Enough for a few entries |
-| `0x00009400`  | `0x00009BFF` | IDT                 | 2048 bytes | 256 entries × 8 bytes    |
-| `0x00009C00`  | `0x00009FFF` | Unused              | 1024 bytes | Free memory              |
+| `0x00009300` | `0x000093FF`   |GDT |   (256 bytes, 32 entries, although only 3 are used)        | Global descriptor table |
+| `0x00009400` | `0x00009BFF`   |IDT |  (2048 bytes, 256 entries × 8 bytes) | Interrupt disrupt table |
+| `0x00009C00` | `0x00009FFF`   |Free| 1024 bytes | Free to use memory |
 | `0x000A0000`  | `0x000BFFFF` | Legacy Video Memory | 128 KiB   | VGA framebuffer (Mode 13h etc.)                          |
 | `0x000C0000`  | `0x000FFFFF` | BIOS ROM + Stack    | \~256 KiB | BIOS area + protected mode stack                         |
 | `0x00100000`  | `0x001FFFFF` | DATA                | 1 MiB     | Early kernel data, init heap                             |

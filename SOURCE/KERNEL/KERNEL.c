@@ -27,6 +27,11 @@ REMARKS
 ---*/
 #include "./32RTOSKRNL/KERNEL.h"
 #include "./32RTOSKRNL/DRIVERS/VIDEO/VBE.h"
+#include "./32RTOSKRNL/DRIVERS/DISK/ATAPI/ATAPI.h"
+#include "./32RTOSKRNL/DRIVERS/DISK/ATA/ATA.h"
+#include "../STD/ASM.h"
+#include "./32RTOSKRNL/MEMORY/E820.h"
+#include "./32RTOSKRNL/CPU/INTERRUPTS.h"
 
 __attribute__((noreturn))
 void kernel_entry_main(U0) {
