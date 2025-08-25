@@ -136,7 +136,6 @@ U0 ___memcpy(void* dest, const void* src, U32 n) {
     }
 }
 
-
 U0 UPDATE_VRAM(U0) {
     VBE_MODE* mode = GET_VBE_MODE();
     if (!mode) return;
@@ -162,7 +161,6 @@ BOOLEAN VBE_DRAW_FRAMEBUFFER(U32 pos, VBE_PIXEL_COLOUR colour) {
     if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
     switch (bytes_per_pixel) {
         case 1:
-            // Contrast blue hues
             framebuffer[pos] = (U8)(colour  & 0xFF);
             break;
 
@@ -341,7 +339,6 @@ BOOLEAN VBE_DRAW_RECTANGLE_FILLED(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL
             VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(col, row, colours));
         }
     }
-
     return TRUE;
 }
 
@@ -378,3 +375,4 @@ BOOLEAN VBE_DRAW_LINE(U32 x1, U32 y1, U32 x2, U32 y2, VBE_PIXEL_COLOUR colours, 
     return TRUE;
 }
 */
+

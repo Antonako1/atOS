@@ -141,8 +141,8 @@ READ_DISK:
 ;
 ; Return:
 ;   ax - number of sectors in the extent
-CALCULATE_SECTORS:
-    add ax, 511
-    shr ax, 9
-    ret
+; CALCULATE_SECTORS:
+;     add ax, 511
+;     shr ax, 9
+;     ret
 %endif ; BIOS_ISO

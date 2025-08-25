@@ -10,94 +10,86 @@
 // REVISION HISTORY:
 //     2025/05/26 - Antonako1
 //         Created this file.
+//      2025/08/19 - Antonako1
+//         Updated memory regions.
 // REMARKS:
 //     See MEMORY.md for a detailed description of the memory regions.
 
 #ifndef MEMORY_H
 #define MEMORY_H
 
-// --- 16-bit / early 32-bit memory regions ---
+// Real Mode / BIOS areas
+#define MEM_IVT_BASE              0x00000000
+#define MEM_IVT_END               0x000003FF
+#define MEM_BDA_BASE              0x00000400
+#define MEM_BDA_END               0x000004FF
+#define MEM_BIOS_RESERVED_BASE    0x00000500
+#define MEM_BIOS_RESERVED_END     0x00000FFF
 
-#define IVT_ADDRESS              0x00000000UL
-#define IVT_SIZE                 0x00000400UL  // 1 KiB
-#define IVT_END                  (IVT_ADDRESS + IVT_SIZE - 1)
+// Bootloader + Kernel early
+#define MEM_BOOTLOADER_BASE       0x00001000
+#define MEM_BOOTLOADER_END        0x00001FFF
+#define MEM_KRNL_BASE             0x00002000
+#define MEM_KRNL_END              0x00007FFF
+#define MEM_E820_BASE             0x00008000
+#define MEM_E820_END              0x00008FFF
 
-#define BIOS_DATA_AREA_ADDRESS   0x00000400UL
-#define BIOS_DATA_AREA_SIZE      0x00000100UL  // 256 bytes
-#define BIOS_DATA_AREA_END       (BIOS_DATA_AREA_ADDRESS + BIOS_DATA_AREA_SIZE - 1)
+// VESA / Descriptor tables
+#define MEM_VESA_CTRL_INFO_BASE   0x00009000
+#define MEM_VESA_CTRL_INFO_END    0x000091FF
+#define MEM_VBE_MODE_INFO_BASE    0x00009200
+#define MEM_VBE_MODE_INFO_END     0x000092FF
 
-#define BIOS_RESERVED_ADDRESS    0x00000500UL
-#define BIOS_RESERVED_SIZE       0x00000B00UL  // ~2.5 KiB (0xFFF - 0x500 + 1)
-#define BIOS_RESERVED_END        (BIOS_RESERVED_ADDRESS + BIOS_RESERVED_SIZE - 1)
+// IDT / GDT / LDT
+#define MEM_GDT_BASE              0x00009300
+#define MEM_GDT_END               0x000093FF
+#define MEM_IDT_BASE              0x00009400
+#define MEM_IDT_END               0x00009BFF
+#define MEM_LDT_BASE              0x00009C00
+#define MEM_LDT_END               0x00009DFF
 
-#define BOOTLOADER_ADDRESS       0x00001000UL
-#define BOOTLOADER_SIZE          0x00001000UL  // 4 KiB
-#define BOOTLOADER_END           (BOOTLOADER_ADDRESS + BOOTLOADER_SIZE - 1)
+// 512kb of free memory
+#define MEM_UNUSED_BASE           0x00009E00
+#define MEM_UNUSED_END            0x00009FFF
 
-#define KRNL_ADDRESS             0x00002000UL
-#define KRNL_SIZE                0x00006000UL  // 24 KiB
-#define KRNL_END                 (KRNL_ADDRESS + KRNL_SIZE - 1)
+// Legacy video / Stack
+#define MEM_VGA_BASE              0x000A0000
+#define MEM_VGA_END               0x000BFFFF
+#define MEM_STACK_BASE            0x00080000
+#define MEM_STACK_END             0x000BFFFF
 
-#define E820_ADDRESS             0x00008000UL
-#define E820_SIZE                0x00001000UL  // 4 KiB
-#define E820_END                 (E820_ADDRESS + E820_SIZE - 1)
+// BIOS ROM
+#define MEM_BIOS_ROM_BASE         0x000C0000
+#define MEM_BIOS_ROM_END          0x000FFFFF
 
-#define VESA_MODE_INFO_ADDRESS   0x00009000UL
-#define VESA_MODE_INFO_SIZE      0x00000101UL  // 257 bytes
-#define VESA_MODE_INFO_END       (VESA_MODE_INFO_ADDRESS + VESA_MODE_INFO_SIZE - 1)
+// Kernel memory
+#define MEM_KERNEL_DATA_BASE      0x00100000
+#define MEM_KERNEL_DATA_END       0x001FFFFF
+#define MEM_RTOSKRNL_BASE         0x00200000
+#define MEM_RTOSKRNL_END          0x003FFFFF
+#define MEM_KERNEL_HEAP_BASE      0x00400000
+#define MEM_KERNEL_HEAP_END       0x005FFFFF
+#define MEM_PROGRAM_TMP_BASE      0x00600000
+#define MEM_PROGRAM_TMP_END       0x00DFFFFF
 
-#define VBE_CONTROLLER_INFO_ADDRESS 0x00009100UL
-#define VBE_CONTROLLER_INFO_SIZE    0x00000F00UL  // ~3.75 KiB
-#define VBE_CONTROLLER_INFO_END     (VBE_CONTROLLER_INFO_ADDRESS + VBE_CONTROLLER_INFO_SIZE - 1)
+// Paging + Framebuffer
+#define MEM_PAGING_BASE           0x00E00000
+#define MEM_PAGING_END            0x00EFFFFF
 
-#define LEGACY_VIDEO_MEMORY_ADDRESS 0x000A0000UL
-#define LEGACY_VIDEO_MEMORY_SIZE    0x00020000UL  // 128 KiB
-#define LEGACY_VIDEO_MEMORY_END     (LEGACY_VIDEO_MEMORY_ADDRESS + LEGACY_VIDEO_MEMORY_SIZE - 1)
+#define MEM_FRAMEBUFFER_BASE      0x00F00000
+#define MEM_FRAMEBUFFER_END       0x012004EF
 
-#define BIOS_ROM_STACK_ADDRESS   0x000C0000UL
-#define BIOS_ROM_STACK_SIZE      0x00040000UL  // ~256 KiB
-#define BIOS_ROM_STACK_END       (BIOS_ROM_STACK_ADDRESS + BIOS_ROM_STACK_SIZE - 1)
+// ACPI / APIC
+#define MEM_ACPI_APIC_BASE        0x01201000
+#define MEM_ACPI_APIC_END         0x012FFFFF
 
-// --- Protected mode / kernel memory ---
+// Reserved
+#define MEM_RESERVED_BASE         0x01300000
+#define MEM_RESERVED_END          0x076FFFFF
 
-#define DATA_ADDRESS             0x00100000UL
-#define DATA_SIZE                0x00100000UL  // 1 MiB
-#define DATA_END                 (DATA_ADDRESS + DATA_SIZE - 1)
+// User space
+#define MEM_USER_SPACE_BASE       0x07700000
+#define MEM_USER_SPACE_END        0x1FFFFFFF
 
-#define RTOSKRNL_ADDRESS         0x00200000UL
-#define RTOSKRNL_SIZE            0x00200000UL  // 2 MiB
-#define RTOSKRNL_END             (RTOSKRNL_ADDRESS + RTOSKRNL_SIZE - 1)
-
-#define KERNEL_HEAP_ADDRESS      0x00400000UL
-#define KERNEL_HEAP_SIZE         0x00200000UL  // 2 MiB
-#define KERNEL_HEAP_END          (KERNEL_HEAP_ADDRESS + KERNEL_HEAP_SIZE - 1)
-
-#define PROGRAM_ADDRESS          0x00600000UL
-#define PROGRAM_SIZE             0x00800000UL  // 8 MiB
-#define PROGRAM_END              (PROGRAM_ADDRESS + PROGRAM_SIZE - 1)
-
-// --- System structures and reserved memory ---
-
-#define PAGING_ADDRESS           0x00E00000UL
-#define PAGING_SIZE              0x00100000UL  // 1 MiB
-#define PAGING_END               (PAGING_ADDRESS + PAGING_SIZE - 1)
-
-#define FRAMEBUFFER_ADDRESS      0x00F00000UL
-#define FRAMEBUFFER_SIZE         0x00100000UL  // 1 MiB
-#define FRAMEBUFFER_END          (FRAMEBUFFER_ADDRESS + FRAMEBUFFER_SIZE - 1)
-
-#define ACPI_ADDRESS             0x01000000UL
-#define ACPI_SIZE                0x00100000UL  // 1 MiB
-#define ACPI_END                 (ACPI_ADDRESS + ACPI_SIZE - 1)
-
-#define RESERVED_MMIO_ADDRESS    0x01100000UL
-#define RESERVED_MMIO_SIZE       0x06400000UL  // 100 MiB
-#define RESERVED_MMIO_END        (RESERVED_MMIO_ADDRESS + RESERVED_MMIO_SIZE - 1)
-
-// --- High memory user space ---
-
-#define USER_SPACE_ADDRESS       0x07500000UL
-#define USER_SPACE_END           0x1FFFFFFFUL
-#define USER_SPACE_SIZE          (USER_SPACE_END - USER_SPACE_ADDRESS + 1)  // ~395 MiB
 
 #endif // MEMORY_H

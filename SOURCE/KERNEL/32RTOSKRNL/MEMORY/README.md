@@ -23,13 +23,14 @@
 | `0x00009400` | `0x00009BFF`   |IDT |  (2048 bytes, 256 entries × 8 bytes) | Interrupt disrupt table |
 | `0x00009C00` | `0x00009FFF`   |Free| 1024 bytes | Free to use memory |
 | `0x000A0000`  | `0x000BFFFF` | Legacy Video Memory | 128 KiB   | VGA framebuffer (Mode 13h etc.)                          |
-| `0x000C0000`  | `0x000FFFFF` | BIOS ROM + Stack    | \~256 KiB | BIOS area + protected mode stack                         |
-| `0x00100000`  | `0x001FFFFF` | DATA                | 1 MiB     | Early kernel data, init heap                             |
+| `0x00080000`  | `0x000BFFFF` | Stack               |~256 KiB   | Stack|
+| `0x000C0000`  | `0x000FFFFF` | BIOS ROM            |~256 KiB | Bios area
+| `0x00100000`  | `0x001FFFFF` | Kernel data         | 1 MiB | Early kernel data, init heap|
 | `0x00200000`  | `0x003FFFFF` | RTOSKRNL            | 2 MiB     | 32-bit RTOS Kernel binary                                |
 | `0x00400000`  | `0x005FFFFF` | Kernel Heap         | 2 MiB     | Kernel dynamic allocations                               |
 | `0x00600000`  | `0x00DFFFFF` | Program/Tmp         | 8 MiB     | Temporary programs and data                              |
 | `0x00E00000`  | `0x00EFFFFF` | Paging Structures   | 1 MiB     | Page directory + tables                                  |
-| `0x00F00000`  | `0x011FFFFF` | Framebuffer         | 3 MiB     | VESA framebuffer (1024x768x32bpp)                     |
-| `0x01200000`  | `0x012FFFFF` | ACPI/APIC           | 1 MiB     | ACPI (RSDP/XSDT), local APIC structures               |
+| `0x00F00000`  | `0x012004EF` | Framebuffer         | ~3 MiB     | VESA framebuffer (1024x768x32bpp)                     |
+| `0x01201000`  | `0x012FFFFF` | ACPI/APIC           | 1 MiB     | ACPI (RSDP/XSDT), local APIC structures               |
 | `0x01300000`  | `0x076FFFFF` | Reserved            | 100 MiB   | Reserved for MMIO and future expansion                |
 | `0x07700000`  | `0x1FFFFFFF` | User Space          | ~395 MiB  | Space for user applications, memory mappings, future use |

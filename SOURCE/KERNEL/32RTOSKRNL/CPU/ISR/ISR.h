@@ -51,6 +51,7 @@ REMARKS
 //  - Use ISR_STUB for other vectors (0..31 excluding the above, and IRQ stubs).
 // -----------------------
 
+
 #define ISR_STUB(n) \
 __attribute__((naked)) void isr_##n(void) { \
     __asm__ volatile ( \
@@ -88,7 +89,6 @@ __attribute__((naked)) void isr_##n(void) { \
         : : "i"(n) \
     ); \
 }
-
 #define ISR_STUB_ERRCODE(n) \
 __attribute__((naked)) void isr_##n(void) { \
     __asm__ volatile ( \

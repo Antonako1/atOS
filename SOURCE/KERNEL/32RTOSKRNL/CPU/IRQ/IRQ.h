@@ -27,8 +27,8 @@ REMARKS
 #include "../../MEMORY/MEMORY.h"
 #include "../ISR/ISR.h"
 
-
 U0 IRQ_INIT(U0);
 void pic_send_eoi(U8 irq);
+
 
 #endif // IRQ_H

@@ -19,6 +19,7 @@
 #define ENUM         enum
 #define INLINE       inline
 #define ASM          __asm__
+#define RETURN       return
 
 #define CONST        const
 #define VOLATILE    volatile
@@ -36,6 +37,9 @@ typedef signed short  I16;
 typedef unsigned short U16;
 typedef signed int    I32;
 typedef unsigned int  U32;
+typedef I8            S8;
+typedef I16           S16;
+typedef I32           S32;
 
 // Floating-point definitions
 typedef float         F32;
@@ -46,7 +50,7 @@ typedef float         F32;
 #define TRUE         1
 #define FALSE        0
 
-#define CHAR         char
+#define CHAR         U8
 #define UCHAR        unsigned char
 #define SHORT        I16
 #define USHORT       U16
@@ -61,6 +65,9 @@ typedef U16          UWORD;
 typedef I32          DWORD;
 typedef U32          UDWORD;
 
+typedef U8*          PU8;
+typedef U16*         PU16;
+typedef U32*         PU32;
 
 
 // Min - Max value definitions

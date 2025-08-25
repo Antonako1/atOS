@@ -30,4 +30,5 @@ typedef struct __attribute__((packed)) {
 void idt_set_gate(I32 idx, U32 handler_addr, U16 sel, U8 type_attr);
 VOID IDT_INIT(U0);
 
+
 #endif

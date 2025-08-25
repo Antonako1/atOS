@@ -35,10 +35,18 @@ REMARKS
     Note: If building outside KERNEL, ensure that the external definitions are defined,
     if not, define them in your application's source file.
         See below for external definitions.
+    
+    Access VESA struct at memory address VESA_LOAD_ADDRESS_PHYS.
+
+    When compiling, include VESA.c
 ---*/
 #ifndef VESA_H
 #define VESA_H
 #include "../../../../STD/ATOSMINDEF.h" // TYPE DEFINITIONS
+#include "../../MEMORY/MEMORY.h"
+
+#define RM2LA(seg, off)  (((U32)(seg) << 4) + (U32)(off))
+#define FAR_PTR_TO_LINEAR(ptr)  RM2LA(((ptr) >> 16) & 0xFFFF, (ptr) & 0xFFFF)
 
 /*+++
 external definitions
@@ -49,8 +57,8 @@ extern volatile U32 VIDEO_MODE; // Defined in KERNEL.c
 
 // #define VIDEO_MEMORY ((volatile U16*)0x00F00000)
 #define VIDEO_MEMORY ((volatile U16*)0xB8000) // Text mode video memory address
-#define SCREEN_WIDTH 80
-#define SCREEN_HEIGHT 25
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 768
 
 /* Foreground/Background colors */
 #define COLOR_GREEN_ON_BLACK 0x0A
@@ -68,14 +76,19 @@ typedef struct {
     U32 OemVendorNamePtr;    // Far pointer to vendor name string
     U32 OemProductNamePtr;   // Far pointer to product name string
     U32 OemProductRevPtr;    // Far pointer to product revision string
+    U32 VBE_AF_VERSION;
+    DWORD VideoModes;      // Current video mode (16-bit mode number)
+    U8 VBE_IMPLEMENTATION[216];
+    U8 OEM_SCRATCHPAD[256]; // OEM scratchpad for additional data 
 } __attribute__((packed)) VESA_INFO;
 
 #define VESA_LOAD_ADDRESS_SEGMENT 0x9000u
 #define VESA_LOAD_ADDRESS_OFFSET 0x0000u
 #define VESA_LOAD_ADDRESS_PHYS VESA_LOAD_ADDRESS_SEGMENT * 16 + VESA_LOAD_ADDRESS_OFFSET
 #define VESA_CTRL_SIZE 512
-#define VESA_TARGET_MODE 0x107 // 1024x768x32bpp
+#define VESA_TARGET_MODE 0x116 // 1024x768x16
 
 BOOL vesa_check(void);
+
 
 #endif

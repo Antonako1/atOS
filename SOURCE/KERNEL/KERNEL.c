@@ -25,6 +25,7 @@ REVISION HISTORY
 REMARKS
     None
 ---*/
+#define KERNEL_ENTRY
 #include "./32RTOSKRNL/KERNEL.h"
 #include "./32RTOSKRNL/DRIVERS/VIDEO/VBE.h"
 #include "./32RTOSKRNL/DRIVERS/DISK/ATAPI/ATAPI.h"
@@ -32,6 +33,7 @@ REMARKS
 #include "../STD/ASM.h"
 #include "./32RTOSKRNL/MEMORY/E820.h"
 #include "./32RTOSKRNL/CPU/INTERRUPTS.h"
+
 
 __attribute__((noreturn))
 void kernel_entry_main(U0) {
@@ -45,6 +47,7 @@ void kernel_entry_main(U0) {
     // vbe_check();
     // E820_INIT();
     VBE_MODE* mode = GET_VBE_MODE();
+
     VBE_DRAW_ELLIPSE(
         mode->XResolution / 2, 
         mode->YResolution / 2, 
@@ -84,7 +87,6 @@ void kernel_entry_main(U0) {
         
     // VBE_DRAW_LINE_THICKNESS(0, 0, 700, 500, VBE_RED, 5);
     VBE_DRAW_TRIANGLE(100, 100, 150, 100, 125, 50, VBE_RED);
-
     VBE_DRAW_CHARACTER_8x8(210, 210, 'A', VBE_BLACK, VBE_SEE_THROUGH);
     VBE_DRAW_CHARACTER_8x8(220, 210, 'B', VBE_BLACK, VBE_WHITE);
     // VBE_DRAW_TRIANGLE(200, 200, 250, 200, 225, 150, VBE_GREEN);
@@ -94,16 +96,10 @@ void kernel_entry_main(U0) {
     VBE_STOP_DRAWING();
 
     while (1) {
-        for (U32 y = 0; y < mode->YResolution; y++) {
-            for (U32 x = 0; x < mode->XResolution; x++) {
-                U32 offset = y * mode->XResolution + x;
-                framebuffer[offset] = VBE_COLOUR_GREEN;
-            }
-        }
+        __asm__ volatile ("hlt");
     }
-
 }
-
+    
 __attribute__((noreturn, section(".text")))
 void _start(void) {
     kernel_entry_main();

@@ -173,7 +173,7 @@ VESA_CTRL_SIZE    EQU 512
 VBE_MODE_OFFSET   EQU VESA_LOAD_OFFSET + VESA_CTRL_SIZE
 VBE_MODE_SIZE     EQU 256          ; typical size for mode info structure
 
-VESA_TARGET_MODE  EQU 0x114        ; the video mode you want
+VESA_TARGET_MODE  EQU 0x116   
 
 
 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -186,32 +186,6 @@ GDT_SIZE    EQU 40             ; 5 entries × 8 bytes each
 IDT_SEGMENT EQU 0x9400
 IDT_OFFSET  EQU 0x0000
 IDT_SIZE    EQU 2048           ; 256 entries × 8 bytes each
-
-
-GDT_PTR:
-    dw GDT_SIZE-1      ; limit (size-1)
-    dd GDT_SEGMENT     ; base address
-GDT_PTR_END:
-
-gdt_start:
-    dd 0x0                ; Null descriptor
-    dd 0x0
-
-    dd 0x0000FFFF         ; Code segment descriptor (base=0, limit=4GB)
-    dd 0x00CF9A00
-
-    dd 0x0000FFFF         ; Data segment descriptor (base=0, limit=4GB)
-    dd 0x00CF9200
-
-gdt_end:
-
-
-; ----------------------------------------
-; GDTR - GDT register structure
-; ----------------------------------------
-gdtr:
-    dw gdt_end - gdt_start - 1     ; GDT size (limit)
-    dd gdt_start                   ; GDT base address
 
 
 IDT_PTR:
@@ -228,5 +202,17 @@ IDTR:
     dw IDT_end - IDT - 1           ; Limit
     dd IDT                         ; Base
 
+gdt_start:
+    dd 0x0
+    dd 0x0
+    dd 0x0000FFFF
+    dd 0x00CF9A00
+    dd 0x0000FFFF
+    dd 0x00CF9200
+gdt_end:
+
+gdtr:
+    dw gdt_end - gdt_start - 1
+    dd gdt_start
 
 %endif ;KERNEL_ENTRY_DATA

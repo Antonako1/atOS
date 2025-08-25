@@ -11,7 +11,7 @@ INPUT_ISO_DIR  ?= ISO_DIR
 ISO_NAME      ?= atOS.iso
 
 CComp         ?= gcc
-CompArgs      ?= -m32 -ffreestanding -fno-pic -fno-pie -nostdlib -O0 -Wall -Wextra
+CompArgs 	  ?= -m32 -ffreestanding -fno-pic -fno-pie -nostdlib -O0 -Wall -Wextra -fno-stack-protector -fno-builtin -fno-inline
 
 INPUT_ISO_DIR_SYSTEM ?= $(INPUT_ISO_DIR)/ATOS
 INPUT_ISO_DIR_USER ?= $(INPUT_ISO_DIR)/USER
@@ -48,20 +48,32 @@ kernel:
 	@echo "Compiling KRNL.BIN (32-bit protected mode C kernel)..."
 	mkdir -p $(OUTPUT_KERNEL_DIR)
 # Compile each .c file to its own .o
-	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/KERNEL.c -o $(OUTPUT_KERNEL_DIR)/KERNEL.o
+	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/KERNEL.c -o $(OUTPUT_KERNEL_DIR)/KERNEL.o -m32
 
 	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/VIDEO/VESA.c -o $(OUTPUT_KERNEL_DIR)/VESA.o
 
-	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/VIDEO/VBE.c -o $(OUTPUT_KERNEL_DIR)/VBE.o
+	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/VIDEO/VBE.c -o $(OUTPUT_KERNEL_DIR)/VBE.o 
+
+	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/GDT/GDT.c -o $(OUTPUT_KERNEL_DIR)/GDT.o
+
+	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/IDT/IDT.c -o $(OUTPUT_KERNEL_DIR)/IDT.o
+
+	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/ISR/ISR.c -o $(OUTPUT_KERNEL_DIR)/ISR.o
+
+	$(CComp) $(CompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/IRQ/IRQ.c -o $(OUTPUT_KERNEL_DIR)/IRQ.o
 
 # Link all object files into KRNL.BIN
 	
 		$(CComp) -m32 -nostdlib -ffreestanding \
-		-Wl,-T,$(SOURCE_KERNEL_DIR)/kernel.ld,-nostdlib,-e,_start,--oformat=binary \
+		-Wl,-T,$(SOURCE_KERNEL_DIR)/kernel.ld,-e,_start,--oformat=binary \
 		-o $(OUTPUT_KERNEL_DIR)/KRNL.BIN \
 		$(OUTPUT_KERNEL_DIR)/KERNEL.o \
 		$(OUTPUT_KERNEL_DIR)/VESA.o \
-		$(OUTPUT_KERNEL_DIR)/VBE.o
+		$(OUTPUT_KERNEL_DIR)/VBE.o \
+		$(OUTPUT_KERNEL_DIR)/GDT.o \
+		$(OUTPUT_KERNEL_DIR)/IDT.o \
+		$(OUTPUT_KERNEL_DIR)/ISR.o \
+		$(OUTPUT_KERNEL_DIR)/IRQ.o \
 
 
 	@echo "KRNL.BIN compiled successfully."
@@ -100,7 +112,8 @@ iso: bootloader kernel
 # Run ISO in QEMU
 run: iso
 	@echo "Running ISO in QEMU..."
-	qemu-system-i386 -vga std -boot d -cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) -m 512
+	qemu-img create -f raw hdd.img 256M
+	qemu-system-i386 -vga std -boot d -cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) -m 512 -drive file=hdd.img,format=raw,if=ide,index=0,media=disk
 
 # Clean
 clean:

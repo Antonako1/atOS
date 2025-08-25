@@ -32,22 +32,22 @@ DAP:
 ; ----------------------------------------
 ; String Constants
 ; ----------------------------------------
-msg_greeting_1:     db "atOS-RT 16-bit kernel loaded...", 0
-msg_kernel_end:     db "atOS-RT 16-bit kernel ended, going into 32-bit protected mode...", 0
-msg_test_1:         db "MSG_TEST_1", 0
-msg_mem_err1:       db "INT 15h, AX E820h.", 0
-msg_mem_err2:       db "INT 15h, AX E820h. EAX != 0x534D4150", 0
-msg_mem_err3:       db "INT 15h, AX E820h. ECX < 20", 0
-msg_mem_err4:       db "INT 15h, AX E820h. ECX > MEM_BUF_LEN", 0
+msg_greeting_1:     db "16-bit kernel loaded...", 0
+msg_kernel_end:     db "16-bit kernel ended, going into 32-bit protected mode...", 0
+msg_test_1:         db "test", 0
+msg_mem_err1:       db "E820h.", 0
+msg_mem_err2:       db "E820h. EAX != 0x534D4150", 0
+msg_mem_err3:       db "E820h. ECX < 20", 0
+msg_mem_err4:       db "E820h. ECX > MEM_BUF_LEN", 0
 msg_mem_err5:       db "No free memory for KRNL.BIN", 0
 msg_mem_err6:       db "", 0
-msg_hng_1:          db "__HANG__", 0
+msg_hng_1:          db "_HANG_", 0
 msg_e820_done:      db "E820h done...", 0
 msg_disk_err1:      db "Error reading from disk...", 0
-msg_iso_err1:       db "ISO9660 error... Invalid volume descriptor", 0
-msg_iso_err2:       db "ISO9660 error... Invalid extent length", 0
-msg_iso_err3:       db "ISO9660 error... Invalid extent location", 0
-msg_iso_errg:       db "ISO9660 general error", 0
+msg_iso_err1:       db "ISO error. Invalid volume descriptor", 0
+msg_iso_err2:       db "ISO error. Invalid extent length", 0
+msg_iso_err3:       db "ISO error. Invalid extent location", 0
+msg_iso_errg:       db "ISO error. General", 0
 msg_krnl_not_found: db "KRNL.BIN not found", 0
 msg_vesa_err1:      db "VESA/VBE function error", 0
 msg_vesa_err2:      db "VESA/VBE not supported", 0

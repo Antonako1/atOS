@@ -29,13 +29,13 @@ REMARKS
 #define ICW1_ICW4 0x01
 #define ICW4_8086 0x01
 
+
 // Send End-of-Interrupt (EOI) to PICs
 void pic_send_eoi(U8 irq) {
     if(irq >= 8) 
         outb(PIC2_CMD, 0x20); // Slave PIC
     outb(PIC1_CMD, 0x20);     // Master PIC
 }
-
 // Remap the PIC to avoid conflicts with CPU exceptions
 void pic_remap() {
     outb(PIC1_CMD, ICW1_INIT | ICW1_ICW4);

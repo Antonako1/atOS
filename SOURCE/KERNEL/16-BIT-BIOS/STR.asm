@@ -77,19 +77,19 @@ strncmp:
 ; 
 ; REMARKS
 ;     None
-strncopy:
-    pusha                   ; Save all general-purpose registers
-.copy_loop:
-    cmp cx, 0               ; Check if we've reached the maximum length
-    je .done                ; Exit if CX is 0
-    lodsb                   ; Load byte at [SI] into AL and increment SI
-    stosb                   ; Store byte in AL to [DI] and increment DI
-    or al, al               ; Check if the byte is null (end of string)
-    jz .done                ; Exit if null terminator is found
-    dec cx                  ; Decrement remaining character count
-    jmp .copy_loop          ; Repeat the loop
-.done:
-    popa                    ; Restore all general-purpose registers
-    ret
+; strncopy:
+;     pusha                   ; Save all general-purpose registers
+; .copy_loop:
+;     cmp cx, 0               ; Check if we've reached the maximum length
+;     je .done                ; Exit if CX is 0
+;     lodsb                   ; Load byte at [SI] into AL and increment SI
+;     stosb                   ; Store byte in AL to [DI] and increment DI
+;     or al, al               ; Check if the byte is null (end of string)
+;     jz .done                ; Exit if null terminator is found
+;     dec cx                  ; Decrement remaining character count
+;     jmp .copy_loop          ; Repeat the loop
+; .done:
+;     popa                    ; Restore all general-purpose registers
+;     ret
 
 %endif ; BIOS_STR

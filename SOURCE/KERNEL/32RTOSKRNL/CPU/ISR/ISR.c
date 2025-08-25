@@ -19,11 +19,9 @@ REMARKS
 #include "./ISR.h"
 #include "../IRQ/IRQ.h"
 #include "../IDT/IDT.h"
-#include "../../DRIVERS/VIDEO/VBE.h"
 
 ISRHandler g_Handlers[IDT_COUNT];
 
-VBE_MODE* vbe_mode = GET_VBE_MODE();
 
 // Called by the ISR stub
 void isr_handler(struct regs* r, U32 int_no) {
@@ -156,3 +154,4 @@ ISR_STUB(46) // IRQ14 - Primary ATA
 ISR_STUB(47) // IRQ15 - Secondary ATA
 
 ISR_STUB(100) // Default stub for other interrupts
+

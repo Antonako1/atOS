@@ -6,6 +6,8 @@
 static IDTDESCRIPTOR idtr;
 // Low-level function to set a gate in memory
 #define IDT_PTR ((IDTENTRY*)IDT_MEM_BASE)
+
+// Low-level function to set a gate in memory
 void idt_set_gate(I32 idx, U32 handler_addr, U16 sel, U8 type_attr) {
     IDTENTRY* gate = &IDT_PTR[idx];
     gate->OffsetLow  = handler_addr & 0xFFFF;
@@ -14,9 +16,6 @@ void idt_set_gate(I32 idx, U32 handler_addr, U16 sel, U8 type_attr) {
     gate->TypeAttr   = type_attr;
     gate->OffsetHigh = (handler_addr >> 16) & 0xFFFF;
 }
-
-
-
 
 VOID IDT_INIT(U0) {
     // first 32 entries
@@ -40,6 +39,7 @@ VOID IDT_INIT(U0) {
         else
             idt_set_gate(i, (U32)isr_100, KCODE_SEL, INT_GATE_32); // Null handler for now
     }
+
 
 
     idtr.size = IDT_COUNT * sizeof(IDTENTRY) - 1;

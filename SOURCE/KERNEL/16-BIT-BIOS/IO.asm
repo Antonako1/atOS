@@ -16,20 +16,11 @@
 ;     Functions:
 ;       PRINTN - Prints a string with given length 
 ;       PRINT  - Prints a null-terminated string
-;       PRINTN_Q - Prints a string with given length
 ;       PRINTNLN - Prints a string with given length
 ;       PRINTLN - Prints a null-terminated string
 ;       PRINT_LINEFEED - Prints a line break (CR + LF)
-;       PRINT_DEC - Prints input as decimal
-;       PRINT_DECN - Prints input as decimal as long as CX
-;       PRINT_BIN - Prints input as binary
-;       PRINT_BINN - Prints input as binary as long as CX
 ;       PRINT_HEX - Prints input as hexadecimal
-;       PRINT_HEXN - Prints input as hexadecimal as long as CX
-;       PRINT_Q - Prints a double quote character
-;       PRINT_HEX_N_RANGE - Prints CX bytes at address EAX as hex (with "0x" prefix)
 ;       PUTCHAR - Prints a character
-;       PUTCHARLN - Prints a character and adds \r\n at the end
 ;       PRINT__ - Prints a underscore character
 ;
 
@@ -198,11 +189,6 @@ PRINTLN:
     call PRINT_LINEFEED ; Call PRINT_LINEFEED to print CR + LF
     ret
 
-PRINTNLN_Q:
-    call PRINTN_Q
-    call PRINT_LINEFEED
-    ret
-
 ; void PUTCHAR(AL char);
 ;
 ; DESCRIPTION
@@ -220,22 +206,6 @@ PUTCHAR:
     popa
     ret
 
-; void PUTCHARLN(AL char);
-;
-; DESCRIPTION
-;     Prints a character and adds \r\n at the end.
-;
-; PARAMETERS
-;     AL - character to print
-;
-; RETURN
-;     None
-PUTCHARLN:
-    pusha
-    call PUTCHAR ; Call PUTCHAR to print the character
-    call PRINT_LINEFEED ; Call PRINT_LINEFEED to print CR + LF
-    popa
-    ret
 
 PRINT__:
     pusha
@@ -243,73 +213,6 @@ PRINT__:
     call PUTCHAR
     popa
     ret 
-    
-; TODO:
-;   PRINT_DEC   - Prints input as decimal
-;   PRINT_DECN  - Prints input as decimal as long as CX
-
-;   void PRINT_DEC(AX);
-;
-; DESCRIPTION
-;     Prints the value in AX as decimal using BIOS interrupt 0x21
-;     and INT 0x10.
-;     The value is printed in 8 digits (32 bits).
-; PARAMETERS
-;     EAX - value to print
-; RETURN
-;     None
-PRINT_DEC:
-    pusha
-
-    add eax, 0x30
-    call PUTCHAR
-
-    popa
-    ret
-
-
-;   PRINT_BIN   - Prints input as binary
-;   PRINT_BINN  - Prints input as binary as long as CX
-
-
-; void PRINT_HEXN(EAX, CX)
-;
-; Prints EAX as CX hex digits (e.g., CX = 8 for 32-bit, CX = 4 for 16-bit, etc.)
-; Shows "0x" prefix, followed by big-endian hex digits.
-;
-PRINT_HEXN:
-    pusha
-
-    ; Show "0x"
-    mov al, '0'
-    call PUTCHAR
-    mov al, 'x'
-    call PUTCHAR
-
-    mov ebx, eax       ; Copy the value to EBX to preserve EAX
-    mov esi, ecx        ; Save CX in ESI for loop control
-
-.next_nibble:
-    dec esi
-    mov ecx, esi
-    shl ecx, 2         ; Multiply index by 4 to shift to correct nibble
-    mov eax, ebx
-    shr eax, cl        ; Bring desired nibble into low 4 bits
-    and al, 0x0F       ; Isolate low nibble
-
-    ; Convert nibble to ASCII
-    cmp al, 9
-    jbe .digit
-    add al, 7
-.digit:
-    add al, '0'
-    call PUTCHAR
-
-    cmp esi, 0
-    jne .next_nibble
-
-    popa
-    ret
 
 
 ;  void PRINT_HEX(AX);
@@ -354,78 +257,5 @@ PRINT_HEX:
 
     popa
     ret
-
-; void PRINT_Q(void)
-;
-; DESCRIPTION
-;     Prints a double quote character using BIOS interrupt 0x10
-;
-; PARAMETERS
-;     None
-; RETURN
-;     None
-PRINT_Q:
-    pusha
-    mov al, '"'
-    call PUTCHAR
-    popa
-    ret
-
-
-; PRINT_HEX_N_RANGE:
-;   Prints CX bytes at address EAX as hex (with "0x" prefix)
-;   Example: if [EAX] = 0x12 0xAB, it prints: 0x12AB
-;
-; INPUT:
-;   EAX = pointer to memory
-;   CX  = number of bytes to print
-;
-; PRINT_HEX_N_RANGE:
-;     pusha
-
-;     ; Print "0x" prefix
-;     mov al, '0'
-;     call PUTCHAR
-;     mov al, 'x'
-;     call PUTCHAR
-
-;     ; Print each byte from memory
-;     mov esi, eax        ; ESI = pointer to memory
-
-; .next_byte:
-;     mov al, [esi]       ; Load byte from memory
-;     call PRINT_BYTE_HEX
-;     inc esi
-;     loop .next_byte     ; CX is already our counter
-
-;     popa
-;     ret
-
-; ; Helper function: Print AL as 2-digit hex (e.g., AL=0xAB -> prints "AB")
-; PRINT_BYTE_HEX:
-;     push ax
-;     push bx
-
-;     mov ah, al
-;     shr ah, 4
-;     and ah, 0x0F
-;     call HEX_NIBBLE_PRINT
-
-;     and al, 0x0F
-;     call HEX_NIBBLE_PRINT
-
-;     pop bx
-;     pop ax
-;     ret
-
-; ; Print nibble in AL (must be 0-15)
-; HEX_NIBBLE_PRINT:
-;     cmp al, 9
-;     jbe .digit
-;     add al, 7
-; .digit:
-;     add al, '0'
-;     call PUTCHAR
-;     ret
 
 %endif ; BIOS_IO
