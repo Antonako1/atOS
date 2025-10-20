@@ -391,24 +391,31 @@ VOIDPTR LOAD_KERNEL_SHELL(U32 *bin_size_out, IsoDirectoryRecord **fileptr_out) {
 
 
 void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
+    KDEBUG_PUTS("[rtos] Enter LOAD_AND_RUN_KERNEL_SHELL\n");
     VBE_FLUSH_SCREEN();
+    KDEBUG_PUTS("[rtos] Screen flushed\n");
     VOIDPTR file = NULLPTR;
     static U32 bin_size = 0;
     IsoDirectoryRecord *fileptr = NULLPTR;
 
+    KDEBUG_PUTS("[rtos] Loading shell file record...\n");
     if(!(file = LOAD_KERNEL_SHELL(&bin_size, &fileptr))) {
         panic("PANIC: Failed to load kernel shell!", PANIC_KERNEL_SHELL_GENERAL_FAILURE);
         return;
     }
+    KDEBUG_PUTS("[rtos] Shell file loaded, size=0x"); KDEBUG_HEX32(bin_size); KDEBUG_PUTS("\n");
 
+    KDEBUG_PUTS("[rtos] Starting RUN_BINARY(atOShell) ...\n");
     panic_if(
         !RUN_BINARY("atOShell", file, bin_size, USER_HEAP_SIZE, USER_STACK_SIZE, 
             TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 0), 
         "PANIC: Failed to run kernel shell!", 
         PANIC_KERNEL_SHELL_GENERAL_FAILURE
     );
+    KDEBUG_PUTS("[rtos] RUN_BINARY returned OK\n");
     ISO9660_FREE_MEMORY(file);
     ISO9660_FREE_MEMORY(fileptr);
+    KDEBUG_PUTS("[rtos] LOAD_AND_RUN_KERNEL_SHELL done\n");
 }
 
 
@@ -447,4 +454,3 @@ void RTOSKRNL_LOOP(VOID) {
         handle_kernel_messages();
     }
 }
-
