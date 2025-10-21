@@ -12,3 +12,4 @@ Drivers are as follows:
 
 .\PIT - Programmable Interval Timer driver
 
+.\AC97 - AC'97 audio driver (ICH-compatible). Requires QEMU `-device ac97,audiodev=...` and is wired via syscalls for simple tone playback and stop.

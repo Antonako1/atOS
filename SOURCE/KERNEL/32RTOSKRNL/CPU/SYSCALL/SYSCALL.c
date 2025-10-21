@@ -14,6 +14,7 @@
 #include <DRIVERS/VIDEO/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
+#include <DRIVERS/AC97/AC97.h>
 
 #define SYSCALL_ENTRY(id, fn) [id] = fn,
 static SYSCALL_HANDLER syscall_table[SYSCALL_MAX] = {
@@ -260,6 +261,18 @@ U32 SYS_ISO9660_FREE_MEMORY(U32 ptr, U32 unused2, U32 unused3, U32 unused4, U32 
     return 0;
 }
 
+// Audio syscalls
+U32 SYS_AC97_TONE(U32 freq, U32 ms, U32 amp, U32 rate, U32 unused5) {
+    (void)unused5;
+    BOOLEAN ok = AC97_TONE(freq, ms, rate, (U16)amp);
+    return ok ? 1 : 0;
+}
+U32 SYS_AC97_STOP(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    AC97_STOP();
+    return 0;
+}
+
 U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5) {
     if (num >= SYSCALL_MAX) return (U32)-1;
     SYSCALL_HANDLER h = syscall_table[num];
@@ -288,5 +301,4 @@ __attribute__((naked)) void isr_syscall(void) {
         "iret\n\t"
     );
 }
-
 

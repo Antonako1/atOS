@@ -2,6 +2,44 @@
 
 Debugging support is very minimal, due to the OS running in a very constrained environment (raw binary, no standard libraries, etc). However, there are some basic debugging facilities available.
 
+## Kernel Debug Output (KDEBUG)
+
+The kernel now emits lightweight debug output to the Bochs/QEMU debug I/O port `0xE9`. It also mirrors to the first serial port (COM1) inside the guest, but the default run targets do not capture serial output to a host file.
+
+- QEMU flags (already used by `make run`):
+- `-debugcon file:OUTPUT/DEBUG/debug.log`
+- `-global isa-debugcon.iobase=0xe9`
+
+Files are written under `OUTPUT/DEBUG/` so you can tail them while the VM runs:
+
+```bash
+tail -f OUTPUT/DEBUG/debug.log
+```
+
+Kernel usage:
+- `KDEBUG_INIT()` — initializes COM1 (115200 8N1) and is called early in `rtos_kernel()`
+- `KDEBUG_PUTS(const U8 *s)` — prints a string (adds CR before LF to help some terminals)
+- `KDEBUG_PUTC(U8 c)` — prints a single character
+- `KDEBUG_HEX32(U32 v)` — prints a 32-bit value as hex prefixed with `0x`
+
+This is intended for early, low-overhead logging that does not depend on the graphics stack.
+
+### Shell Bootstrap Markers
+
+The kernel logs around user shell launch to help isolate boot hangs:
+
+- `[rtos] Enter LOAD_AND_RUN_KERNEL_SHELL` — entering loader
+- `[rtos] Screen flushed` — VBE framebuffer cleared/flushed
+- `[rtos] Loading shell file record...` — ISO9660 lookup started
+- `[rtos] Shell file loaded, size=0xXXXXXXXX` — file found and size determined
+- `[rtos] Starting RUN_BINARY(atOShell) ...` — process creation starting
+- `[proc] RUN_BINARY enter name="atOShell" size=0x...` — RUN_BINARY called with sizes
+- `[proc] setup_user_process...` and `[proc] setup_user_process OK` — user address space and binary mapping
+- `[proc] added to scheduler pid=0xXXXXXXXX` — shell enqueued in scheduler
+- `[rtos] RUN_BINARY returned OK` and `[rtos] LOAD_AND_RUN_KERNEL_SHELL done` — control returned to kernel loop
+
+If the log stops before RUN_BINARY, investigate ISO9660 read or memory allocation. If it stops inside RUN_BINARY, instrument process setup (paging, mapping, or initial trap frame) further.
+
 ## QEMU Debugging
 
 When running atOS in Qemu, you can use the built-in compact-monitor for debugging. To enable it, press View -> compactmonitor0 or Ctrl + Alt + 2. This will open a console window inside Qemu.

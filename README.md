@@ -151,7 +151,9 @@ The project uses `make` with simple targets:
 ### Debugging
 
 Debugging support is minimal.
-Please see DOCS/DEBUGGING.md for current options and tips.
+Please see `DOCS/DEBUGGING.md` for options and tips. When using `make run`/`make run_user_gui`, QEMU writes a debug log to:
+
+- `OUTPUT/DEBUG/debug.log` (port 0xE9 debugcon)
 
 ---
 

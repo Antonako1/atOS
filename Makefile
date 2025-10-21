@@ -47,6 +47,8 @@ INPUT_ISO_DIR_USER ?= $(INPUT_ISO_DIR)/USER
 INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 
 .PHONY: all kernel bootloader iso clean run help programs diskvbr clean_tap runn setup_tap
+.PHONY: run_user
+.PHONY: run_user_gui
 
 # Default target
 all: iso
@@ -136,7 +138,9 @@ kernel:
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/ATA_PIO/ATA_PIO.c -o $(OUTPUT_KERNEL_DIR)/ATA_PIO.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/CMOS/CMOS.c -o $(OUTPUT_KERNEL_DIR)/CMOS.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/RTL8139/RTL8139.c -o $(OUTPUT_KERNEL_DIR)/RTL8139.o
+	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/AC97/AC97.c -o $(OUTPUT_KERNEL_DIR)/AC97.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/BEEPER/BEEPER.c -o $(OUTPUT_KERNEL_DIR)/BEEPER.o
+	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DEBUG/KDEBUG.c -o $(OUTPUT_KERNEL_DIR)/KDEBUG.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/PCI/PCI.c -o $(OUTPUT_KERNEL_DIR)/PCI.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/PIT/PIT.c -o $(OUTPUT_KERNEL_DIR)/PIT.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/GDT/GDT.c -o $(OUTPUT_KERNEL_DIR)/GDT.o
@@ -200,6 +204,8 @@ kernel:
 		$(OUTPUT_KERNEL_DIR)/PROC.o \
 		$(OUTPUT_KERNEL_DIR)/FPU.o \
 		$(OUTPUT_KERNEL_DIR)/RTL8139.o \
+		$(OUTPUT_KERNEL_DIR)/AC97.o \
+		$(OUTPUT_KERNEL_DIR)/KDEBUG.o \
 		$(OUTPUT_KERNEL_DIR)/BITMAP.o \
 		$(OUTPUT_KERNEL_DIR)/ATA_PIIX3.o \
 		$(OUTPUT_KERNEL_DIR)/ATA_PIO.o \
@@ -251,8 +257,9 @@ iso: bootloader kernel programs diskvbr
 
 # Run ISO in QEMU
 run: 
-	@echo "Running ISO in QEMU..."
+	@echo "Running ISO in QEMU (user-mode net, GUI+audio)..."
 	qemu-img create -f raw hdd.img 256M
+	mkdir -p OUTPUT/DEBUG
 	qemu-system-i386 -vga std \
 	-m 1024 \
 	-boot order=d \
@@ -263,7 +270,10 @@ run:
 	-device ide-hd,drive=hd0,bus=ide.0 \
 	-device ide-cd,drive=cdrom,bus=ide.1 \
 	-device ac97,audiodev=snd0 \
-	-audiodev sdl,id=snd0
+	-debugcon file:OUTPUT/DEBUG/debug.log \
+		-global isa-debugcon.iobase=0xe9 \
+		-audiodev sdl,id=snd0 \
+		-nic user,model=rtl8139,mac=52:54:00:12:34:56
 
 # remove tap device
 clean_tap:
@@ -282,8 +292,8 @@ setup_tap:
 	$(MAKE) clean_tap
 	# Create TAP device if it doesn't exist
 	@if ! ip link show tap0 >/dev/null 2>&1; then \
-	    echo "Creating TAP device tap0..."; \
-	    sudo ip tuntap add dev tap0 mode tap; \
+	    echo "Creating TAP device tap0 owned by $(shell id -un)..."; \
+	    sudo ip tuntap add dev tap0 mode tap user $(shell id -un); \
 	else \
 	    echo "TAP device tap0 already exists"; \
 	fi
@@ -335,6 +345,9 @@ help:
 	@echo "  make iso        - Build bootable ISO (default)"
 	@echo "  make run        - Run ISO in QEMU"
 	@echo "  sudo make runn  - Run ISO in QEMU with ethernet driver"
+	@echo "  make run_user   - Run headless QEMU (no sudo, user-net)"
+	@echo "  make run_user_gui - Run QEMU with GUI+audio (no sudo, user-net)"
+	@echo "  Logs: OUTPUT/DEBUG/debug.log (from I/O port 0xE9)"
 	@echo "  sudo make setup_tap      - Setup tap ethernet config"
 	@echo "  sudo make clean_tap      - Clean tap ethernet config"
 	@echo "  make clean      - Clean build artifacts"

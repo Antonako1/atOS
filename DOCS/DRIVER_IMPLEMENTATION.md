@@ -5,6 +5,7 @@ This document explains how to **create drivers** for the operating system based 
 - **ATA PIIX3** (Bus Master DMA) driver  
 - **CMOS (RTC)** driver  
 - **RTL8139** (Network) driver  
+- **AC'97** (Audio) driver  
 
 Each driver follows a consistent **driver architecture** within the kernel and uses ONLY kernel usable functions:
 - `PCI` for device discovery and configuration
@@ -406,6 +407,47 @@ When adding new syscalls, always:
 * Define them in `SYSCALL_LIST.h`
 * Implement the `SYS_` prefixed function
 * Expose it through user-space wrappers in the appropriate subsystem
+
+---
+
+## 🔊 AC'97 Audio Driver Notes
+
+The AC'97 driver targets Intel ICH-compatible controllers exposed via PCI. It performs:
+
+- PCI discovery for devices with class `Multimedia` and subclass `Audio`.
+- Extraction of BAR0/BAR1 as I/O ports for NAM (mixer) and NABM (bus master).
+- Codec reset and power-up via NAM registers.
+- DMA setup for PCM out using a Buffer Descriptor List (BDL) programmed into NABM.
+- IRQ installation for buffer completion notifications.
+
+QEMU run requirements (already present in `make run`):
+
+```bash
+-device ac97,audiodev=snd0 -audiodev sdl,id=snd0
+```
+
+Key registers and concepts (subset):
+- NAM reset: `NAM_RESET (0x00)`
+- Sample rate: `NAM_FRONT_DAC_RATE (0x2C)`
+- Volumes: `NAM_MASTER_VOLUME (0x02)`, `NAM_PCM_OUT_VOLUME (0x18)`
+- BDL base: `NABM_PO_BDBAR (0x10)`
+- Control: `NABM_PO_CR (RUN/IOCE/LVBIE)`
+- Status: `NABM_PO_SR (BCIS/LVBCI)`
+
+Driver API:
+- `BOOLEAN AC97_INIT(void);` — discover device, reset codec, allocate DMA, enable IRQs.
+- `BOOLEAN AC97_PLAY(const U16* pcm, U32 frames, U8 channels, U32 rate);` — play 16-bit stereo PCM.
+- `BOOLEAN AC97_TONE(U32 freq, U32 duration_ms, U32 rate, U16 amp);` — generate a square tone.
+- `VOID AC97_STOP(void);` — stop playback and clear status.
+
+Syscalls exposed to userland:
+- `SYSCALL_AC97_TONE` → `SYS_AC97_TONE(freq, ms, amp, rate)`
+- `SYSCALL_AC97_STOP` → `SYS_AC97_STOP()`
+
+IRQ handling:
+The IRQ handler acknowledges PIC and clears NABM status bits. It also tracks buffer completions to stop playback when a finite buffer set has played out.
+
+See: `SOURCE/KERNEL/32RTOSKRNL/DRIVERS/AC97/AC97.c` and `AC97.h`.
 
 ---
 

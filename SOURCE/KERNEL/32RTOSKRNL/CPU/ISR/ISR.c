@@ -78,11 +78,14 @@ void irq_common_handler(I32 vector, U32 errcode) {
         panic(PANIC_TEXT("Non-IRQ received in irq_common_handler!"), vector);
         return;
     }
-    if(vector != 0x21 && vector != 0x28) DUMP_ERRCODE(vector);
+    // Only dump if there is no registered handler (avoid noisy consoles)
+    if (!g_Handlers[vector]) {
+        if(vector != 0x21 && vector != 0x28) DUMP_ERRCODE(vector);
+    }
     #endif // __RTOS__
-    if (g_Handlers[vector]) 
+    if (g_Handlers[vector]) {
         g_Handlers[vector](vector, errcode);
-    else {
+    } else {
         int irq = vector - PIC_REMAP_OFFSET; // 0x20
         if ((unsigned)irq < 16) pic_send_eoi(irq);
     }

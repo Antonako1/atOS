@@ -558,6 +558,9 @@ void add_tcb_to_scheduler(TCB *new_tcb) {
 }
 
 BOOLEAN RUN_BINARY(U8 *proc_name, VOIDPTR file, U32 bin_size, U32 heap_size, U32 stack_size, U32 initial_state, U32 parent_pid) {
+    KDEBUG_PUTS("[proc] RUN_BINARY enter name=\"");
+    KDEBUG_PUTS(proc_name);
+    KDEBUG_PUTS("\" size=0x"); KDEBUG_HEX32(bin_size); KDEBUG_PUTS(" heap=0x"); KDEBUG_HEX32(heap_size); KDEBUG_PUTS(" stack=0x"); KDEBUG_HEX32(stack_size); KDEBUG_PUTS("\n");
     if(!file || !proc_name) return FALSE;
     if(!initialized) return FALSE; // multitasking not initialized
     if(bin_size == 0 || bin_size > MAX_USER_BINARY_SIZE) {
@@ -576,14 +579,17 @@ BOOLEAN RUN_BINARY(U8 *proc_name, VOIDPTR file, U32 bin_size, U32 heap_size, U32
         new_proc->parent = get_tcb_by_pid(parent_pid);
 
     // Setup memory + trap frame
+    KDEBUG_PUTS("[proc] setup_user_process...\n");
     panic_if(!setup_user_process(new_proc, (U8 *)file, bin_size, heap_size, stack_size, initial_state),
              PANIC_TEXT("Failed to set up user process"), PANIC_OUT_OF_MEMORY);
+    KDEBUG_PUTS("[proc] setup_user_process OK\n");
 
     new_proc->info.pid = get_next_pid();
     STRNCPY((char *)new_proc->info.name, (char *)proc_name, TASK_NAME_MAX_LEN);
     new_proc->info.name[TASK_NAME_MAX_LEN - 1] = '\0';
 
     add_tcb_to_scheduler(new_proc);
+    KDEBUG_PUTS("[proc] added to scheduler pid=0x"); KDEBUG_HEX32(new_proc->info.pid); KDEBUG_PUTS("\n");
 
     return TRUE;
 }

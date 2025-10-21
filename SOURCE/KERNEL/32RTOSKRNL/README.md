@@ -12,3 +12,7 @@ Contains files used by the 32-bit kernel and its entry file
   - Memory definitions and functions
 - SYSCALL\
   - Syscalls
+
+Additional subsystems:
+- `DEBUG/` — Minimal kernel debug I/O helpers (I/O port 0xE9; also mirrors to COM1 when present). See `DOCS/DEBUGGING.md` for QEMU flags and log details.
+- `DRIVERS/AC97/` — AC'97 audio driver initialization and simple playback helpers.

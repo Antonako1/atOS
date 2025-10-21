@@ -19,6 +19,7 @@
 #include <DRIVERS/CMOS/CMOS.h>
 #include <DRIVERS/BEEPER/BEEPER.h>
 #include <DRIVERS/RTL8139/RTL8139.h>
+#include <DRIVERS/AC97/AC97.h>
 
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <RTOSKRNL/PROC/PROC.h>

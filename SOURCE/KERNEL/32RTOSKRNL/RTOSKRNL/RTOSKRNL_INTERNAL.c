@@ -500,6 +500,7 @@ void assert(BOOL condition) {
 
 
 void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
+    KDEBUG_PUTS("[rtos] Enter LOAD_AND_RUN_KERNEL_SHELL\n");
     VBE_FLUSH_SCREEN();
     FAT_LFN_ENTRY ent = { 0 };
     U32 sz = 0;
@@ -510,6 +511,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     if(!file) {
         panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
+
     panic_if(
         !RUN_BINARY("atOShell", file, sz, USER_HEAP_SIZE, USER_STACK_SIZE, 
             TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 0), 
@@ -518,6 +520,8 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     );
     KFREE(file);
     file = NULLPTR;
+    KDEBUG_PUTS("[rtos] RUN_BINARY returned OK\n");
+    KDEBUG_PUTS("[rtos] LOAD_AND_RUN_KERNEL_SHELL done\n");
 }
 
 BOOL initialize_filestructure(VOID) {
@@ -552,4 +556,3 @@ void RTOSKRNL_LOOP(VOID) {
         handle_kernel_messages();
     }
 }
-
