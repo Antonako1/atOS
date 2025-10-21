@@ -101,7 +101,19 @@ BOOLEAN STRCASECMP(U8 *a, U8 *b) {
     }
     return (int)(*a - *b);
 }
-
+BOOLEAN STRCASENCMP(U8 *a, U8 *b, U32 n) {
+    if (!a || !b) return -1;
+    while (*a && *b && n--) {
+        CHAR ca = *a;
+        CHAR cb = *b;
+        if (ca >= 'a' && ca <= 'z') ca -= 32;
+        if (cb >= 'a' && cb <= 'z') cb -= 32;
+        if (ca != cb) return (int)(ca - cb);
+        a++;
+        b++;
+    }
+    return (int)(*a - *b);
+}
 
 U32 ATOI(CONST U8* str) {
     U32 res = 0;

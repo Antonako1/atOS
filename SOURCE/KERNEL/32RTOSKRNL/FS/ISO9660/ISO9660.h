@@ -78,7 +78,7 @@ typedef struct _IsoDirectoryRecord {
 __attribute__((packed))
 IsoDirectoryRecord;
 
-#define IDR_SIZE sizeof(_IsoDirectoryRecord)
+#define IDR_SIZE sizeof(IsoDirectoryRecord)
 
 typedef struct _PrimaryVolumeDescriptor {
     U8 TypeCode;

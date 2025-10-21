@@ -263,8 +263,6 @@ run:
 	-device ide-hd,drive=hd0,bus=ide.0 \
 	-device ide-cd,drive=cdrom,bus=ide.1 \
 	-device ac97,audiodev=snd0 \
-	-netdev tap,id=tap0,ifname=tap0,script=no,downscript=no \
-	-device rtl8139,netdev=tap0,mac=52:54:00:12:34:56 \
 	-audiodev sdl,id=snd0
 
 # remove tap device
@@ -299,6 +297,19 @@ setup_tap:
 	fi
 
 	@echo "TAP device ready. No IP assigned, communicate using MAC addresses only."
+	qemu-system-i386 -vga std \
+	-m 1024 \
+	-boot order=d \
+	-cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) \
+	-drive id=cdrom,file=$(OUTPUT_ISO_DIR)/$(ISO_NAME),format=raw,if=none \
+	-drive id=hd0,file=hdd.img,format=raw,if=none \
+	-device piix3-ide,id=ide \
+	-device ide-hd,drive=hd0,bus=ide.0 \
+	-device ide-cd,drive=cdrom,bus=ide.1 \
+	-device ac97,audiodev=snd0 \
+	-netdev tap,id=tap0,ifname=tap0,script=no,downscript=no \
+	-device rtl8139,netdev=tap0,mac=52:54:00:12:34:56 \
+	-audiodev sdl,id=snd0
 
 
 

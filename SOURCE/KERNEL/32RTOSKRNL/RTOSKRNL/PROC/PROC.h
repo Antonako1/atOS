@@ -182,6 +182,7 @@ typedef struct proc_message {
     // Needs to be freed by receiver if data_provided is TRUE
     // Use KFREE to free
     VOIDPTR data; 
+    U32 data_size;
 
     U32 signal; // Provide signal value if needed
 

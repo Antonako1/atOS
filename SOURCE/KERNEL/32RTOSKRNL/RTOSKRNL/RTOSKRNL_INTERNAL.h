@@ -8,7 +8,8 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
-#define PANIC_TEXT(x) "" __FILE__ ", ln" STR(__LINE__) ": " x
+#define PANIC_TEXT(x) x " (" __FILE__":"STR(__LINE__) ")"
+#define PANIC_IF_TXT(x) x, PANIC_TEXT(#x)
 
 typedef enum {
 

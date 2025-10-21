@@ -100,7 +100,7 @@ U32 SYS_GET_KEYBOARD_MODIFIERS(U32 unused1, U32 unused2, U32 unused3, U32 unused
     if (!mod) return 0;
     MODIFIERS *retval = GET_KEYBOARD_MODIFIERS();
     MEMCPY(mod, retval, sizeof(MODIFIERS));
-    Free(retval);
+    KFREE(retval);
     return (U32)mod;
 }
 
@@ -117,20 +117,40 @@ U32 SYS_MESSAGE_AMOUNT(U32 pid, U32 msg_ptr, U32 length, U32 signal, U32 unused5
     U32 res = t->msg_count;
     return (U32)res;
 }
-U32 SYS_GET_MESSAGE(U32 unused1, U32 unusef2, U32 unused3, U32 unused4, U32 unused5) {
+U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused5;
     TCB *t = get_current_tcb();
     if (!t) return 0;
     if (t->msg_count == 0) return 0; // no messages
+
     PROC_MESSAGE *msg = &t->msg_queue[t->msg_queue_head];
     PROC_MESSAGE *msg_copy = KMALLOC(sizeof(PROC_MESSAGE));
     if (!msg_copy) return 0;
+
     MEMCPY(msg_copy, msg, sizeof(PROC_MESSAGE));
-    // Advance head
+
+    if (msg->data_provided && msg->data) {
+        // Determine how much data needs to be copied.
+        // This should be stored in the message (you can add msg->data_size field)
+        U32 data_size = msg->signal; // or another field that holds the size
+        if (data_size == 0) data_size = sizeof(KEYPRESS) + sizeof(MODIFIERS); // fallback
+        VOIDPTR data_copy = KMALLOC(data_size);
+        if (data_copy) {
+            MEMCPY(data_copy, msg->data, data_size);
+            msg_copy->data = data_copy;
+        } else {
+            msg_copy->data_provided = FALSE;
+            msg_copy->data = NULL;
+        }
+    }
+
+    // Advance queue head
     t->msg_queue_head = (t->msg_queue_head + 1) % PROC_MSG_QUEUE_SIZE;
     t->msg_count--;
+
     return (U32)msg_copy;
 }
+
 U32 SYS_SEND_MESSAGE(U32 msg_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     if (!msg_ptr) return (U32)-1;

@@ -197,13 +197,15 @@ BOOLEAN CREATE_CHILD_FILE(U32 parent_cluster, U8 *name, U8 attrib, PU8 filedata,
 
 // ----- Directory management -----
 
-BOOL DIR_ENUMERATE_LFN(U32 dir_cluster, FAT_LFN_ENTRY *out_entries, U32 max_count);
+BOOL DIR_ENUMERATE_LFN(U32 dir_cluster, FAT_LFN_ENTRY *out_entries, U32 *max_count);
 // Reads all valid directory entries from a directory cluster chain.
 // Fills up to 'max_count' entries in 'out_entries'. Returns TRUE if successful.
+// Count returned in max_count
 
-BOOL DIR_ENUMERATE(U32 dir_cluster, DIR_ENTRY *out_entries, U32 max_count);
+BOOL DIR_ENUMERATE(U32 dir_cluster, DIR_ENTRY *out_entries, U32 *max_count);
 // Reads all valid directory entries from a directory cluster chain.
 // Fills up to 'max_count' entries in 'out_entries'. Returns TRUE if successful.
+// Count returned in max_count
 
 BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *entry, const char *name);
 // Deletes a file or directory entry from 'entry'.

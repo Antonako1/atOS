@@ -17,6 +17,7 @@ BOOLEAN STRNCMP(CONST U8* str1, CONST U8* str2, U32 n);
 
 // returns 0 on success
 BOOLEAN STRCASECMP(U8 *a, U8 *b);
+BOOLEAN STRCASENCMP(U8 *a, U8 *b, U32 n);
 
 U0 *STRCHR(CONST U8* str, U8 c);
 U0 *STRRCHR(CONST U8* str, U8 c);
