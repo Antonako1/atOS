@@ -31,6 +31,6 @@ F32 sqrtf(F32 x);
 I32 round_up(I32 x);
 I32 round_down(I32 x);
 I32 round_to_nearest(I32 x);
-
+I32 ceil_to_multiple(I32 x, I32 n);
 BOOLEAN range_overlap(U32 a_start, U32 a_len, U32 b_start, U32 b_len);
 #endif // MATH_H

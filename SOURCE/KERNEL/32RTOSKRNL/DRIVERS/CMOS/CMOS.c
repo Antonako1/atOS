@@ -108,7 +108,7 @@ VOID RTC_HANDLER(U32 vector, U32 errcode) {
 
     cmos_read_register(RTC_REG_C);
     
-    pic_send_eoi(8);
+    pic_send_eoi(vector - PIC_REMAP_OFFSET);
 }
 
 BOOLEAN INIT_RTC(VOID) {

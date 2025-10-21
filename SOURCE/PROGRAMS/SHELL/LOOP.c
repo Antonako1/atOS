@@ -52,7 +52,6 @@ U0 EDIT_LINE_MSG_LOOP() {
             MODIFIERS *mods = (MODIFIERS *)((U8 *)msg->data + sizeof(KEYPRESS));
             HANDLE_KB_EDIT_LINE(kp, mods);
         }
-
         FREE_MESSAGE(msg);
     }
 }

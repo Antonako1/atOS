@@ -7,9 +7,8 @@
 
 DESCRIPTION
     Kernel heap memory allocation functions.
-    Kernel heap is a linear allocator, meaning that it allocates memory in a contiguous block.
-    It does not support freeing individual allocations, only freeing all allocations at once.
-
+    This implementation uses a block-based allocation strategy with splitting
+    and coalescing to manage memory efficiently.
 
 AUTHORS
     Name(s)
@@ -43,11 +42,10 @@ VOID KFREE(VOIDPTR ptr);
 VOIDPTR KCALLOC(U32 num, U32 size);
 
 /// @brief Reallocates memory in the kernel heap.
-/// @param addr Pointer to the current memory block. Updated to point to the new block.
-/// @param oldSize Current size of the memory block in bytes.
+/// @param addr Pointer to the current memory block.
 /// @param newSize New size of the memory block in bytes.
-/// @return TRUE if reallocation succeeded, FALSE otherwise.
-BOOLEAN KREALLOC(VOIDPTR *addr, U32 oldSize, U32 newSize);
+/// @return Pointer to new memory block, or NULL if allocation failed.
+VOIDPTR KREALLOC(VOIDPTR addr, U32 newSize);
 
 /// @brief Allocates memory from the kernel heap with specified alignment.
 /// @param size Size in bytes to allocate.
@@ -66,28 +64,50 @@ VOID KFREE_ALIGN(VOIDPTR ptr);
 
 #define KHEAP_MAX_SIZE (MEM_KERNEL_HEAP_END - MEM_KERNEL_HEAP_BASE) // Maximum heap size in bytes
 #define KHEAP_MAX_SIZE_PAGES (KHEAP_MAX_SIZE / PAGE_SIZE)
-#define KHEAP_DEFAULT_SIZE_PAGES (KHEAP_MAX_SIZE_PAGES / 1.5) // Default initial heap size (2/3 of max)
+#define KHEAP_DEFAULT_SIZE_PAGES (KHEAP_MAX_SIZE_PAGES / 2) // Default initial heap size
 
 /// @brief Initializes the kernel heap.
-/// @param pageNum Number of pages to allocate for the heap, must be >= KHEAP_MIN_SIZE_PAGES.
+/// @param pageNum Number of pages to allocate for the heap.
 /// @return TRUE if initialization succeeded, FALSE otherwise.
 BOOLEAN KHEAP_INIT(U32 pageNum);
 
-typedef struct KHeapBlock {
-    U32 size;       // Size of the block (excluding header)
-    U8 free;        // 1 = free, 0 = allocated
+/// @brief Header for a memory block in the kernel heap.
+/// Placed directly before the user-accessible memory region.
+typedef struct ATTRIB_PACKED {
+    U32 magic0;       // Magic value to validate block integrity
+    U32 size;         // User-requested size (payload size)
+    U32 magic1;       // Another magic value for extra validation
+    U32 real_size;    // Allocated payload size (after alignment)
+    BOOLEAN free;     // Flag indicating if the block is free
+    U32 magic2;       // A third magic value
 } KHeapBlock;
 
+// Magic values help detect heap corruption, like buffer overflows or invalid frees.
+#define KHEAP_BLOCK_MAGIC0 0xDEADBEEF
+#define KHEAP_BLOCK_MAGIC1 0xFEEBDAED
+#define KHEAP_BLOCK_MAGIC2 0xDABBADAF
+
+/// @brief Structure holding information about the kernel heap.
 typedef struct {
-    U32 totalSize;
-    U32 usedSize;
-    U32 freeSize;
-    VOIDPTR baseAddress;
-    VOIDPTR currentPtr;
+    U32 totalSize;      // Total size of the heap region in bytes
+    U32 usedSize;       // Sum of real_size of all used blocks
+    U32 freeSize;       // Sum of real_size of all free blocks
+    VOIDPTR baseAddress;  // Start address of the heap
+    VOIDPTR currentPtr;   // Pointer for the next-fit search start
 } KHeap;
 
+/// @brief Retrieves statistics and information about the kernel heap.
+/// @return Pointer to the kernel's KHeap structure.
 KHeap* KHEAP_GET_INFO(VOID);
+
+/// @brief Retrieves a pointer to the header of the Nth block in the heap.
+/// @param index The zero-based index of the block to retrieve.
+/// @return Pointer to the KHeapBlock, or NULL if the index is out of bounds.
 KHeapBlock* KHEAP_GET_X_BLOCK(U32 index);
+
+/// @brief Expands the kernel heap by a given number of pages.
+/// @param additionalPages The number of pages to add to the heap.
+/// @return TRUE if expansion succeeded, FALSE otherwise.
 BOOLEAN KHEAP_EXPAND(U32 additionalPages);
 
 #endif // KHEAP_H

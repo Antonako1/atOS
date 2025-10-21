@@ -29,4 +29,7 @@ BOOLEAN ATA_PIO_READ_SECTORS(U32 lba, U8 sector_count, VOIDPTR out_buffer);
 BOOLEAN ATA_PIO_WRITE_SECTORS(U32 lba, U8 sector_count, VOIDPTR in_buffer);
 
 U32 ATA_CALC_SEC_COUNT(U32 bytes);
+
+#define ATA_PIO_READ_CLUSTER(lba, in_buffer)    ATA_PIO_READ_SECTORS(lba, 1, in_buffer)
+#define ATA_PIO_WRITE_CLUSTER(lba, out_buffer)  ATA_PIO_WRITE_SECTORS(lba, 1, out_buffer)
 #endif // ATA_PIO_DRIVER_H

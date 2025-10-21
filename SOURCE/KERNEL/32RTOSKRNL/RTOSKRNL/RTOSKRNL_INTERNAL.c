@@ -18,9 +18,9 @@ and some not-so-important functions are here.
 #include <PROC/PROC.h>
 #include <VIDEO/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
+#include <ERROR/ERROR.h>
 
-
-#define INC_rki_row(rki_row) (rki_row += VBE_CHAR_HEIGHT + 2); if(rki_row > 1024) rki_row = 0;
+#define INC_rki_row(rki_row) (rki_row += VBE_CHAR_HEIGHT + 2)
 #define DEC_rki_row(rki_row) (rki_row -= VBE_CHAR_HEIGHT + 2)
 static U32 rki_row __attribute__((section(".data"))) = 0;
 
@@ -139,6 +139,16 @@ void DUMP_ERRCODE(U32 errcode) {
     VBE_UPDATE_VRAM();
 }
 
+void DUMP_U32_2(U32 x, U32 y) {
+    U8 buf[20];
+    ITOA_U(x, buf, 16);
+    VBE_DRAW_STRING(0, rki_row, buf, PANIC_COLOUR);
+    ITOA_U(y, buf, 16);
+    VBE_DRAW_STRING(200, rki_row, buf, PANIC_COLOUR);
+    INC_rki_row(rki_row);
+    VBE_UPDATE_VRAM();
+}
+
 void DUMP_INTNO(U32 int_no) {
     U8 buf[20];
     VBE_DRAW_STRING(0, rki_row, "Interrupt number: ", PANIC_COLOUR);
@@ -150,13 +160,13 @@ void DUMP_INTNO(U32 int_no) {
 
 void DUMP_MEMORY(U32 addr, U32 length) {
     U8 buf[20] = { 0 };
-    char ascii[16] = { 0 };  // 16 chars per line
+    char ascii[17] = { 0 };  // 16 chars + null terminator
     U8 *ptr = (U8*)addr;
 
-    for(U32 i = 0; i < length; i++) {
+    for (U32 i = 0; i < length; i++) {
         // Start new line every 16 bytes
-        if(i % 16 == 0) {
-            if(i != 0) {
+        if (i % 16 == 0) {
+            if (i != 0) {
                 // Draw ASCII characters at end of previous line
                 VBE_DRAW_STRING(100 + 16 * 30, rki_row, ascii, PANIC_COLOUR);
                 INC_rki_row(rki_row);
@@ -165,6 +175,8 @@ void DUMP_MEMORY(U32 addr, U32 length) {
             // Print memory address at start of line
             ITOA_U((U32)(ptr + i), buf, 16);
             VBE_DRAW_STRING(0, rki_row, buf, PANIC_COLOUR);
+
+            MEMZERO(ascii, sizeof(ascii)); // clear ASCII buffer
         }
 
         // Print hex value of the byte
@@ -177,8 +189,8 @@ void DUMP_MEMORY(U32 addr, U32 length) {
 
     // Draw ASCII for the last line
     int lastLineBytes = length % 16;
-    if(lastLineBytes == 0) lastLineBytes = 16;  // full line
-    for(int j = lastLineBytes; j < 16; j++) ascii[j] = ' '; // pad remaining
+    if (lastLineBytes == 0) lastLineBytes = 16; // full line
+    ascii[lastLineBytes] = '\0';                 // null terminate
     VBE_DRAW_STRING(100 + 16 * 30, rki_row, ascii, PANIC_COLOUR);
     INC_rki_row(rki_row);
 
@@ -188,12 +200,28 @@ void DUMP_MEMORY(U32 addr, U32 length) {
 
 
 
+
 void DUMP_STRING(STRING buf) {
     VBE_DRAW_STRING(0, rki_row, buf, PANIC_COLOUR);
     INC_rki_row(rki_row);
     VBE_UPDATE_VRAM();
 }
-
+void DUMP_STRINGN(STRING buf, U32 n) {
+    for(U32 i = 0; i < n; i++) {
+        VBE_DRAW_CHARACTER(i * VBE_CHAR_WIDTH, rki_row, buf[i], PANIC_COLOUR);
+    }
+    INC_rki_row(rki_row);
+    VBE_UPDATE_VRAM();
+}
+void DUMP_STRING_U32(STRING str, U32 num) {
+    U8 buf[16];
+    ITOA_U(num, buf, 16);
+    VBE_DRAW_STRING(0, rki_row, buf, PANIC_COLOUR);
+    VBE_DRAW_STRING(16 * 16 + 2, rki_row, str, PANIC_COLOUR);
+    INC_rki_row(rki_row);
+    DUMP_MEMORY(num, 32);
+    VBE_UPDATE_VRAM();
+}
 
 void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     CLI;
@@ -228,55 +256,168 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     INC_rki_row(rki_row);
     DUMP_STACK(esp - 60, 80);
     INC_rki_row(rki_row);
+
+        // 🔍 Kernel Heap Info
+    INC_rki_row(rki_row);
+    VBE_DRAW_STRING(0, rki_row, "Kernel Heap Info:", fg, bg);
+    INC_rki_row(rki_row);
+    KHeap *heap = KHEAP_GET_INFO();
+    if (heap) {
+        ITOA(heap->totalSize, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Total Size: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(heap->usedSize, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Used Size: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(heap->freeSize, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Free Size: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+    }
+
+    // 🔍 Pageframe Info
+    INC_rki_row(rki_row);
+    VBE_DRAW_STRING(0, rki_row, "Pageframe Info:", fg, bg);
+    INC_rki_row(rki_row);
+    PAGEFRAME_INFO *pf = GET_PAGEFRAME_INFO();
+    if (pf && pf->initialized) {
+        ITOA(pf->size, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Total Pages: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(pf->usedMemory, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Used Memory: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(pf->freeMemory, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Free Memory: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(pf->reservedMemory, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Reserved Memory: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+    }
+
     VBE_UPDATE_VRAM();
     ASM_VOLATILE("cli; hlt");
 }
 void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     CLI;
+    debug_vram_start();
     rki_row = 0;
     VBE_CLEAR_SCREEN(bg);
     U8 buf[16];
-    ITOA(errmsg, buf, 16);
-    VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
-    VBE_DRAW_STRING(VBE_CHAR_WIDTH*13, rki_row, buf, fg, bg);
-    VBE_DRAW_CHARACTER(VBE_CHAR_WIDTH*19, rki_row, (U8)errmsg, fg, bg);
-    INC_rki_row(rki_row);
-    VBE_DRAW_STRING(0, rki_row, msg, fg, bg);
-    INC_rki_row(rki_row);
-    VBE_DRAW_STRING(0, rki_row, "System halted, Dump as in panic() call.", fg, bg);
-    INC_rki_row(rki_row);
+    // Registers
     U32 esp = ASM_READ_ESP();
     U32 eip = ASM_GET_EIP();
-    
     INC_rki_row(rki_row);    
     VBE_DRAW_STRING(0, rki_row, "Registers:", fg, bg);
     INC_rki_row(rki_row);
     regs r = ASM_READ_REGS();
     DUMP_REGS(&r);
+
     VBE_DRAW_STRING(0, rki_row, "EIP:", fg, bg);
     ITOA(eip, buf, 16);
     VBE_DRAW_STRING(50, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
+
     VBE_DRAW_STRING(0, rki_row, "ESP:", fg, bg);
     ITOA(esp, buf, 16);
     VBE_DRAW_STRING(50, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
+    // Error code
+    ITOA_U(errmsg, buf, 16);
+    VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
+    VBE_DRAW_STRING(VBE_CHAR_WIDTH*13, rki_row, buf, fg, bg);
+    INC_rki_row(rki_row);
 
+    // Last error
+    VBE_DRAW_STRING(0, rki_row, "Last error: 0x", fg, bg);
+    ITOA_U(GET_LAST_ERROR(), buf, 16);
+    VBE_DRAW_STRING(VBE_CHAR_WIDTH*14, rki_row, buf, fg, bg);
+    VBE_DRAW_CHARACTER(VBE_CHAR_WIDTH*19, rki_row, (U8)errmsg, fg, bg);
+    INC_rki_row(rki_row);
+
+    // Message
+    VBE_DRAW_STRING(0, rki_row, msg, fg, bg);
+    INC_rki_row(rki_row);
+    VBE_DRAW_STRING(0, rki_row, "System halted, Dump as in panic() call.", fg, bg);
+    INC_rki_row(rki_row);
+
+
+
+    // Stack
     INC_rki_row(rki_row);
     DUMP_STACK(esp, 10);
-    
     INC_rki_row(rki_row);
     DUMP_CALLER_STACK(10);
     INC_rki_row(rki_row);
 
+    // Memory dumps
     VBE_DRAW_STRING(0, rki_row, "Memory dump at EIP", fg, bg);
     INC_rki_row(rki_row);
-    
     DUMP_MEMORY(eip, 64);
 
     VBE_DRAW_STRING(0, rki_row, "Memory dump at error code.", fg, bg);
     INC_rki_row(rki_row);
     DUMP_MEMORY(errmsg, 256);
+
+    // 🔍 Kernel Heap Info
+    INC_rki_row(rki_row);
+    VBE_DRAW_STRING(0, rki_row, "Kernel Heap Info:", fg, bg);
+    INC_rki_row(rki_row);
+    KHeap *heap = KHEAP_GET_INFO();
+    if (heap) {
+        ITOA(heap->totalSize, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Total Size: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(heap->usedSize, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Used Size: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(heap->freeSize, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Free Size: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+    }
+
+    // 🔍 Pageframe Info
+    INC_rki_row(rki_row);
+    VBE_DRAW_STRING(0, rki_row, "Pageframe Info:", fg, bg);
+    INC_rki_row(rki_row);
+    PAGEFRAME_INFO *pf = GET_PAGEFRAME_INFO();
+    if (pf && pf->initialized) {
+        ITOA(pf->size, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Total Pages: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(pf->usedMemory, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Used Memory: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(pf->freeMemory, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Free Memory: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+
+        ITOA(pf->reservedMemory, buf, 16);
+        VBE_DRAW_STRING(0, rki_row, "Reserved Memory: 0x", fg, bg);
+        VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
+        INC_rki_row(rki_row);
+    }
 
     VBE_UPDATE_VRAM();
     ASM_VOLATILE("cli; hlt");
@@ -355,82 +496,56 @@ void assert(BOOL condition) {
 
 
 
-// #define SHELL_PATH "INNER/INNER2/INSIDE_1.TXT"
-// #define DEBUG_PRINT_SHELL_CONTENTS_AND_HALT
-
-#define SHELL_PATH "PROGRAMS/atOShell/atOShell.BIN"
-// #define SHELL_PATH "PROGRAMS/TEST1/TEST1.BIN"
-
-VOIDPTR LOAD_KERNEL_SHELL(U32 *bin_size_out, IsoDirectoryRecord **fileptr_out) {
-    U8 filename[] = SHELL_PATH; // ISO9660 format
-    *fileptr_out = ISO9660_FILERECORD_TO_MEMORY((CHAR*)filename);
-    if(!*fileptr_out) {
-        panic("PANIC: Failed to read kernel shell from disk!", PANIC_KERNEL_SHELL_GENERAL_FAILURE);
-        return NULL;
-    }
-    if(bin_size_out) 
-        *bin_size_out = (*fileptr_out)->extentLengthLE;
-
-
-    VOIDPTR file_data_out = ISO9660_READ_FILEDATA_TO_MEMORY(*fileptr_out);
-
-    if(!file_data_out) {
-        ISO9660_FREE_MEMORY(*fileptr_out);
-        panic("PANIC: Failed to read kernel shell data from disk!", PANIC_KERNEL_SHELL_GENERAL_FAILURE);
-        return NULL;
-    }
-    return file_data_out;
-}
-
+#define SHELL_PATH "PROGRAMS/ATOSHELL/ATOSHELL.BIN"
 
 
 void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
+    KDEBUG_PUTS("[rtos] Enter LOAD_AND_RUN_KERNEL_SHELL\n");
     VBE_FLUSH_SCREEN();
-    VOIDPTR file = NULLPTR;
-    static U32 bin_size = 0;
-    IsoDirectoryRecord *fileptr = NULLPTR;
-
-    if(!(file = LOAD_KERNEL_SHELL(&bin_size, &fileptr))) {
-        panic("PANIC: Failed to load kernel shell!", PANIC_KERNEL_SHELL_GENERAL_FAILURE);
-        return;
+    FAT_LFN_ENTRY ent = { 0 };
+    U32 sz = 0;
+    if(!PATH_RESOLVE_ENTRY(SHELL_PATH, &ent)) {
+        panic("Unable to load SHELL from FAT", PANIC_INITIALIZATION_FAILED);
+    }
+    VOIDPTR file = READ_FILE_CONTENTS(&sz, &ent.entry);
+    if(!file) {
+        panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
 
     panic_if(
-        !RUN_BINARY("atOShell", file, bin_size, USER_HEAP_SIZE, USER_STACK_SIZE, 
+        !RUN_BINARY("atOShell", file, sz, USER_HEAP_SIZE, USER_STACK_SIZE, 
             TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 0), 
         "PANIC: Failed to run kernel shell!", 
         PANIC_KERNEL_SHELL_GENERAL_FAILURE
     );
-    ISO9660_FREE_MEMORY(file);
-    ISO9660_FREE_MEMORY(fileptr);
+    KFREE(file);
+    file = NULLPTR;
+    KDEBUG_PUTS("[rtos] RUN_BINARY returned OK\n");
+    KDEBUG_PUTS("[rtos] LOAD_AND_RUN_KERNEL_SHELL done\n");
 }
 
-
 BOOL initialize_filestructure(VOID) {
-    // LOAD_BPB();
-    
-    WRITE_DISK_BPB();
-    IsoDirectoryRecord *vbr = NULLPTR;
+    if(!GET_BPB_LOADED()) {
+        return LOAD_BPB();
+    }
     VOIDPTR bin = NULLPTR;
     U32 sz = 0;
-    vbr = ISO9660_FILERECORD_TO_MEMORY("ATOS/DISK_VBR.BIN");
-    if(!vbr) return FALSE;
-    sz = vbr->extentLengthLE;
-    bin = ISO9660_READ_FILEDATA_TO_MEMORY(vbr);
+    bin = ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY("ATOS/DISK_VBR.BIN", &sz);
     if(!bin) {
-        ISO9660_FREE_MEMORY(vbr);
         return FALSE;
     }
-
-    if(!POPULATE_BOOTLOADER(bin, sz)) {
-        ISO9660_FREE_MEMORY(vbr);
+    if(!ZERO_INITIALIZE_FAT32(bin, sz)) {
         ISO9660_FREE_MEMORY(bin);
         return FALSE;
     }
-
-    ISO9660_FREE_MEMORY(vbr);
     ISO9660_FREE_MEMORY(bin);
-
+    // FAT_LFN_ENTRY ent;
+    // sz = 0;
+    // PATH_RESOLVE_ENTRY("/KRNL.BIN", &ent);
+    // bin = READ_FILE_CONTENTS(&sz, &ent.entry);
+    // DUMP_MEMORY(bin, sz);
+    // KFREE(bin);
+    // HLT;
     return TRUE;
 }
 
@@ -438,16 +553,6 @@ BOOL initialize_filestructure(VOID) {
 void RTOSKRNL_LOOP(VOID) {
     early_debug_tcb(get_last_pid());
     while(1) {
-        // VBE_DRAW_LINE(0, i, j, i, pass++ % 2 == 0 ? VBE_RED : VBE_GREEN);
-        // i++;
-        // if(i >= 1024) i = 0;
-        // j++;
-        // if(j >= 768) j = 0;
-        // if(pass >= 100) {
-        //     pass = 0;
-        //     pass = (pass % 2 == 0) ? 1 : -1;
-        // }
         handle_kernel_messages();
     }
 }
-

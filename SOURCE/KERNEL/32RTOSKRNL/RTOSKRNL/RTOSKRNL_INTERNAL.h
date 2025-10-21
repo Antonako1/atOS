@@ -8,7 +8,8 @@
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
-#define PANIC_TEXT(x) "" __FILE__ ", ln" STR(__LINE__) ": " x
+#define PANIC_TEXT(x) x " (" __FILE__":"STR(__LINE__) ")"
+#define PANIC_IF_TXT(x) x, PANIC_TEXT(#x)
 
 typedef enum {
 
@@ -61,6 +62,7 @@ void DUMP_ERRCODE(U32 errcode);
 void DUMP_INTNO(U32 int_no);
 void DUMP_MEMORY(U32 addr, U32 length);
 void DUMP_STRING(STRING buf);
+void DUMP_STRINGN(STRING buf, U32 n);
 
 // Kernel internal functions
 void set_rki_row(U32 rki_row);

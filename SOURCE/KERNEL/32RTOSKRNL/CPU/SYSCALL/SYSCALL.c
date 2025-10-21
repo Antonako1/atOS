@@ -14,6 +14,7 @@
 #include <DRIVERS/VIDEO/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
+#include <DRIVERS/AC97/AC97.h>
 
 #define SYSCALL_ENTRY(id, fn) [id] = fn,
 static SYSCALL_HANDLER syscall_table[SYSCALL_MAX] = {
@@ -100,7 +101,7 @@ U32 SYS_GET_KEYBOARD_MODIFIERS(U32 unused1, U32 unused2, U32 unused3, U32 unused
     if (!mod) return 0;
     MODIFIERS *retval = GET_KEYBOARD_MODIFIERS();
     MEMCPY(mod, retval, sizeof(MODIFIERS));
-    Free(retval);
+    KFREE(retval);
     return (U32)mod;
 }
 
@@ -117,20 +118,40 @@ U32 SYS_MESSAGE_AMOUNT(U32 pid, U32 msg_ptr, U32 length, U32 signal, U32 unused5
     U32 res = t->msg_count;
     return (U32)res;
 }
-U32 SYS_GET_MESSAGE(U32 unused1, U32 unusef2, U32 unused3, U32 unused4, U32 unused5) {
+U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused5;
     TCB *t = get_current_tcb();
     if (!t) return 0;
     if (t->msg_count == 0) return 0; // no messages
+
     PROC_MESSAGE *msg = &t->msg_queue[t->msg_queue_head];
     PROC_MESSAGE *msg_copy = KMALLOC(sizeof(PROC_MESSAGE));
     if (!msg_copy) return 0;
+
     MEMCPY(msg_copy, msg, sizeof(PROC_MESSAGE));
-    // Advance head
+
+    if (msg->data_provided && msg->data) {
+        // Determine how much data needs to be copied.
+        // This should be stored in the message (you can add msg->data_size field)
+        U32 data_size = msg->signal; // or another field that holds the size
+        if (data_size == 0) data_size = sizeof(KEYPRESS) + sizeof(MODIFIERS); // fallback
+        VOIDPTR data_copy = KMALLOC(data_size);
+        if (data_copy) {
+            MEMCPY(data_copy, msg->data, data_size);
+            msg_copy->data = data_copy;
+        } else {
+            msg_copy->data_provided = FALSE;
+            msg_copy->data = NULL;
+        }
+    }
+
+    // Advance queue head
     t->msg_queue_head = (t->msg_queue_head + 1) % PROC_MSG_QUEUE_SIZE;
     t->msg_count--;
+
     return (U32)msg_copy;
 }
+
 U32 SYS_SEND_MESSAGE(U32 msg_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     if (!msg_ptr) return (U32)-1;
@@ -204,9 +225,9 @@ U32 SYS_KFREE(U32 pointer, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     KFREE((void *)pointer);
     return 0;
 }
-U32 SYS_KREALLOC(U32 pointer, U32 oldSize, U32 newSize, U32 unused4, U32 unused5) {
+U32 SYS_KREALLOC(U32 pointer, U32 newSize, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused4; (void)unused5;
-    return (U32)KREALLOC((void *)pointer, oldSize, newSize);
+    return (U32)KREALLOC((void *)pointer, newSize);
 }
 U32 SYS_KCALLOC(U32 num, U32 size, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused3; (void)unused4; (void)unused5;
@@ -240,6 +261,18 @@ U32 SYS_ISO9660_FREE_MEMORY(U32 ptr, U32 unused2, U32 unused3, U32 unused4, U32 
     return 0;
 }
 
+// Audio syscalls
+U32 SYS_AC97_TONE(U32 freq, U32 ms, U32 amp, U32 rate, U32 unused5) {
+    (void)unused5;
+    BOOLEAN ok = AC97_TONE(freq, ms, rate, (U16)amp);
+    return ok ? 1 : 0;
+}
+U32 SYS_AC97_STOP(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    AC97_STOP();
+    return 0;
+}
+
 U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5) {
     if (num >= SYSCALL_MAX) return (U32)-1;
     SYSCALL_HANDLER h = syscall_table[num];
@@ -268,5 +301,4 @@ __attribute__((naked)) void isr_syscall(void) {
         "iret\n\t"
     );
 }
-
 

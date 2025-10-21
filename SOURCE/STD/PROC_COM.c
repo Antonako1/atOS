@@ -21,7 +21,7 @@ VOID SEND_MESSAGE(PROC_MESSAGE *msg) {
     if (!msg_copy) return;
     MEMCPY(msg_copy, msg, sizeof(PROC_MESSAGE));
     SYSCALL1(SYSCALL_SEND_MESSAGE, (U32)msg_copy);
-    Free(msg);
+    Free(msg_copy);
 }
     
 PROC_MESSAGE *GET_MESSAGE() {
@@ -67,6 +67,7 @@ TCB *GET_CURRENT_TCB(void) {
         return &process;
     }
     TCB *t = (TCB *)SYSCALL(SYSCALL_GET_CUR_TCB, 0, 0, 0, 0, 0);
+    
     if(t) {
         MEMCPY(&process, t, sizeof(TCB));
         Free(t);

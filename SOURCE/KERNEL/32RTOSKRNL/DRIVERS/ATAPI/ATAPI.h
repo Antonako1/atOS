@@ -77,5 +77,7 @@ U32 INITIALIZE_ATAPI();
 /// @return Same as ATAPI_CHECK result.
 U32 GET_ATAPI_INFO();
 
+U32 ATAPI_CALC_SECTORS(U32 len);
+
 #endif // KERNEL_ENTRY
 #endif // ATA_ATAPI_DRIVER_H

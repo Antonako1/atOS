@@ -15,6 +15,10 @@ U8* STRNCONCAT(U8 *dest, U32 dest_pos, U8 *src, U32 max_len);
 BOOLEAN STRCMP(CONST U8* str1, CONST U8* str2);
 BOOLEAN STRNCMP(CONST U8* str1, CONST U8* str2, U32 n);
 
+// returns 0 on success
+BOOLEAN STRCASECMP(U8 *a, U8 *b);
+BOOLEAN STRCASENCMP(U8 *a, U8 *b, U32 n);
+
 U0 *STRCHR(CONST U8* str, U8 c);
 U0 *STRRCHR(CONST U8* str, U8 c);
 

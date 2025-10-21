@@ -106,6 +106,9 @@ static inline VOID __delay(U32 ms) {
     }
 }
 
+static inline VOID yield() {
+    __asm__ volatile("int $0x20");
+}
 
 #endif // KERNEL_ENRTY
 // Write `count` 16-bit words from buffer to port

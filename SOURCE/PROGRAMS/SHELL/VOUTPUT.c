@@ -30,6 +30,105 @@ static volatile U32 pending_scrolls ATTRIB_DATA = 0;
 static U32 last_scroll_process_tick ATTRIB_DATA = 0;
 #define SCROLL_PROCESS_INTERVAL_MS 16
 
+// ---------------------- Local fast-path helpers ----------------------
+static inline BOOLEAN is_printable(U8 c) {
+    return (c >= 0x20 && c != 0x7F);
+}
+
+// Draw a background rectangle for len characters at (col,row)
+static inline VOID DRAW_CELL_BG_RUN(U32 col, U32 row, U32 len, VBE_PIXEL_COLOUR bg) {
+    if (len == 0) return;
+    U32 x = COL_TO_PIX(col);
+    U32 y = ROW_TO_PIX(row);
+    U32 cell_adv = CHAR_WIDTH + CHAR_SPACING;
+    U32 w = len * cell_adv - CHAR_SPACING; // include inner spacings, not trailing gap
+    DRAW_FILLED_RECTANGLE(x, y, w, CHAR_HEIGHT, bg);
+}
+
+// Efficiently draw a string of length len at cell (col,row)
+// Background is cleared with a single filled-rectangle per run, then
+// foreground spans are emitted as horizontal lines per bit-run.
+static VOID DRAW_STRING_AT(U32 col, U32 row, const U8 *s, U32 len, VBE_PIXEL_COLOUR fg, VBE_PIXEL_COLOUR bg) {
+    if (!s || len == 0) return;
+
+    // Clear background for the entire span with a single call (per row strip)
+    DRAW_CELL_BG_RUN(col, row, len, bg);
+
+    // For each glyph scanline, draw contiguous foreground runs merged across characters
+    U32 base_x = COL_TO_PIX(col);
+    U32 base_y = ROW_TO_PIX(row);
+    const U32 cell_adv = CHAR_WIDTH + CHAR_SPACING;
+    for (U32 i = 0; i < CHAR_HEIGHT; i++) {
+        BOOLEAN in_run = FALSE;
+        U32 run_start_x = 0;
+        // Scan across all bits in the span
+        for (U32 ci = 0; ci < len; ci++) {
+            U8 ch = s[ci];
+            const U8 *glyph = &WIN1KXHR__8x16[ch * CHAR_HEIGHT];
+            U8 bits = glyph[i];
+            for (U32 bj = 0; bj < CHAR_WIDTH; bj++) {
+                U8 bit = (bits >> (CHAR_WIDTH - 1 - bj)) & 1;
+                U32 px = base_x + ci * cell_adv + bj;
+                if (bit) {
+                    if (!in_run) {
+                        in_run = TRUE;
+                        run_start_x = px;
+                    }
+                } else if (in_run) {
+                    // finish run up to previous pixel
+                    DRAW_LINE(run_start_x, base_y + i, px - 1, base_y + i, fg);
+                    in_run = FALSE;
+                }
+            }
+        }
+        if (in_run) {
+            // close last run to the end of the span
+            U32 end_x = base_x + len * cell_adv - CHAR_SPACING - 1;
+            DRAW_LINE(run_start_x, base_y + i, end_x, base_y + i, fg);
+        }
+    }
+}
+
+// Write a span into the text buffer and draw it in batched mode.
+// Handles wrapping across rows.
+static U32 WRITE_SPAN_FAST(const U8 *s, U32 len) {
+    if (!s || len == 0) return 0;
+    U32 written = 0;
+
+    // Hide any cursor glyph overlay before we modify cells
+    RESTORE_CURSOR_UNDERNEATH(cursor.Column, cursor.Row);
+
+    while (written < len) {
+        if (cursor.Row >= cursor.ROWS) {
+            SCROLL_TEXTBUFFER_UP();
+            cursor.Row = cursor.ROWS - 1;
+            cursor.Column = 0;
+        }
+
+        U32 avail = (cursor.COLUMNS > cursor.Column) ? (cursor.COLUMNS - cursor.Column) : 0;
+        if (avail == 0) {
+            // wrap to next line
+            cursor.Column = 0;
+            ROW_INC();
+            continue;
+        }
+        U32 chunk = (len - written < avail) ? (len - written) : avail;
+
+        // Copy into text buffer
+        MEMCPY(&text_buffer[cursor.Row][cursor.Column], s + written, chunk);
+
+        // Draw at once
+        DRAW_STRING_AT(cursor.Column, cursor.Row, s + written, chunk, cursor.fgColor, cursor.bgColor);
+
+        cursor.Column += chunk;
+        written += chunk;
+    }
+
+    // Redraw cursor at the end position
+    DRAW_CURSOR_AT(cursor.Column, cursor.Row);
+    return written;
+}
+
 U0 INIT_SHELL_VOUTPUT(VOID) {
     // Clear text buffer
     for(U32 r = 0; r < AMOUNT_OF_ROWS; r++) {
@@ -165,18 +264,8 @@ VOID TOGGLE_INSERT_MODE() {
 }
 
 static inline void DRAW_CHAR_AT(U32 col, U32 row, U8 ch, VBE_PIXEL_COLOUR fg, VBE_PIXEL_COLOUR bg) {
-    U32 x = COL_TO_PIX(col);
-    U32 y = ROW_TO_PIX(row);
-    const U8 *glyph = &WIN1KXHR__8x16[ch * CHAR_HEIGHT];
-
-    for (U32 i = 0; i < CHAR_HEIGHT; i++) {
-        U8 bits = glyph[i];
-        for (U32 j = 0; j < CHAR_WIDTH; j++) {
-            U8 bit = (bits >> (CHAR_WIDTH - 1 - j)) & 1;
-            VBE_PIXEL_COLOUR colour = bit ? fg : bg;
-            DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x + j, y + i, colour));
-        }
-    }
+    // Fast path: draw a single-character span with provided colours
+    DRAW_STRING_AT(col, row, &ch, 1, fg, bg);
 }
 
 void REDRAW_CHAR(U32 col, U32 row) {
@@ -285,8 +374,10 @@ VOID MOVE_BUFFER_CONTENTS_RIGHT_FROM(U32 col, U32 row) {
     // Start from end and move towards col+1
     for (int c = (int)cursor.COLUMNS - 1; c > (int)col; c--) {
         text_buffer[row][c] = text_buffer[row][c - 1];
-        REDRAW_CHAR((U32)c, row);
     }
+    // Redraw affected region in one go
+    U32 span_len = cursor.COLUMNS - col;
+    DRAW_STRING_AT(col, row, &text_buffer[row][col], span_len, cursor.fgColor, cursor.bgColor);
     // the cell at [row][col] will be overwritten by caller
 }
 
@@ -296,10 +387,11 @@ VOID MOVE_BUFFER_CONTENTS_LEFT_FROM(U32 col, U32 row) {
     if (col >= cursor.COLUMNS) return;
     for (U32 c = col; c < cursor.COLUMNS - 1; c++) {
         text_buffer[row][c] = text_buffer[row][c + 1];
-        REDRAW_CHAR(c, row);
     }
     text_buffer[row][cursor.COLUMNS - 1] = ' ';
-    REDRAW_CHAR(cursor.COLUMNS - 1, row);
+    // Redraw affected region once
+    U32 span_len = cursor.COLUMNS - col;
+    DRAW_STRING_AT(col, row, &text_buffer[row][col], span_len, cursor.fgColor, cursor.bgColor);
 }
 
 VOID REDRAW_CURRENT_LINE() {
@@ -315,10 +407,8 @@ VOID REDRAW_CURRENT_LINE() {
             text_buffer[cursor.Row][c] = current_line[c];
         }
     
-        // Redraw only that one line
-        for (U32 c = 0; c < cursor.COLUMNS; c++) {
-            REDRAW_CHAR(c, cursor.Row);
-        }
+        // Redraw the whole current line in one span
+        DRAW_STRING_AT(0, cursor.Row, &text_buffer[cursor.Row][0], cursor.COLUMNS, cursor.fgColor, cursor.bgColor);
     } else {
         // Ensure we always redraw on the prompt row (no vertical movement while editing)
         U32 r = prompt_row;
@@ -337,10 +427,8 @@ VOID REDRAW_CURRENT_LINE() {
             text_buffer[r][prompt_length + i] = current_line[i];
         }
 
-        // Redraw only the affected region
-        for (U32 c = prompt_length; c < cursor.COLUMNS; c++) {
-            REDRAW_CHAR(c, r);
-        }
+        // Redraw only the affected region as one span
+        DRAW_STRING_AT(prompt_length, r, &text_buffer[r][prompt_length], cursor.COLUMNS - prompt_length, cursor.fgColor, cursor.bgColor);
 
         // Ensure screen cursor is synced to edit_pos
         cursor.Row = r;
@@ -367,11 +455,6 @@ VOID HANDLE_BACKSPACE() {
     // Delete that character (shift left)
     MOVE_BUFFER_CONTENTS_LEFT_FROM(cursor.Column, cursor.Row);
 
-    // Ensure the entire tail of row is redrawn
-    for (U32 c = cursor.Column; c < cursor.COLUMNS; c++) {
-        REDRAW_CHAR(c, cursor.Row);
-    }
-
     // Draw cursor at new position immediately
     DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
@@ -383,11 +466,6 @@ VOID DELETE_CHAR_AT_CURSOR() {
 
     // remove char under cursor by shifting left from cursor.Column
     MOVE_BUFFER_CONTENTS_LEFT_FROM(cursor.Column, cursor.Row);
-
-    // redraw affected region
-    for (U32 c = cursor.Column; c < cursor.COLUMNS; c++) {
-        REDRAW_CHAR(c, cursor.Row);
-    }
 
     DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
@@ -478,18 +556,19 @@ U32 PUTC(U8 c) {
         return 1;
     }
 
-    // Handle tab (4 spaces) - insert spaces
+    // Handle tab (4 spaces) - batch insert spaces
     if (c == '\t') {
         U32 spaces = 4 - (cursor.Column % 4);
-        for (U32 i = 0; i < spaces; i++) {
+        if (spaces) {
             if (cursor.INSERT_MODE) {
-                MOVE_BUFFER_CONTENTS_RIGHT_FROM(cursor.Column, cursor.Row);
+                for (U32 i = 0; i < spaces; i++) {
+                    MOVE_BUFFER_CONTENTS_RIGHT_FROM(cursor.Column, cursor.Row);
+                }
             }
-            text_buffer[cursor.Row][cursor.Column] = ' ';
-            REDRAW_CHAR(cursor.Column, cursor.Row);
-            COLUMN_INC();
+            U8 sp[8];
+            for (U32 i = 0; i < spaces && i < 8; i++) sp[i] = ' ';
+            WRITE_SPAN_FAST(sp, spaces);
         }
-        DRAW_CURSOR_AT(cursor.Column, cursor.Row);
         return 1;
     }
 
@@ -499,8 +578,9 @@ U32 PUTC(U8 c) {
         MOVE_BUFFER_CONTENTS_RIGHT_FROM(cursor.Column, cursor.Row);
     }
 
+    // Fast path draw for a single character
     text_buffer[cursor.Row][cursor.Column] = c;
-    REDRAW_CHAR(cursor.Column, cursor.Row);
+    DRAW_STRING_AT(cursor.Column, cursor.Row, &text_buffer[cursor.Row][cursor.Column], 1, cursor.fgColor, cursor.bgColor);
 
     // Advance cursor
     COLUMN_INC();
@@ -511,18 +591,37 @@ U32 PUTC(U8 c) {
     return 1;
 }
 U32 PUTS(U8 *str) {
-    U32 count = 0;
+    if (!str) return 0;
+    U32 total = 0;
+
+    // Batch printable spans, handle controls individually
     while (*str) {
-        count += PUTC(*str++);
+        // Handle control characters upfront
+        if (*str == '\n') { total += PUTC(*str++); continue; }
+        if (*str == '\r') { total += PUTC(*str++); continue; }
+        if (*str == '\t') { total += PUTC(*str++); continue; }
+
+        // Accumulate printable run
+        const U8 *start = str;
+        U32 len = 0;
+        while (str[len] && is_printable(str[len])) {
+            len++;
+        }
+        if (len) {
+            total += WRITE_SPAN_FAST(start, len);
+            str += len;
+            continue;
+        }
+
+        // Fallback for any other byte
+        total += PUTC(*str++);
     }
-    return count;
+    return total;
 }
 
 VOID DRAW_TEXT_BUFFER(VOID) {
     for (U32 r = 0; r < cursor.ROWS; r++) {
-        for (U32 c = 0; c < cursor.COLUMNS; c++) {
-            REDRAW_CHAR(c, r);
-        }
+        DRAW_STRING_AT(0, r, &text_buffer[r][0], cursor.COLUMNS, cursor.fgColor, cursor.bgColor);
     }
 }
 

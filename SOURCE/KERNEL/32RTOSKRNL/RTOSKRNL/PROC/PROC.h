@@ -182,6 +182,7 @@ typedef struct proc_message {
     // Needs to be freed by receiver if data_provided is TRUE
     // Use KFREE to free
     VOIDPTR data; 
+    U32 data_size;
 
     U32 signal; // Provide signal value if needed
 
@@ -279,8 +280,6 @@ void early_debug_tcb(U32 pid);
 
 TrapFrame* pit_handler_task_control(TrapFrame* tf);
 
-/// @brief Handle task state transitions.
-void PROC_HANDLE_TASK_TRANSITIONS(void);
 
 TCB *get_tcb_by_pid(U32 pid);
 TCB *get_tcb_by_name(U8 *name);

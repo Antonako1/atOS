@@ -72,7 +72,7 @@ U32 GET_ATAPI_INFO() {
 int read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
     U16 port = 0;
     BOOLEAN slave = 0;
-    switch(atapiWhere){
+    switch (atapiWhere) {
         case ATAPI_PRIMARY_MASTER:
             port = ATA_PRIMARY_BASE;
             break;
@@ -87,62 +87,77 @@ int read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
             port = ATA_SECONDARY_BASE;
             slave = 1;
             break;
+        default:
+            return ATA_FAILED;
     }
 
-        // The command
-	volatile U8 read_cmd[12] = {ATAPI_CMD_READ12, 0,
-	                                 (lba >> 0x18) & 0xFF, (lba >> 0x10) & 0xFF, (lba >> 0x08) & 0xFF,
-	                                 (lba >> 0x00) & 0xFF,
-	                                 (sectors >> 0x18) & 0xFF, (sectors >> 0x10) & 0xFF, (sectors >> 0x08) & 0xFF,
-	                                 (sectors >> 0x00) & 0xFF,
-	                                 0, 0};
+    /* Prepare command */
+    volatile U8 read_cmd[12] = {
+        ATAPI_CMD_READ12, 0,
+        (lba >> 24) & 0xFF, (lba >> 16) & 0xFF,
+        (lba >> 8) & 0xFF,  (lba >> 0) & 0xFF,
+        (sectors >> 24) & 0xFF, (sectors >> 16) & 0xFF,
+        (sectors >> 8) & 0xFF,  (sectors >> 0) & 0xFF,
+        0, 0
+    };
 
-	_outb(port + ATA_DRIVE_HEAD, 0xA0 & (slave << 4)); // Drive select
-	ata_io_wait(port);
-	_outb(port + ATA_ERR, 0x00);
-	_outb(port + ATA_LBA_MID, 2048 & 0xFF);
-	_outb(port + ATA_LBA_HI, 2048 >> 8);
-	_outb(port + ATA_COMM_REG, 0xA0); // Packet command
-	ata_io_wait(port); // I think we might need this delay, not sure, so keep this
- 
-    // Wait for status
-	while (1) {
-		U8 status = _inb(port + ATA_COMM_REG);
-		if ((status & STAT_ERR) == 1)
-			return ATA_FAILED;
-		if (!(status & STAT_BSY) && (status & STAT_DRQ))
-			break;
-		ata_io_wait(port);
-	}
+    _outb(port + ATA_DRIVE_HEAD, 0xA0 | (slave << 4));
+    ata_io_wait(port);
+    _outb(port + ATA_ERR, 0x00);
+    _outb(port + ATA_LBA_MID, ATAPI_SECTOR_SIZE & 0xFF);
+    _outb(port + ATA_LBA_HI, ATAPI_SECTOR_SIZE >> 8);
+    _outb(port + ATA_COMM_REG, 0xA0);
+    ata_io_wait(port);
 
-        // Send command
-	_outsw(port + ATA_DATA, (U16 *) read_cmd, 6);
+    /* Wait for readiness */
+    while (1) {
+        U8 status = _inb(port + ATA_COMM_REG);
+        if (status & STAT_ERR)
+            return ATA_FAILED;
+        if (!(status & STAT_BSY) && (status & STAT_DRQ))
+            break;
+        ata_io_wait(port);
+    }
 
-        // Read words
-	for (U32 i = 0; i < sectors; i++) {
-                // Wait until ready
-		while (1) {
-			U8 status = _inb(port + ATA_COMM_REG);
-			if (status & STAT_ERR)
-				return ATA_FAILED;
-			if (!(status & STAT_BSY) && (status & STAT_DRQ))
-				break;
-		}
+    /* Send packet */
+    _outsw(port + ATA_DATA, (U16 *)read_cmd, 6);
 
-		int size = _inb(port + ATA_LBA_HI) << 8
-		           | _inb(port + ATA_LBA_MID); // Get the size of transfer
+    /* Read sectors */
+    for (U32 i = 0; i < sectors; i++) {
+        /* Wait for DRQ */
+        while (1) {
+            U8 status = _inb(port + ATA_COMM_REG);
+            if (status & STAT_ERR)
+                return ATA_FAILED;
+            if (!(status & STAT_BSY) && (status & STAT_DRQ))
+                break;
+        }
 
-		_insw(port + ATA_DATA, (U16 *) ((U8 *) buffer + i * 0x800), size / 2); // Read it
-	}
+        /* Get transfer size (bytes) */
+        int size = (_inb(port + ATA_LBA_HI) << 8) | _inb(port + ATA_LBA_MID);
 
-	return ATA_SUCCESS;
+        if (size <= 0 || (U32)size > ATAPI_SECTOR_SIZE)
+            return ATA_FAILED;
+
+        /* Calculate safe buffer offset */
+        U32 offset = i * ATAPI_SECTOR_SIZE;
+        _insw(port + ATA_DATA, (U16 *)((U8 *)buffer + offset), size / 2);
+    }
+
+    return ATA_SUCCESS;
 }
+
 
 U32 READ_CDROM(U32 atapiWhere, U32 lba, U32 sectors, U8 *buf) {
-    // return ATAPI_READ_SECTOR(atapiWhere, lba, sectors, buf);
-    return read_cdrom(atapiWhere, lba, sectors, (U16 *) buf);
+    if (atapiWhere == ATA_FAILED || !buf)
+        return 0;
+
+    return read_cdrom(atapiWhere, lba, sectors, (U16 *)buf);
 }
 
 
+U32 ATAPI_CALC_SECTORS(U32 len) {
+    return (len + ATAPI_SECTOR_SIZE - 1) / ATAPI_SECTOR_SIZE;
+}
 #ifndef KERNEL_ENTRY
 #endif // KERNEL_ENTRY
