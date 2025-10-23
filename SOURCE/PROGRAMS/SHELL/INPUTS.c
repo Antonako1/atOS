@@ -33,6 +33,7 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
     if (!kp->pressed) return;
 
     switch (kp->keycode) {
+        case KEY_INSERT: TOGGLE_INSERT_MODE(); break;
         case KEY_ENTER: HANDLE_LE_ENTER(); break;
         case KEY_BACKSPACE: HANDLE_LE_BACKSPACE(); break;
         case KEY_DELETE: HANDLE_LE_DELETE(); break;

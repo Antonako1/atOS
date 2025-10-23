@@ -9,6 +9,7 @@
 #define TYPEDEF_H
 
 #define ATTRIB_DATA __attribute__((section(".data")))
+#define ATTRIB_RODATA __attribute__((section(".rodata")))
 #define ATTRIB_BSS  __attribute__((section(".bss")))
 #define ATTRIB_CODE __attribute__((section(".text")))
 #define ATTRIB_PACKED __attribute__((packed))
@@ -90,6 +91,10 @@ typedef U32          DWORD;
 typedef U8*          PU8;
 typedef U16*         PU16;
 typedef U32*         PU32;
+
+typedef PU8*         PPU8;
+typedef PU16*        PPU16;
+typedef PU32*        PPU32;
 
 typedef U32          SIZE_T;
 typedef U32          size_t;

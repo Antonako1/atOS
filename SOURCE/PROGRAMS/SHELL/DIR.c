@@ -1,0 +1,357 @@
+#include <PROGRAMS/SHELL/SHELL.h>
+#include <STD/FS_DISK.h>
+#include <STD/PROC_COM.h>
+#include <STD/ASM.h>
+#include <STD/MEM.h>
+#include <STD/STRING.h>
+
+
+static U8 tmp_line[CUR_LINE_MAX_LENGTH] ATTRIB_DATA = { 0 };
+static U8 tmp_line_out[CUR_LINE_MAX_LENGTH] ATTRIB_DATA = { 0 };
+#define MAX_COUNT_DIRS MAX_CHILD_ENTIES
+static DIR_ENTRY dirs[MAX_CHILD_ENTIES] ATTRIB_DATA = { 0 };
+
+void INITIALIZE_DIR(SHELL_INSTANCE *shndl) {
+    shndl->fat_info.current_cluster = FAT32_GET_ROOT_CLUSTER();
+    // Assuming FAT32_GET_ROOT_DIR_ENTRY returns the structure for the root dir
+    shndl->fat_info.current_path_dir_entry = FAT32_GET_ROOT_DIR_ENTRY(); 
+    STRCPY(shndl->fat_info.path, "/");
+    STRCPY(shndl->fat_info.prev_path, "/");
+}
+
+PU8 PARSE_CD_RAW_LINE(PU8 line, U32 cut_index) {
+    if (!line) return line;
+
+    // Use a temporary copy for str_trim to avoid modifying the static buffer 
+    // before the argument shift if 'line' is one of the static buffers.
+    // However, since PARSE_CD_RAW_LINE modifies 'line' in place, we will assume 
+    // the caller provides a modifiable copy (which CMD_CD/CMD_DIR will do).
+
+    str_trim(line); // remove leading/trailing spaces
+
+    U32 i = cut_index;
+
+    // Skip spaces after command name
+    while (line[i] == ' ') i++;
+
+    // Shift the remainder (the argument) to the beginning
+    U32 j = 0;
+    while (line[i] != '\0') {
+        line[j++] = line[i++];
+    }
+    line[j] = '\0';
+
+    str_trim(line); // clean up any remaining spaces
+    return line;
+}
+
+STATIC U32 ClassifyPath(PU8 path) {
+    if (!path || !*path)
+        return 4; // invalid
+
+    if (path[0] == '/') {
+        return 0; // absolute path or root "/"
+    } 
+    else if (path[0] == '.' && path[1] == '\0') {
+        return 1; // "."
+    } 
+    else if (path[0] == '.' && path[1] == '.' && (path[2] == '/' || path[2] == '\0')) {
+        return 2; // ".." or "../"
+    } 
+    else {
+        return 1; // relative
+    }
+}
+
+STATIC VOID NormalizePath(PU8 path) {
+    if (!path || path[0] != '/') 
+        return; // This function expects an absolute path
+
+    // Array to store pointers to the "clean" path components
+    // (This acts as our stack)
+    PU8 parts[64]; // Max 64 directory levels
+    U32 part_count = 0;
+
+    // Use STRTOK to split the path by '/'. 
+    // This will modify the 'path' string in place, which is fine.
+    // It also handily skips multiple slashes like "/a//b".
+    PU8 token = (PU8)STRTOK((char *)path, "/");
+    while (token) {
+        if (STRCMP(token, ".") == 0) {
+            // Case 1: Token is ".", just ignore it
+        } else if (STRCMP(token, "..") == 0) {
+            // Case 2: Token is "..", pop one level from our stack
+            if (part_count > 0) {
+                part_count--;
+            }
+        } else {
+            // Case 3: Normal directory name, push it onto our stack
+            if (part_count < 64) { // Avoid stack overflow
+                parts[part_count++] = token;
+            }
+            // Optional: handle "path too deep" error else
+        }
+        
+        token = (PU8)STRTOK(NULL, "/");
+    }
+
+    // Now, rebuild the normalized path string in the 'path' buffer
+    PU8 p = path;
+    *p++ = '/'; // All paths start with root
+
+    if (part_count == 0) {
+        // The path was "/", "/..", "/./", etc.
+        *p = '\0'; // Just leave the single "/"
+        return;
+    }
+
+    for (U32 i = 0; i < part_count; i++) {
+        STRCPY(p, parts[i]);
+        p += STRLEN(parts[i]);
+
+        // Add a separator, but not after the last part
+        if (i < part_count - 1) {
+            *p++ = '/';
+        }
+    }
+
+    // Add the final null terminator
+    *p = '\0';
+}
+
+BOOLEAN ResolvePath(PU8 path, PU8 out_buffer, size_t out_buffer_size) {
+    // ... (ResolvePath is good as provided, no changes needed) ...
+    if (!path || !*path || !out_buffer || out_buffer_size == 0)
+        return FALSE;
+
+    SHELL_INSTANCE *shndl = GET_SHNDL();
+    if (!shndl)
+        return FALSE;
+
+    // Use a temporary buffer for intermediate path construction.
+    const size_t tmp_max_size = CUR_LINE_MAX_LENGTH; // Use define instead of 512
+    size_t cur_len = 0;
+    size_t remaining = 0;
+
+    // Classify path type
+    U32 type = ClassifyPath(path);
+    if (type > 2)
+        return FALSE;
+
+    // Construct pre-normalized path safely
+    switch (type) {
+        case 0: // absolute
+            STRNCPY(tmp_line, path, tmp_max_size - 1);
+            tmp_line[tmp_max_size - 1] = '\0'; // Ensure null-termination
+            break;
+
+        case 1: // relative (e.g., "a", "./test")
+        case 2: // parent (e.g., "..", "../b")
+        {
+            if (type == 1 && STRCMP(path, ".") == 0) {
+                // Special case "cd .", just copy current path
+                STRNCPY(tmp_line, shndl->fat_info.path, tmp_max_size - 1);
+                tmp_line[tmp_max_size - 1] = '\0';
+                break;
+            }
+
+            // 1. Copy current path
+            STRNCPY(tmp_line, shndl->fat_info.path, tmp_max_size - 1);
+            tmp_line[tmp_max_size - 1] = '\0';
+            cur_len = STRLEN(tmp_line);
+            remaining = tmp_max_size - cur_len - 1; // -1 for null char
+
+            // 2. Add separator
+            if (STRCMP(tmp_line, "/") != 0) {
+                if (remaining < 1) return FALSE; // No space for "/"
+                STRNCAT(tmp_line, "/", remaining);
+                remaining--;
+            }
+            
+            // 3. Add the new path component
+            if (STRLEN(path) >= remaining) return FALSE; // Not enough space
+            STRNCAT(tmp_line, path, remaining);
+            break;
+        }
+
+        default:
+            return FALSE;
+    }
+
+    // Normalize the path in-place
+    NormalizePath(tmp_line);
+
+    // Final check: Does the result fit in the user's output buffer?
+    size_t final_len = STRLEN(tmp_line);
+    if (final_len + 1 > out_buffer_size) {
+        // Resulting path is too long for the provided output buffer
+        return FALSE;
+    }
+
+    // Safely copy the final, normalized path to the output buffer
+    STRCPY(out_buffer, tmp_line);
+    return TRUE;
+}
+
+
+
+BOOLEAN CD_INTO(PU8 path) {
+    if (!path || !*path)
+        return FALSE;
+
+    SHELL_INSTANCE *shndl = GET_SHNDL();
+    if (!shndl)
+        return FALSE;
+
+    // 1. Resolve the path
+    // tmp_line_out will contain the CLEAN, ABSOLUTE, NORMALIZED path (e.g., "/home/user")
+    if (ResolvePath(path, tmp_line_out, sizeof(tmp_line_out)) == FALSE) {
+        PUTS("cd: Failed to resolve path.\n");
+        return FALSE;
+    }
+
+    // 2. Validate the resolved path: must exist and be a directory.
+    FAT_LFN_ENTRY entry = { 0 };
+    if (FAT32_PATH_RESOLVE_ENTRY(tmp_line_out, &entry) == FALSE) {
+        PUTS("cd: Path not found.\n");
+        return FALSE;
+    }
+    
+    // Check for directory attribute
+    if (!(entry.entry.ATTRIB & FAT_ATTRB_DIR)) {
+        PUTS("cd: Not a directory.\n");
+        return FALSE;
+    }
+
+    // 3. Update the shell's state
+    STRCPY(shndl->fat_info.prev_path, shndl->fat_info.path);
+    STRCPY(shndl->fat_info.path, tmp_line_out);
+
+    // 4. Update the current cluster and directory entry
+    shndl->fat_info.current_cluster = ((U32)entry.entry.HIGH_CLUSTER_BITS << 16) | entry.entry.LOW_CLUSTER_BITS;
+    // shndl->fat_info.current_path_dir_entry = entry; // Assuming this copies the entry structure
+
+    // Optional: PUTS(tmp_line_out); // Print new path
+    return TRUE;
+}
+
+
+BOOLEAN CD_PREV() {
+    SHELL_INSTANCE *shndl = GET_SHNDL();
+    return CD_INTO(shndl->fat_info.prev_path);
+}
+
+BOOLEAN CD_BACKWARDS_DIR() {
+    SHELL_INSTANCE *shndl = GET_SHNDL();
+    if (!shndl) return FALSE;
+
+    // If already at root path "/", nothing to go back to.
+    if (STRCMP(shndl->fat_info.path, "/") == 0) return TRUE; // already at root
+
+    U32 len = STRLEN(shndl->fat_info.path);
+    if (len == 0) return FALSE;
+
+    // allocate temporary buffer for manipulation
+    PU8 tmp = MAlloc(len + 2); // +2 for safety (slash + nul)
+    if (!tmp) return FALSE;
+    MEMZERO(tmp, len + 2);
+    STRNCPY(tmp, shndl->fat_info.path, len + 1); // copy exact
+
+    // find last slash
+    PU8 slash = STRRCHR(tmp, '/');
+    if (!slash) {
+        Free(tmp);
+        return FALSE;
+    }
+
+    if (slash == tmp) {
+        // path like "/something" and last slash is root slash -> result should be root "/"
+        tmp[1] = '\0';
+    } else {
+        // cut off last component
+        *slash = '\0';
+    }
+
+    // ensure we have at least "/"
+    if (STRLEN(tmp) == 0) {
+        tmp[0] = '/';
+        tmp[1] = '\0';
+    }
+
+    BOOLEAN result = CD_INTO(tmp);
+    Free(tmp);
+    return result;
+}
+
+VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
+    U32 cluster = ((U32)dir->entry.HIGH_CLUSTER_BITS << 16) | dir->entry.LOW_CLUSTER_BITS;
+    U32 count = MAX_COUNT_DIRS;
+    U32 res = FAT32_DIR_ENUMERATE(cluster, dirs, &count);
+    if(!res) return;
+    PRINTNEWLINE();
+    PUTS("Type  Size      Name\n");
+    PUTS("----  --------  ----\n");
+
+    for (U32 i = 0; i < count; i++) {
+        FAT_LFN_ENTRY *f = &dirs[i];
+
+        // Type
+        if (f->entry.ATTRIB & FAT_ATTRB_DIR) {
+            PUTS("d     ");
+        } else {
+            PUTS("-     ");
+        }
+
+        // Size (assuming you have a PUT_U32 or similar)
+        // This is a placeholder for your number-printing logic
+        PUT_DEC(f->entry.FILE_SIZE); // You must implement this
+        PUTS("  ");
+        
+        // Name
+        PUTS(f->lfn);
+        PUTS("\n");
+    }
+}
+
+VOID PRINT_CONTENTS_PATH(PU8 path) {
+    // 1. Resolve the path
+    // We use tmp_line for the resolved path to keep tmp_line_out clean for CD/other uses, 
+    // although using either is generally fine as long as we avoid conflicts.
+    if (ResolvePath(path, tmp_line, sizeof(tmp_line)) == FALSE) {
+        PUTS("dir: Failed to resolve path.\n");
+        return;
+    }
+
+    // 2. Resolve the entry
+    FAT_LFN_ENTRY ent = { 0 };
+    BOOLEAN res = FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent);
+    if(!res) {
+        PUTS("dir: Directory not found.\n");
+        return;
+    }
+    
+    // Check if it's a directory
+    if (!(ent.entry.ATTRIB & FAT_ATTRB_DIR)) {
+        PUTS("dir: Not a directory.\n");
+        return;
+    }
+
+    // Optional: PUTS(tmp_line);
+    // Optional: PUT_HEX(ent.entry.LOW_CLUSTER_BITS); PUT_HEX(ent.entry.HIGH_CLUSTER_BITS);
+
+    PRINT_CONTENTS(&ent);
+}
+
+
+
+
+
+
+
+PU8 GET_PATH() {
+    return GET_SHNDL()->fat_info.path;
+}
+
+PU8 GET_PREV_PATH() {
+    return GET_SHNDL()->fat_info.prev_path;
+}

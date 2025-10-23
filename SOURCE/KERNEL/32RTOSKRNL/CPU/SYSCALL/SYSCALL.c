@@ -10,6 +10,7 @@
 #include <MEMORY/HEAP/KHEAP.h>
 
 #include <FS/ISO9660/ISO9660.h>
+#include <FS/FAT/FAT.h>
 
 #include <DRIVERS/VIDEO/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
@@ -272,6 +273,85 @@ U32 SYS_AC97_STOP(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused
     AC97_STOP();
     return 0;
 }
+
+
+U32 SYS_GET_ROOT_CLUSTER(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    return GET_ROOT_CLUSTER();
+}
+U32 SYS_FIND_DIR_BY_NAME_AND_PARENT(U32 parent, U32 name_ptr, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    return FIND_DIR_BY_NAME_AND_PARENT(parent, (PU8)name_ptr);
+}
+U32 SYS_FIND_FILE_BY_NAME_AND_PARENT(U32 parent, U32 name_ptr, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    return FIND_FILE_BY_NAME_AND_PARENT(parent, (PU8)name_ptr);
+}
+U32 SYS_FIND_DIR_ENTRY_BY_NAME_AND_PARENT(U32 out_ptr, U32 parent, U32 name_ptr, U32 unused4, U32 unused5) {
+    (void)unused4;(void)unused5;
+    return FIND_DIR_ENTRY_BY_NAME_AND_PARENT((DIR_ENTRY *)out_ptr, parent, (PU8)name_ptr);
+}
+U32 SYS_READ_LFNS(U32 dir_ent_ptr, U32 lfn_out_ptr, U32 size_out_ptr, U32 unused4, U32 unused5) {
+    (void)unused4;(void)unused5;
+    return READ_LFNS((DIR_ENTRY*)dir_ent_ptr, (LFN*)lfn_out_ptr, (PU32)size_out_ptr);
+}
+U32 SYS_CREATE_CHILD_DIR(U32 parent_cluster, U32 name_ptr, U32 attrib, U32 cluster_out, U32 unused5) {
+    (void)unused5;
+    BOOL res = CREATE_CHILD_DIR(parent_cluster, (PU8)name_ptr, (U8)attrib, (PU32)cluster_out);
+    return res;
+}
+U32 SYS_GET_ROOT_DIR_ENTRY(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    DIR_ENTRY e = GET_ROOT_DIR_ENTRY();
+    DIR_ENTRY *ep = KMALLOC((sizeof(DIR_ENTRY)));
+    if(!ep) return NULLPTR;
+    return (U32)ep;
+}
+U32 SYS_CREATE_CHILD_FILE(U32 parent_cluster, U32 name_ptr, U32 attrib, U32 filedata_ptr, U32 filedata_size) {
+    U32 cluster_out = 0;
+    BOOL res = CREATE_CHILD_FILE(parent_cluster, (PU8)name_ptr, (U8)attrib, (PU8)filedata_ptr, filedata_size, &cluster_out);
+    if (res) {
+        MEMCPY((PU32)attrib, &cluster_out, sizeof(U32)); // Write cluster_out back to user space
+    }
+    return res;
+}
+
+U32 SYS_DIR_ENUMERATE_LFN(U32 dir_cluster, U32 out_entries, U32 max_count_ptr, U32 unused4, U32 unused5) {
+    (void)unused4; (void)unused5;
+    return DIR_ENUMERATE_LFN(dir_cluster, (FAT_LFN_ENTRY*)out_entries, (PU32)max_count_ptr);
+}
+
+U32 SYS_DIR_ENUMERATE(U32 dir_cluster, U32 out_entries, U32 max_count_ptr, U32 unused4, U32 unused5) {
+    (void)unused4; (void)unused5;
+    return DIR_ENUMERATE(dir_cluster, (DIR_ENTRY*)out_entries, (PU32)max_count_ptr);
+}
+
+U32 SYS_DIR_REMOVE_ENTRY(U32 entry_ptr, U32 name_ptr, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3; (void)unused4; (void)unused5;
+    return DIR_REMOVE_ENTRY((DIR_ENTRY*)entry_ptr, (const char*)name_ptr);
+}
+
+U32 SYS_READ_FILE_CONTENTS(U32 entry_ptr, U32 size_out_ptr, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3; (void)unused4; (void)unused5;
+    return (U32)READ_FILE_CONTENTS((PU32)size_out_ptr, (DIR_ENTRY*)entry_ptr);
+}
+
+U32 SYS_FILE_WRITE(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unused5) {
+    (void)unused4; (void)unused5;
+    return FILE_WRITE((DIR_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
+}
+
+U32 SYS_FILE_APPEND(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unused5) {
+    (void)unused4; (void)unused5;
+    return FILE_APPEND((DIR_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
+}
+
+U32 SYS_PATH_RESOLVE_ENTRY(U32 path_ptr, U32 out_entry_ptr, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3; (void)unused4; (void)unused5;
+    return PATH_RESOLVE_ENTRY((U8*)path_ptr, (FAT_LFN_ENTRY*)out_entry_ptr);
+}
+
+
 
 U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5) {
     if (num >= SYSCALL_MAX) return (U32)-1;

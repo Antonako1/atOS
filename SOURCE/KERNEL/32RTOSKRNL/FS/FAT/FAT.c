@@ -705,19 +705,24 @@ BOOLEAN CREATE_ROOT_DIR(U32 root_cluster) {
     DIR_ENTRY dot = {0};
     DIR_ENTRY dotdot = {0};
 
+    // --- . Entry ---
     MEMCPY(dot.FILENAME, ".          ", 11);
-    dot.ATTRIB = FAT_ATTRB_DIR;
+    dot.ATTRIB = FAT_ATTRB_DIR; // Correct: Must be marked as a directory
+    // Correct: Points to itself (root_cluster)
     dot.LOW_CLUSTER_BITS = root_cluster & 0xFFFF;
     dot.HIGH_CLUSTER_BITS = (root_cluster >> 16) & 0xFFFF;
 
+    // --- .. Entry ---
     MEMCPY(dotdot.FILENAME, "..         ", 11);
-    dotdot.ATTRIB = FAT_ATTRB_DIR;
+    dotdot.ATTRIB = FAT_ATTRB_DIR; // Correct: Must be marked as a directory
+    // Correct: Points to itself (root_cluster)
     dotdot.LOW_CLUSTER_BITS = root_cluster & 0xFFFF;
     dotdot.HIGH_CLUSTER_BITS = (root_cluster >> 16) & 0xFFFF;
 
     MEMCPY(buf, &dot, sizeof(DIR_ENTRY));
     MEMCPY(buf + sizeof(DIR_ENTRY), &dotdot, sizeof(DIR_ENTRY));
-
+    
+    // ... write to disk and update FAT table ...
     if (!FAT_WRITE_CLUSTER(root_cluster, buf)) {
         Free(buf);
         return FALSE;
@@ -995,7 +1000,7 @@ BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent_cluster, U8
                 for (U32 j = 0; j < 3 && entries[i].FILENAME[8+j] != ' '; j++)
                     shortname[STRLEN(shortname)] = entries[i].FILENAME[8+j];
             }
-            if (STRCMP(shortname, name) == TRUE) {
+            if (STRCMP(shortname, name) == 0) {
                 MEMCPY(out, &entries[i], sizeof(DIR_ENTRY));
                 return TRUE;
             }
@@ -1320,7 +1325,7 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
             
             // Compare ignoring case
             U32 len = STRLEN(name);
-            if (STRCASENCMP(name, tmp.FILENAME, len < 11 ? len : 11) == 0 || DIR_NAME_COMP(e, component)) {
+            if (STRNICMP(name, tmp.FILENAME, len < 11 ? len : 11) == 0 || DIR_NAME_COMP(e, component)) {
                 MEMCPY(&out_entry->entry, e, sizeof(DIR_ENTRY));
                 STRNCPY(out_entry->lfn, name, FAT_MAX_FILENAME - 1);
                 out_entry->lfn[FAT_MAX_FILENAME - 1] = '\0';
@@ -1529,7 +1534,7 @@ BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *dir_entry, const char *name) {
                 continue;
 
             // Compare short name
-            if (STRCASECMP(ent->FILENAME, name) == 0) {
+            if (STRICMP(ent->FILENAME, name) == 0) {
                 // Free clusters if it’s a file or directory
                 U32 start_cluster = (ent->HIGH_CLUSTER_BITS << 16) | ent->LOW_CLUSTER_BITS;
                 if (start_cluster >= FIRST_ALLOWED_CLUSTER_NUMBER) {
@@ -1550,4 +1555,27 @@ BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *dir_entry, const char *name) {
     }
     Free(cluster_buf);
     return FALSE; // not found
+}
+
+// -----------------------------------------------------------------------------
+// Returns the DIR_ENTRY representing the FAT32 root directory.
+// The FAT32 root has no parent entry on disk, so we synthesize one.
+// -----------------------------------------------------------------------------
+DIR_ENTRY GET_ROOT_DIR_ENTRY(void)
+{
+    DIR_ENTRY root;
+    MEMSET(&root, 0, sizeof(root));
+
+    // The root directory cluster is stored in BPB (BIOS Parameter Block)
+    root.FILENAME[0] = '/'; // optional visual marker
+    root.ATTRIB = FAT_ATTRB_DIR;
+    root.LOW_CLUSTER_BITS = (U16)(bpb.EXBR.ROOT_CLUSTER & 0xFFFF);
+    root.HIGH_CLUSTER_BITS = (U16)(bpb.EXBR.ROOT_CLUSTER >> 16);
+    root.FILE_SIZE = 0; // directories typically 0 for compatibility
+
+    // optional: pad the filename field with spaces to be valid 8.3 format
+    for (int i = 1; i < 11; ++i)
+        root.FILENAME[i] = ' ';
+
+    return root;
 }

@@ -61,21 +61,25 @@ U32 FIRST_INDEX_OF(CONST U8* str, U8 c) {
     }
     return (U32)-1; // not found
 }
-BOOLEAN STRCMP(CONST U8* str1, CONST U8* str2) {
+INT STRCMP(const U8* str1, const U8* str2) {
     while (*str1 && (*str1 == *str2)) {
         str1++;
         str2++;
     }
-    return (*str1 == *str2);
+    return (INT)(*str1) - (INT)(*str2);
 }
-BOOLEAN STRNCMP(CONST U8* str1, CONST U8* str2, U32 n) {
+
+INT STRNCMP(const U8* str1, const U8* str2, U32 n) {
     while (n && *str1 && (*str1 == *str2)) {
         str1++;
         str2++;
         n--;
     }
-    return (n == 0) || (*str1 == *str2);
+
+    if (n == 0) return 0;
+    return (INT)(*str1) - (INT)(*str2);
 }
+
 U0 *STRCHR(CONST U8* str, U8 c) {
     while (*str && (*str != c)) str++;
     return (*str == c) ? (U0 *)str : NULL;
@@ -88,32 +92,52 @@ U0 *STRRCHR(CONST U8* str, U8 c) {
     }
     return last;
 }
-BOOLEAN STRCASECMP(U8 *a, U8 *b) {
+
+INT STRICMP(U8 *a, U8 *b) {
     if (!a || !b) return -1;
+
     while (*a && *b) {
         CHAR ca = *a;
         CHAR cb = *b;
+
         if (ca >= 'a' && ca <= 'z') ca -= 32;
         if (cb >= 'a' && cb <= 'z') cb -= 32;
-        if (ca != cb) return (int)(ca - cb);
+
+        if (ca != cb)
+            return (INT)(ca - cb);
+
         a++;
         b++;
     }
-    return (int)(*a - *b);
+
+    return (INT)(*a - *b);
 }
-BOOLEAN STRCASENCMP(U8 *a, U8 *b, U32 n) {
+
+INT STRNICMP(U8 *a, U8 *b, U32 n) {
     if (!a || !b) return -1;
-    while (*a && *b && n--) {
+    if (n == 0) return 0;
+
+    while (n-- && *a && *b) {
         CHAR ca = *a;
         CHAR cb = *b;
+
         if (ca >= 'a' && ca <= 'z') ca -= 32;
         if (cb >= 'a' && cb <= 'z') cb -= 32;
-        if (ca != cb) return (int)(ca - cb);
+
+        if (ca != cb)
+            return (INT)(ca - cb);
+
         a++;
         b++;
+
+        // if we consumed n characters, stop (avoid reading past)
+        if (n == 0)
+            break;
     }
-    return (int)(*a - *b);
+
+    return (INT)(*a - *b);
 }
+
 
 U32 ATOI(CONST U8* str) {
     U32 res = 0;
@@ -313,5 +337,177 @@ U0 STR_TOLOWER(U8* str) {
     while(*str) {
         *str = TOLOWER(*str);
         str++;
+    }
+}
+
+static U32 is_whitespace(U8 c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+// Trim leading whitespace in-place
+U8* str_ltrim(U8 *s) {
+    if (!s) return NULL;
+
+    U8 *p = s;
+    while (*p && is_whitespace(*p)) p++; // skip leading spaces
+
+    // Shift string left if needed
+    if (p != s) {
+        U8 *dst = s;
+        while (*p) *dst++ = *p++;
+        *dst = '\0';
+    }
+
+    return s;
+}
+
+// Trim trailing whitespace in-place
+U8* str_rtrim(U8 *s) {
+    if (!s) return NULL;
+
+    U8 *end = s;
+    while (*end) end++;       // move to null terminator
+    if (end == s) return s;   // empty string
+
+    end--; // last character
+    while (end >= s && is_whitespace(*end)) end--;
+    *(end + 1) = '\0';
+
+    return s;
+}
+
+// Trim both leading and trailing whitespace in-place
+U8* str_trim(U8 *s) {
+    if (!s) return NULL;
+    str_rtrim(s);
+    str_ltrim(s);
+    return s;
+}
+
+BOOLEAN STREQ( U8* str1,  U8* str2) {
+    while (*str1 && (*str1 == *str2)) {
+        str1++;
+        str2++;
+    }
+    return (*str1 == *str2);
+}
+
+BOOLEAN STRNEQ( U8* str1,  U8* str2, U32 n) {
+    while (n && *str1 && (*str1 == *str2)) {
+        str1++;
+        str2++;
+        n--;
+    }
+    if (n == 0) return TRUE;
+    return (*str1 == *str2);
+}
+
+
+
+size_t STRSPN(PU8 str, PU8 accept) {
+    size_t len = 0;
+    PU8 p_accept_start = accept;
+
+    if (!str || !accept) return 0;
+
+    while (str[len] != '\0') {
+        PU8 p_accept = p_accept_start;
+        int found = 0;
+        while (*p_accept != '\0') {
+            if (str[len] == *p_accept) {
+                found = 1;
+                break;
+            }
+            p_accept++;
+        }
+        if (!found) {
+            return len; // Character not in accept set
+        }
+        len++;
+    }
+    return len; // Reached end of string
+}
+
+
+PU8 STRPBRK(PU8 str, PU8 accept) {
+    PU8 p_str_start = str;
+    PU8 p_accept_start = accept;
+
+    if (!str || !accept) return NULLPTR;
+
+    while (*p_str_start != '\0') {
+        PU8 p_accept = p_accept_start;
+        while (*p_accept != '\0') {
+            if (*p_str_start == *p_accept) {
+                return (PU8)p_str_start; // Found a match
+            }
+            p_accept++;
+        }
+        p_str_start++;
+    }
+    return NULLPTR; // No match
+}
+
+
+
+PU8 STRTOK(PU8 str, PU8 delim) {
+    // static pointer to store our position
+    static PU8 last_token_end = NULLPTR;
+    
+    PU8 token_start;
+
+    // 1. Check if we're starting a new string
+    if (str != NULLPTR) {
+        // Yes, so save the start of this new string
+        token_start = str;
+    } else {
+        // No, so check if we have a saved position
+        if (last_token_end == NULLPTR) {
+            // We don't, and str is NULL, so no tokens left.
+            return NULLPTR;
+        }
+        // Continue from where we left off
+        token_start = last_token_end;
+    }
+
+    // 2. Skip any *leading* delimiters
+    // strspn = "string span"
+    // It returns the length of the part of token_start
+    // that consists *only* of delimiter characters.
+    token_start += STRSPN(token_start, delim);
+
+    // 3. Check if we've reached the end
+    if (*token_start == '\0') {
+        // We skipped delimiters and hit the end. No token.
+        last_token_end = NULLPTR; // Reset for next new string
+        return NULLPTR;
+    }
+
+    // 4. Find the *end* of the current token
+    // strpbrk = "string pointer break"
+    // It finds the *first* occurrence of *any* delimiter
+    // in the rest of the string.
+    PU8 token_end = STRPBRK(token_start, delim);
+
+    if (token_end == NULLPTR) {
+        // No delimiter found. This is the last token.
+        // Find the null terminator manually
+        last_token_end = token_start;
+        while (*last_token_end != '\0') {
+            last_token_end++;
+        }
+        // Set our static pointer to NULL so the *next* call returns NULL
+        last_token_end = NULLPTR;
+        return token_start;
+    } else {
+        // 5. Found a delimiter. Terminate the token.
+        // This is the "destructive" part.
+        *token_end = '\0';
+
+        // 6. Save our position for the next call
+        // We'll start *after* the null terminator we just wrote
+        last_token_end = token_end + 1;
+        
+        return token_start;
     }
 }

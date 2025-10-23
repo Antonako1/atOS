@@ -11,16 +11,16 @@ U0 *STRCAT(U8* dest, CONST U8* src);
 U0 *STRNCAT(U8* dest, CONST U8* src, U32 maxlen);
 U8* STRNCONCAT(U8 *dest, U32 dest_pos, U8 *src, U32 max_len);
 
-// these return TRUE if equal
-BOOLEAN STRCMP(CONST U8* str1, CONST U8* str2);
-BOOLEAN STRNCMP(CONST U8* str1, CONST U8* str2, U32 n);
-
-// returns 0 on success
-BOOLEAN STRCASECMP(U8 *a, U8 *b);
-BOOLEAN STRCASENCMP(U8 *a, U8 *b, U32 n);
+INT STRCMP(CONST U8* str1, CONST U8* str2);
+INT STRNCMP(CONST U8* str1, CONST U8* str2, U32 n);
+INT STRICMP(U8 *a, U8 *b);
+INT STRNICMP(U8 *a, U8 *b, U32 n);
 
 U0 *STRCHR(CONST U8* str, U8 c);
 U0 *STRRCHR(CONST U8* str, U8 c);
+
+BOOLEAN STREQ(U8* str1, U8* str2);
+BOOLEAN STRNEQ(U8* str1, U8* str2, U32 n);
 
 U32 ATOI(CONST U8* str);
 U32 ATOI_HEX(CONST U8* str);
@@ -32,4 +32,43 @@ U8 TOLOWER(U8 c);
 U0 STR_TOUPPER(U8* str);
 U0 STR_TOLOWER(U8* str);
 U32 FIRST_INDEX_OF(CONST U8* str, U8 c);
+
+/**
+ * @brief Finds the first character in 'str' that matches
+ * *any* character specified in 'accept'.
+ * @param str    The string to scan.
+ * @param accept The string containing characters to search for.
+ * @return A pointer to the byte in 'str' that matches,
+ * or NULLPTR if no such byte is found.
+ */
+PU8 STRPBRK(PU8 str, PU8 accept);
+
+/**
+ * @brief Breaks a string into a sequence of tokens.
+ *
+ * This function is stateful and not thread-safe.
+ * It modifies the input string 'str' by writing null terminators.
+ *
+ * @param str    The string to tokenize on the first call.
+ * Pass NULLPTR on subsequent calls to continue
+ * tokenizing the same string.
+ * @param delim  A string containing all delimiter characters.
+ * @return A pointer to the beginning of the next token,
+ * or NULLPTR if no more tokens are found.
+ */
+PU8 STRTOK(PU8 str, PU8 delim);
+
+/**
+ * @brief Finds the length of the initial segment of 'str'
+ * that consists *only* of characters from 'accept'.
+ * @param str    The string to scan.
+ * @param accept The string containing acceptable characters.
+ * @return The number of bytes in the initial segment of 'str'
+ * which are in 'accept'.
+ */
+size_t STRSPN(PU8 str, PU8 accept);
+
+U8* str_ltrim(U8 *s);
+U8* str_rtrim(U8 *s);
+U8* str_trim(U8 *s);
 #endif // STRING_H

@@ -22,6 +22,11 @@ U0 _start(U0) {
 
     INITIALIZE_SHELL();
     INIT_SHELL_VOUTPUT();
+    OutputHandle hndl = GetOutputHandle();
+    if(hndl->Column != 0) {
+        for(;;);
+    }
+    INITIALIZE_DIR(&shndl);
 
     SHELL_LOOP();
 }
@@ -46,8 +51,6 @@ U0 INITIALIZE_SHELL() {
     shndl.focused_pid = PROC_GETPID();
     shndl.previously_focused_pid = shndl.focused_pid;
     SWITCH_LINE_EDIT_MODE();
-    // shndl.path 
-    STRNCPY(shndl.path, '/', FAT_MAX_PATH);
 }
 
 U0 SWITCH_CMD_INTERFACE_MODE(VOID) {
@@ -89,6 +92,7 @@ U0 SHELL_LOOP(U0) {
     
     PUTS("atOShell v0.1\r\nType 'help' for a list of commands.\r\n");
     PUT_SHELL_START();
+
     while(1) {
         switch (shndl.state) {
             case STATE_CMD_INTERFACE:

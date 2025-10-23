@@ -89,14 +89,10 @@ Download from the [official QEMU website](https://www.qemu.org/download/#windows
 ### Booting atOS with QEMU
 
 ```bash
-  # If you want to use ethernet driver, run these
-  sudo ip tuntap add dev tap0 mode tap;
-  sudo ip link set tap0 up;
-
   # Creates a hard disk image.
 	qemu-img create -f raw hdd.img 256M   
 
-  # Runs Qemu from ISO with attached HDD, RTL8139, AC97 and PCI support
+	mkdir -p OUTPUT/DEBUG
 	qemu-system-i386 -vga std \
 	-m 1024 \
 	-boot order=d \
@@ -107,9 +103,10 @@ Download from the [official QEMU website](https://www.qemu.org/download/#windows
 	-device ide-hd,drive=hd0,bus=ide.0 \
 	-device ide-cd,drive=cdrom,bus=ide.1 \
 	-device ac97,audiodev=snd0 \
-	-netdev tap,id=tap0,ifname=tap0,script=no,downscript=no \
-	-device rtl8139,netdev=tap0,mac=52:54:00:12:34:56 \
-	-audiodev sdl,id=snd0
+	-debugcon file:OUTPUT/DEBUG/debug.log \
+		-global isa-debugcon.iobase=0xe9 \
+		-audiodev sdl,id=snd0 \
+		-nic user,model=rtl8139,mac=52:54:00:12:34:56
 ```
 
 ---
@@ -164,13 +161,13 @@ Planned and in-progress features for atOS:
 * [x] Bootloader and raw binary kernel loading
 * [x] Basic memory management (paging, allocator, frame BYTEMAP)
 * [X] ISO9660 support
-* [X] Basic drivers (keyboard, screen, disk I/O)
+* [X] Basic drivers (keyboard, screen, disk I/O, audio)
 * [X] Ethernet driver
-* [ ] FAT32 filesystem support
+* [X] FAT32 filesystem support
 * [X] System call interface
 * [X] Multitasking and scheduling
 * [X] Shell environment for interacting with the system
-* [ ] Userland application support via custom language
+* [ ] Running custom processes via shell
 
 *This roadmap is tentative and may evolve as the project grows.*
 

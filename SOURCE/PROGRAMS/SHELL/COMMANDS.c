@@ -2,15 +2,16 @@
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <STD/STRING.h>
 #include <STD/AUDIO.h>
+#include <STD/MEM.h>
 
 #define LEND "\r\n"
+
 
 
 // ======================
 // Command Table
 // ======================
-
-static const ShellCommand shell_commands[] ATTRIB_DATA = {
+static const ShellCommand shell_commands[] ATTRIB_RODATA = {
     { "help",     CMD_HELP,     "Show this help message" },
     { "clear",    CMD_CLEAR,    "Clear the screen" },
     { "cls",      CMD_CLEAR,    "Clear the screen" },
@@ -19,8 +20,15 @@ static const ShellCommand shell_commands[] ATTRIB_DATA = {
     { "echo",     CMD_ECHO,     "Echo text back to screen" },
     { "tone",     CMD_TONE,     "Play tone: tone <freqHz> <ms> [amp] [rate]" },
     { "soundoff", CMD_SOUNDOFF, "Stop AC97 playback" },
+    { "cd",       CMD_CD,       "Change directory: cd <relative path | absolute path | ->" },
+    { "cd..",     CMD_CD_BACKWARDS, "Change directory backwards" },
+    { "dir",     CMD_DIR, "List directory contents" },
 };
+
 #define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
+
+static U8 tmp_line[CUR_LINE_MAX_LENGTH] ATTRIB_DATA = { 0 };
+
 
 // ======================
 // Command Implementations
@@ -66,7 +74,6 @@ VOID CMD_ECHO(U8 *line) {
     }
 }
 
-
 VOID CMD_TONE(U8 *line) {
     U8 *s = line + STRLEN("tone ");
     U32 freq = ATOI(s);
@@ -109,11 +116,53 @@ VOID CMD_UNKNOWN(U8 *line) {
     PRINTNEWLINE();
 }
 
+VOID CMD_CD(PU8 raw_line) {
+    // Use tmp_line_out as the modifiable buffer for the command argument
+    MEMZERO(tmp_line, sizeof(tmp_line));
+    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
+
+    // Get the argument path. For 'cd', the command name is 2 characters.
+    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 2); 
+    
+    // Default to root directory if argument is empty (cd without args)
+    if (!path_arg || *path_arg == '\0') {
+        CD_INTO((PU8)"/");
+    } else {
+        CD_INTO(path_arg);
+    }
+}
 
 
 
+void CMD_CD_BACKWARDS(PU8 line) {
+    (void)line; // unused
+    CD_BACKWARDS_DIR();
+    PRINTNEWLINE();
+}
 
-U0 HANDLE_COMMAND(U8 *line) {
+VOID CMD_DIR(PU8 raw_line) {
+    // Use tmp_line_out as the modifiable buffer for the command argument
+    MEMZERO(tmp_line, sizeof(tmp_line));
+    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
+
+    // Get the argument path. For 'dir', the command name is 3 characters.
+    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 3); 
+    
+    // Default to current directory if argument is empty (dir without args)
+    if (!path_arg || *path_arg == '\0') {
+        // Point the argument back to the buffer which now holds only spaces/null
+        // and set it to "." for the current directory.
+        tmp_line[0] = '.';
+        tmp_line[1] = '\0';
+        path_arg = tmp_line;
+    }
+
+    // PRINT_CONTENTS_PATH handles path resolution, directory check, and printing.
+    PRINT_CONTENTS_PATH(path_arg);
+}
+
+
+U0 HANDLE_COMMAND(U8 *line) { 
     OutputHandle cursor = GetOutputHandle();
     cursor->CURSOR_VISIBLE = FALSE;
 
@@ -137,7 +186,7 @@ U0 HANDLE_COMMAND(U8 *line) {
     // Find command
     BOOLEAN found = FALSE;
     for (U32 j = 0; j < shell_command_count; j++) {
-        if (STRCASECMP((CHAR*)command, shell_commands[j].name) == 0) {
+        if (STRICMP((CHAR*)command, shell_commands[j].name) == 0) {
             shell_commands[j].handler(line);
             found = TRUE;
             break;

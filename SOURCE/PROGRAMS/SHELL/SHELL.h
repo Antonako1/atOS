@@ -2,6 +2,7 @@
 #define SHELL_H
 #include <STD/TYPEDEF.h>
 #include <PROGRAMS/SHELL/VOUTPUT.h>
+#include <PROGRAMS/SHELL/COMMANDS.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
 #include <FAT/FAT.h>
 
@@ -19,7 +20,12 @@ typedef struct {
     U32 previously_focused_pid;
     OutputHandle cursor;
     SHELL_STATES state;
-    U8 path[FAT_MAX_PATH];
+    struct fat_info {
+        U32 current_cluster;
+        DIR_ENTRY current_path_dir_entry;
+        U8 path[FAT_MAX_PATH];
+        U8 prev_path[FAT_MAX_PATH];
+    } fat_info;
     ENV_VARS VARS;
 } SHELL_INSTANCE;
 
@@ -33,5 +39,18 @@ VOID CMD_INTERFACE_LOOP();
 U0 EDIT_LINE_LOOP();
 U0 EDIT_LINE_MSG_LOOP();
 VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod);
+
+
+void INITIALIZE_DIR(SHELL_INSTANCE *shndl);
+PU8 GET_PATH();
+PU8 GET_PREV_PATH();
+BOOLEAN CD_PREV();
+BOOLEAN CD_INTO(PU8 path);
+BOOLEAN CD_BACKWARDS_DIR();
+PU8 PARSE_CD_RAW_LINE(PU8 line, U32 cut_index);
+
+
+VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir);
+VOID PRINT_CONTENTS_PATH(PU8 path);
 
 #endif // SHELL_H

@@ -17,14 +17,18 @@ typedef struct {
 } ShellCommand;
 
 // === Command function prototypes ===
-VOID CMD_HELP(U8 *line);
-VOID CMD_CLEAR(U8 *line);
-VOID CMD_VERSION(U8 *line);
-VOID CMD_EXIT(U8 *line);
-VOID CMD_ECHO(U8 *line);
-VOID CMD_TONE(U8 *line);
-VOID CMD_SOUNDOFF(U8 *line);
-VOID CMD_UNKNOWN(U8 *line);
+#define CMD_FUNC(CMD) void CMD_##CMD(U8 *line)
 
+CMD_FUNC(HELP);
+CMD_FUNC(CLEAR);
+CMD_FUNC(VERSION);
+CMD_FUNC(EXIT);
+CMD_FUNC(ECHO);
+CMD_FUNC(TONE);
+CMD_FUNC(SOUNDOFF);
+CMD_FUNC(UNKNOWN);
+CMD_FUNC(CD);
+CMD_FUNC(CD_BACKWARDS);
+CMD_FUNC(DIR);
 
 #endif // COMMANDS_H

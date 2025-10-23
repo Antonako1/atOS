@@ -183,6 +183,9 @@ BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent, U8 *name);
 /// @return TRUE if any LFN entries were found, FALSE otherwise
 BOOLEAN READ_LFNS(DIR_ENTRY *ent, LFN *out, U32 *size_out);
 
+// Returns the DIR_ENTRY representing the FAT32 root directory.
+// The FAT32 root has no parent entry on disk, so we synthesize one.
+DIR_ENTRY GET_ROOT_DIR_ENTRY(void);
 
 // ----- Directory and file creation -----
 

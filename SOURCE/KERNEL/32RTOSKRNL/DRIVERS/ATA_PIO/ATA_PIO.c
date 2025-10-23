@@ -2,10 +2,6 @@
 #include <STD/ASM.h>
 #include <STD/TYPEDEF.h>
 
-// Note: Assuming the implementation of _inb, _outb, _inw, _outw,
-// ata_io_wait, VOIDPTR, and ATTRIB_DATA are available
-// from the kernel's included headers.
-
 static U32 PIO_IDENTIFIER ATTRIB_DATA = 0;
 // Using standard 0x100000 timeout for consistency and safety
 #define POLLING_TIME 0x100000 

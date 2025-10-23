@@ -3,21 +3,27 @@ Internal RTOSKRNL functions. Some important functions like panic() are here,
 and some not-so-important functions are here.
 */
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
-#include <STD/ASM.h>
 #include <MEMORY/PAGEFRAME/PAGEFRAME.h>
 #include <MEMORY/PAGING/PAGING.h>
 #include <DRIVERS/ATAPI/ATAPI.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
+#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/AC97/AC97.h>
+
 #include <FS/ISO9660/ISO9660.h>
 #include <FS/FAT/FAT.h>
+
 #include <STD/STRING.h>
+#include <STD/ASM.h>
+
 #include <MEMORY/HEAP/KHEAP.h>
+
 #include <CPU/PIT/PIT.h>
-#include <ACPI/ACPI.h>
 #include <CPU/ISR/ISR.h> // for regs struct
+
+#include <ACPI/ACPI.h>
 #include <PROC/PROC.h>
-#include <VIDEO/VBE.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
 #include <ERROR/ERROR.h>
 
 #define INC_rki_row(rki_row) (rki_row += VBE_CHAR_HEIGHT + 2)
@@ -225,6 +231,8 @@ void DUMP_STRING_U32(STRING str, U32 num) {
 
 void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     CLI;
+    AC97_TONE(300, 150, 14400, 8000);
+    AC97_TONE(200, 200, 14400, 8000);
     VBE_COLOUR fg = VBE_WHITE;
     VBE_COLOUR bg = VBE_BLUE;
     VBE_CLEAR_SCREEN(bg);
@@ -312,27 +320,16 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
 void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     CLI;
     debug_vram_start();
+    VBE_UPDATE_VRAM();
+    VBE_UPDATE_VRAM();
+    VBE_UPDATE_VRAM();
+    VBE_UPDATE_VRAM();
+    VBE_UPDATE_VRAM();
+    AC97_TONE(300, 150, 14400, 8000);
+    AC97_TONE(200, 200, 14400, 8000);
     rki_row = 0;
     VBE_CLEAR_SCREEN(bg);
     U8 buf[16];
-    // Registers
-    U32 esp = ASM_READ_ESP();
-    U32 eip = ASM_GET_EIP();
-    INC_rki_row(rki_row);    
-    VBE_DRAW_STRING(0, rki_row, "Registers:", fg, bg);
-    INC_rki_row(rki_row);
-    regs r = ASM_READ_REGS();
-    DUMP_REGS(&r);
-
-    VBE_DRAW_STRING(0, rki_row, "EIP:", fg, bg);
-    ITOA(eip, buf, 16);
-    VBE_DRAW_STRING(50, rki_row, buf, fg, bg);
-    INC_rki_row(rki_row);
-
-    VBE_DRAW_STRING(0, rki_row, "ESP:", fg, bg);
-    ITOA(esp, buf, 16);
-    VBE_DRAW_STRING(50, rki_row, buf, fg, bg);
-    INC_rki_row(rki_row);
     // Error code
     ITOA_U(errmsg, buf, 16);
     VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
@@ -352,7 +349,24 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     VBE_DRAW_STRING(0, rki_row, "System halted, Dump as in panic() call.", fg, bg);
     INC_rki_row(rki_row);
 
+    // Registers
+    U32 esp = ASM_READ_ESP();
+    U32 eip = ASM_GET_EIP();
+    INC_rki_row(rki_row);    
+    VBE_DRAW_STRING(0, rki_row, "Registers:", fg, bg);
+    INC_rki_row(rki_row);
+    regs r = ASM_READ_REGS();
+    DUMP_REGS(&r);
 
+    VBE_DRAW_STRING(0, rki_row, "EIP:", fg, bg);
+    ITOA(eip, buf, 16);
+    VBE_DRAW_STRING(50, rki_row, buf, fg, bg);
+    INC_rki_row(rki_row);
+
+    VBE_DRAW_STRING(0, rki_row, "ESP:", fg, bg);
+    ITOA(esp, buf, 16);
+    VBE_DRAW_STRING(50, rki_row, buf, fg, bg);
+    INC_rki_row(rki_row);
 
     // Stack
     INC_rki_row(rki_row);
@@ -539,19 +553,12 @@ BOOL initialize_filestructure(VOID) {
         return FALSE;
     }
     ISO9660_FREE_MEMORY(bin);
-    // FAT_LFN_ENTRY ent;
-    // sz = 0;
-    // PATH_RESOLVE_ENTRY("/KRNL.BIN", &ent);
-    // bin = READ_FILE_CONTENTS(&sz, &ent.entry);
-    // DUMP_MEMORY(bin, sz);
-    // KFREE(bin);
-    // HLT;
     return TRUE;
 }
 
 
 void RTOSKRNL_LOOP(VOID) {
-    early_debug_tcb(get_last_pid());
+    // early_debug_tcb(get_last_pid());
     while(1) {
         handle_kernel_messages();
     }

@@ -67,7 +67,7 @@ void rtos_kernel(U0) {
     LOAD_AND_RUN_KERNEL_SHELL();
     RTOSKRNL_LOOP();
     HLT; // just in case
-    NOP;
+    NOP; // debug nop
 }
 
 __attribute__((noreturn, section(".text")))

@@ -19,6 +19,7 @@ set(Sources
     ${CUR_DIR}/LOOP.c
     ${CUR_DIR}/SHELL_PROC.c
     ${CUR_DIR}/COMMANDS.c
+    ${CUR_DIR}/DIR.c
     ${CUR_DIR}/INPUTS.c
     ${STD_SOURCES}
 )

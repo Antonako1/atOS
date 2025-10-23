@@ -23,7 +23,7 @@ static U32 history_index ATTRIB_DATA = 0; // 0 = current line, 1..history_count 
 
 // Command history (up to CMD_LINE_HISTORY entries)
 // Each entry is a dynamically allocated string
-static U8 *line_history[CMD_LINE_HISTORY] ATTRIB_DATA = {0};
+static PPU8 line_history[CMD_LINE_HISTORY] ATTRIB_DATA = {0};
 static U32 history_count ATTRIB_DATA = 0;
 
 static volatile U32 pending_scrolls ATTRIB_DATA = 0;
@@ -45,10 +45,15 @@ static inline VOID DRAW_CELL_BG_RUN(U32 col, U32 row, U32 len, VBE_PIXEL_COLOUR 
     DRAW_FILLED_RECTANGLE(x, y, w, CHAR_HEIGHT, bg);
 }
 
+
+#define GLYPH_COUNT (sizeof(WIN1KXHR__8x16) / CHAR_HEIGHT)
+
 // Efficiently draw a string of length len at cell (col,row)
 // Background is cleared with a single filled-rectangle per run, then
 // foreground spans are emitted as horizontal lines per bit-run.
-static VOID DRAW_STRING_AT(U32 col, U32 row, const U8 *s, U32 len, VBE_PIXEL_COLOUR fg, VBE_PIXEL_COLOUR bg) {
+static VOID DRAW_STRING_AT(U32 col, U32 row, const U8 *s, U32 len,
+                           VBE_PIXEL_COLOUR fg, VBE_PIXEL_COLOUR bg)
+{
     if (!s || len == 0) return;
 
     // Clear background for the entire span with a single call (per row strip)
@@ -58,31 +63,43 @@ static VOID DRAW_STRING_AT(U32 col, U32 row, const U8 *s, U32 len, VBE_PIXEL_COL
     U32 base_x = COL_TO_PIX(col);
     U32 base_y = ROW_TO_PIX(row);
     const U32 cell_adv = CHAR_WIDTH + CHAR_SPACING;
+
     for (U32 i = 0; i < CHAR_HEIGHT; i++) {
         BOOLEAN in_run = FALSE;
         U32 run_start_x = 0;
-        // Scan across all bits in the span
+
         for (U32 ci = 0; ci < len; ci++) {
             U8 ch = s[ci];
-            const U8 *glyph = &WIN1KXHR__8x16[ch * CHAR_HEIGHT];
+
+            // ✅ Clamp character index to valid glyph range
+            if (ch >= GLYPH_COUNT)
+                ch = '?'; // fallback glyph
+
+            // ✅ Also check that the index is safe before dereferencing
+            U32 glyph_index = ch * CHAR_HEIGHT;
+            if (glyph_index + i >= sizeof(WIN1KXHR__8x16))
+                continue; // skip invalid glyph line
+
+            const U8 *glyph = &WIN1KXHR__8x16[glyph_index];
             U8 bits = glyph[i];
+
             for (U32 bj = 0; bj < CHAR_WIDTH; bj++) {
                 U8 bit = (bits >> (CHAR_WIDTH - 1 - bj)) & 1;
                 U32 px = base_x + ci * cell_adv + bj;
+
                 if (bit) {
                     if (!in_run) {
                         in_run = TRUE;
                         run_start_x = px;
                     }
                 } else if (in_run) {
-                    // finish run up to previous pixel
                     DRAW_LINE(run_start_x, base_y + i, px - 1, base_y + i, fg);
                     in_run = FALSE;
                 }
             }
         }
+
         if (in_run) {
-            // close last run to the end of the span
             U32 end_x = base_x + len * cell_adv - CHAR_SPACING - 1;
             DRAW_LINE(run_start_x, base_y + i, end_x, base_y + i, fg);
         }
@@ -115,6 +132,7 @@ static U32 WRITE_SPAN_FAST(const U8 *s, U32 len) {
         U32 chunk = (len - written < avail) ? (len - written) : avail;
 
         // Copy into text buffer
+        if (cursor.Row >= AMOUNT_OF_ROWS || cursor.Column >= AMOUNT_OF_COLS) return 0;
         MEMCPY(&text_buffer[cursor.Row][cursor.Column], s + written, chunk);
 
         // Draw at once
@@ -141,8 +159,7 @@ U0 INIT_SHELL_VOUTPUT(VOID) {
     cursor.fgColor = VBE_GREEN;
     cursor.bgColor = VBE_BLACK;
     cursor.CURSOR_STYLE = CURSOR_BLOCK;
-    cursor.INSERT_MODE = FALSE;
-    // cursor.CURSOR_BLINK = FALSE;
+    cursor.INSERT_MODE = TRUE;
     SET_CURSOR_BLINK(TRUE);
     SET_CURSOR_VISIBLE(TRUE);
     TOGGLE_INSERT_MODE(); // Looks weird but starts NOT in insert mode
@@ -151,7 +168,6 @@ U0 INIT_SHELL_VOUTPUT(VOID) {
     cursor.SWIDTH = SCREEN_WIDTH;
     cursor.SHEIGHT = SCREEN_HEIGHT;
 
-    cursor.text_buffer = (U8*)text_buffer; // Cast to U8* for easier access and dynamic allocation
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     shndl = GET_SHNDL();
 }
@@ -171,22 +187,29 @@ U0 SCROLL_TEXTBUFFER_UP(U0) {
 
 
 VOID PUSH_TO_HISTORY(U8 *line) {
+    if (!line) return;
+
+    size_t copy_len = STRNLEN(line, CUR_LINE_MAX_LENGTH);
+    if(copy_len < 1) return; // Ignore empty strings
+
+    U8 *new_line = (U8 *)MAlloc(copy_len + 1);
+    if (!new_line) return; // allocation failed
+
+    MEMCPY(new_line, line, copy_len);
+
+    new_line[copy_len] = '\0';
+
     if (history_count < CMD_LINE_HISTORY) {
-        line_history[history_count] = (U8 *)MAlloc(STRLEN(line) + 1);
-        STRNCPY(line_history[history_count], line, STRLEN(line) + 1);
-        history_count++;
+        line_history[history_count++] = new_line;
     } else {
-        // Free the oldest entry
         Free(line_history[0]);
-        // Shift all entries up
         for (U32 i = 1; i < CMD_LINE_HISTORY; i++) {
             line_history[i - 1] = line_history[i];
         }
-        // Add new entry at the end
-        line_history[CMD_LINE_HISTORY - 1] = (U8 *)MAlloc(STRLEN(line) + 1);
-        STRNCPY(line_history[CMD_LINE_HISTORY - 1], line, STRLEN(line) + 1);
+        line_history[CMD_LINE_HISTORY - 1] = new_line;
     }
 }
+
 
 VOID CLEAR_HISTORY() {
     for (U32 i = 0; i < history_count; i++) {
@@ -269,6 +292,7 @@ static inline void DRAW_CHAR_AT(U32 col, U32 row, U8 ch, VBE_PIXEL_COLOUR fg, VB
 }
 
 void REDRAW_CHAR(U32 col, U32 row) {
+    if (row >= AMOUNT_OF_ROWS || col >= AMOUNT_OF_COLS) return; // defensive
     U8 ch = text_buffer[row][col];
     DRAW_CHAR_AT(col, row, ch, cursor.fgColor, cursor.bgColor);
 }
@@ -284,7 +308,7 @@ void RESTORE_CURSOR_UNDERNEATH(U32 col, U32 row) {
 }
 
 VOID PUT_CURRENT_PATH(VOID) {
-    PUTS("/");
+    PUTS(GET_PATH());
     return;
 }
 
@@ -517,20 +541,18 @@ VOID BLINK_CURSOR(VOID) {
 
 
 VOID PUT_SHELL_START(VOID) {
-    // Put path and prompt chars (this moves cursor.Column)
+    RESTORE_CURSOR_BEFORE_MOVE();
+    cursor.Column = 0;
+
     PUT_CURRENT_PATH();
     PUTS(PATH_END_CHAR);
 
-    // Store where editable area starts (and which row it's on)
     prompt_length = cursor.Column;
     prompt_row = cursor.Row;
-
-    // initialize edit buffer position
     edit_pos = 0;
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
-
-    // Ensure cursor is at the editable start
     cursor.Column = prompt_length;
+
     DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
 
@@ -617,6 +639,22 @@ U32 PUTS(U8 *str) {
         total += PUTC(*str++);
     }
     return total;
+}
+
+U32 PUT_HEX(U32 n) {
+    U8 buf[16];
+    ITOA_U(n, buf, 16);
+    PUTS(buf);
+}
+U32 PUT_BIN(U32 n) {
+    U8 buf[16];
+    ITOA_U(n, buf, 2);
+    PUTS(buf);
+}
+U32 PUT_DEC(U32 n) {
+    U8 buf[16];
+    ITOA_U(n, buf, 10);
+    PUTS(buf);
 }
 
 VOID DRAW_TEXT_BUFFER(VOID) {
@@ -733,132 +771,142 @@ VOID NEW_ROW(VOID) {
 }
 
 
+// ----------------- Line Editing Handlers -----------------
 
-VOID HANDLE_LE_ENTER() {
-    // Terminate buffer at edit_pos and execute
-    if (edit_pos >= CUR_LINE_MAX_LENGTH) edit_pos = CUR_LINE_MAX_LENGTH - 1;
+void HANDLE_LE_ENTER() {
+    if(edit_pos >= CUR_LINE_MAX_LENGTH) edit_pos = CUR_LINE_MAX_LENGTH - 1;
     current_line[edit_pos] = '\0';
+
     RESTORE_CURSOR_BEFORE_MOVE();
-    HANDLE_COMMAND(current_line);   // parse/execute
-    PUSH_TO_HISTORY(current_line);   // save to history
+    HANDLE_COMMAND(current_line);       // parse & execute
     
-    // Clear current_line and move to next row; reinitialize prompt
+    PUSH_TO_HISTORY(current_line);     // save to history
+    
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
-
-    // Move to new line and place prompt
+    
     RESTORE_CURSOR_BEFORE_MOVE();
     cursor.Column = 0;
     PUT_SHELL_START();
-
+    
     history_index = 0; // reset browsing state
 }
 
-VOID HANDLE_LE_BACKSPACE() {
-    if (edit_pos == 0) return; // don't delete before prompt
+void HANDLE_LE_BACKSPACE() {
+    if(edit_pos == 0) return; // can't delete before prompt
+
     edit_pos--;
-
-    // shift left from edit_pos
     U32 len = STRLEN(current_line);
-    for (U32 i = edit_pos; i < len; i++) {
+
+    for(U32 i = edit_pos; i < len; i++) {
         current_line[i] = current_line[i + 1];
     }
+
     RESTORE_CURSOR_BEFORE_MOVE();
     REDRAW_CURRENT_LINE();
 }
 
-VOID HANDLE_LE_DELETE() {
+void HANDLE_LE_DELETE() {
     U32 len = STRLEN(current_line);
-    if (edit_pos >= len) return; // nothing to delete
+    if(edit_pos >= len) return;
 
-    for (U32 i = edit_pos; i < len; i++) {
+    for(U32 i = edit_pos; i < len; i++) {
         current_line[i] = current_line[i + 1];
     }
-    RESTORE_CURSOR_BEFORE_MOVE();
 
+    RESTORE_CURSOR_BEFORE_MOVE();
     REDRAW_CURRENT_LINE();
 }
 
-VOID HANDLE_LE_ARROW_LEFT() {
-    if (edit_pos == 0) return; // prevent moving into prompt
+void HANDLE_LE_ARROW_LEFT() {
+    if(edit_pos == 0) return;
+
+    RESTORE_CURSOR_UNDERNEATH(cursor.Column, cursor.Row);
     edit_pos--;
     cursor.Column = prompt_length + edit_pos;
-    RESTORE_CURSOR_BEFORE_MOVE();
     DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
 
-VOID HANDLE_LE_ARROW_RIGHT() {
+void HANDLE_LE_ARROW_RIGHT() {
     U32 len = STRLEN(current_line);
-    if (edit_pos < len) {
-        edit_pos++;
-        cursor.Column = prompt_length + edit_pos;
-        RESTORE_CURSOR_BEFORE_MOVE();
-        DRAW_CURSOR_AT(cursor.Column, cursor.Row);
-    }
+    if(edit_pos >= len) return;
+
+    RESTORE_CURSOR_UNDERNEATH(cursor.Column, cursor.Row);
+    edit_pos++;
+    cursor.Column = prompt_length + edit_pos;
+    DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
 
-VOID HANDLE_LE_CTRL_C() {
-    // Draw "^C" to visually show the interrupt
+void HANDLE_LE_CTRL_C() {
     PUTS("^C\n");
-
-    // Reset the current input line
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
 
-    // If a process was running, mark it as interrupted
-    if (shndl == STATE_CMD_INTERFACE) {
-        // TERMINATE_FOCUSED_PROCESS(); // <-- implement this if your PROC system supports it
+    if(shndl == STATE_CMD_INTERFACE) {
+        // TERMINATE_FOCUSED_PROCESS(); // implement as needed
     }
 
-    // Return shell to line editing mode
     shndl = STATE_EDIT_LINE;
     history_index = 0;
-
-    // Display prompt again
     PUT_SHELL_START();
 }
 
-VOID HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod) {
+void HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod) {
     if(kp->keycode == KEY_C && mod->ctrl) {
         HANDLE_LE_CTRL_C();
         return;
     }
+
     U8 c = keypress_to_char(kp->keycode);
-    if (!c) return;
+    if(!c) return;
 
     U32 len = STRLEN(current_line);
-    if (len >= CUR_LINE_MAX_LENGTH - 1) return;
 
-    // Make room at edit_pos
-    for (U32 i = len + 1; i > edit_pos; i--) {
+    // === NEW: prevent editing past visible area ===
+    // reserve one cell for NUL if you need it; stop inserting when prompt+len == cursor.COLUMNS
+    if (prompt_length + len >= cursor.COLUMNS - 1) {
+        // buffer full for visible area — ignore or beep
+        // BEEP(); // implement if you have a bell
+        return;
+    }
+    // ==============================================
+
+    if(len >= CUR_LINE_MAX_LENGTH - 1) return;
+
+    // Shift right for insertion
+    for(U32 i = len + 1; i > edit_pos; i--) {
         current_line[i] = current_line[i - 1];
     }
 
     current_line[edit_pos] = c;
-    edit_pos++;
-    RESTORE_CURSOR_BEFORE_MOVE();
 
+    if(cursor.INSERT_MODE) {
+        MOVE_BUFFER_CONTENTS_RIGHT_FROM(prompt_length + edit_pos, prompt_row);
+    }
+
+    edit_pos++;
     REDRAW_CURRENT_LINE();
+    HANDLE_LE_CURSOR();
 }
 
-VOID HANDLE_LE_CURSOR() {
-    // Sync screen cursor with edit_pos
+void HANDLE_LE_CURSOR() {
     cursor.Row = prompt_row;
-    cursor.Column = prompt_length + edit_pos;
+    // clamp column to valid range
+    U32 desired = prompt_length + edit_pos;
+    if (desired >= cursor.COLUMNS) desired = cursor.COLUMNS - 1;
+    cursor.Column = desired;
+
     RESTORE_CURSOR_BEFORE_MOVE();
     DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
 
-VOID HANDLE_LE_ARROW_UP() {
-    if (history_count == 0) return;
 
-    // If we're at newest line, start browsing from most recent entry
-    if (history_index < history_count)
-        history_index++;
-    else
-        history_index = history_count; // clamp
+void HANDLE_LE_ARROW_UP() {
+    if(history_count == 0) return;
 
-    // Copy the corresponding line from history
+    if(history_index < history_count) history_index++;
+    else history_index = history_count;
+
     const U8 *line = line_history[history_count - history_index];
     STRNCPY(current_line, line, CUR_LINE_MAX_LENGTH);
     edit_pos = STRLEN(current_line);
@@ -867,14 +915,12 @@ VOID HANDLE_LE_ARROW_UP() {
     HANDLE_LE_CURSOR();
 }
 
-VOID HANDLE_LE_ARROW_DOWN() {
-    if (history_count == 0) return;
-    if (history_index == 0) return; // already at current line
+void HANDLE_LE_ARROW_DOWN() {
+    if(history_count == 0 || history_index == 0) return;
 
     history_index--;
 
-    if (history_index == 0) {
-        // Return to blank current line
+    if(history_index == 0) {
         MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
         edit_pos = 0;
     } else {
@@ -887,22 +933,16 @@ VOID HANDLE_LE_ARROW_DOWN() {
     HANDLE_LE_CURSOR();
 }
 
-U0 LE_CLS(U0) {
-    // Clear physical screen
+void LE_CLS(void) {
     CLEAR_SCREEN_COLOUR(cursor.bgColor);
-
-    // Clear text buffer and redraw (optional; could skip redraw until prompt)
     CLEAR_TEXTBUFFER();
-    // DRAW_TEXT_BUFFER();
 
-    // Reset editing state
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
     history_index = 0;
 
-    // Reset cursor position
     cursor.Row = 0;
     cursor.Column = 0;
-    // Print prompt at top
+
     PUT_SHELL_START();
 }
