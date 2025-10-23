@@ -1292,6 +1292,13 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
 
     U8 *saveptr;
     U8 *component = STRTOK_R(path_copy, "/", &saveptr);
+    if (STRCMP(path, "/") == 0) {
+        out_entry->entry.LOW_CLUSTER_BITS = GET_ROOT_CLUSTER() & 0xFFFF;
+        out_entry->entry.HIGH_CLUSTER_BITS = (GET_ROOT_CLUSTER() >> 16) & 0xFFFF;
+        out_entry->entry.ATTRIB = FAT_ATTRB_DIR;
+        STRCPY(out_entry->lfn, "/");
+        return TRUE;
+    }
 
     while (component) {
         // Skip empty components (e.g., multiple slashes)
