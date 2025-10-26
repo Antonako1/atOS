@@ -128,6 +128,7 @@ typedef struct {
 #define FAT32_BAD_CLUSTER        0x0FFFFFF7
 #define FAT32_END_OF_CHAIN       0x0FFFFFF8
 
+#define FAT32_DELETED_ENTRY      0xE5
 
 #define SECT_PER_CLUST     8
 #define BYTES_PER_SECT     512

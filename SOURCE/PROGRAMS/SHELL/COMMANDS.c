@@ -117,20 +117,23 @@ VOID CMD_UNKNOWN(U8 *line) {
 }
 
 VOID CMD_CD(PU8 raw_line) {
-    // Use tmp_line_out as the modifiable buffer for the command argument
     MEMZERO(tmp_line, sizeof(tmp_line));
     STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
 
-    // Get the argument path. For 'cd', the command name is 2 characters.
     PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 2); 
-    
-    // Default to root directory if argument is empty (cd without args)
-    if (!path_arg || *path_arg == '\0') {
+    if(STRCMP(path_arg, "-") == 0) {
+        CD_PREV();
+    } else if (!path_arg || *path_arg == '\0') {
         CD_INTO((PU8)"/");
     } else {
         CD_INTO(path_arg);
     }
+
+    // Clear line and show new prompt
+    PRINTNEWLINE();
+    PUT_SHELL_START();
 }
+
 
 
 

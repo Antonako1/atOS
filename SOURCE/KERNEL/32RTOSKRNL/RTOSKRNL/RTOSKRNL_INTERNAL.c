@@ -553,6 +553,7 @@ BOOL initialize_filestructure(VOID) {
         return FALSE;
     }
     ISO9660_FREE_MEMORY(bin);
+    // HLT;
     return TRUE;
 }
 

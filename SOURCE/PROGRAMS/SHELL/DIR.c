@@ -119,58 +119,59 @@ STATIC VOID NormalizePath(PU8 path) {
     *p = '\0';
 }
 
+STATIC VOID StripLeadingDotSlash(PU8 *path_ptr) {
+    PU8 path = *path_ptr;
+    while (path[0] == '.' && path[1] == '/') {
+        path += 2; // skip "./"
+    }
+    *path_ptr = path;
+}
+
 BOOLEAN ResolvePath(PU8 path, PU8 out_buffer, size_t out_buffer_size) {
-    // ... (ResolvePath is good as provided, no changes needed) ...
     if (!path || !*path || !out_buffer || out_buffer_size == 0)
         return FALSE;
 
     SHELL_INSTANCE *shndl = GET_SHNDL();
-    if (!shndl)
-        return FALSE;
+    if (!shndl) return FALSE;
 
-    // Use a temporary buffer for intermediate path construction.
-    const size_t tmp_max_size = CUR_LINE_MAX_LENGTH; // Use define instead of 512
-    size_t cur_len = 0;
-    size_t remaining = 0;
-
-    // Classify path type
     U32 type = ClassifyPath(path);
-    if (type > 2)
-        return FALSE;
+    if (type > 2) return FALSE;
 
-    // Construct pre-normalized path safely
+    // Temporary buffer
+    const size_t tmp_max_size = CUR_LINE_MAX_LENGTH;
+    tmp_line[0] = '\0';
+
     switch (type) {
         case 0: // absolute
             STRNCPY(tmp_line, path, tmp_max_size - 1);
-            tmp_line[tmp_max_size - 1] = '\0'; // Ensure null-termination
+            tmp_line[tmp_max_size - 1] = '\0';
             break;
 
-        case 1: // relative (e.g., "a", "./test")
-        case 2: // parent (e.g., "..", "../b")
+        case 1: // relative
+        case 2: // parent
         {
-            if (type == 1 && STRCMP(path, ".") == 0) {
-                // Special case "cd .", just copy current path
-                STRNCPY(tmp_line, shndl->fat_info.path, tmp_max_size - 1);
-                tmp_line[tmp_max_size - 1] = '\0';
-                break;
+            PU8 rel_path = path;
+            if (type == 1) {
+                if (STRCMP(rel_path, ".") == 0) {
+                    STRNCPY(tmp_line, shndl->fat_info.path, tmp_max_size - 1);
+                    tmp_line[tmp_max_size - 1] = '\0';
+                    break;
+                }
+                // strip leading ./ from relative path
+                StripLeadingDotSlash(&rel_path);
             }
 
-            // 1. Copy current path
+            // start with current path
             STRNCPY(tmp_line, shndl->fat_info.path, tmp_max_size - 1);
             tmp_line[tmp_max_size - 1] = '\0';
-            cur_len = STRLEN(tmp_line);
-            remaining = tmp_max_size - cur_len - 1; // -1 for null char
 
-            // 2. Add separator
+            // add separator if needed
             if (STRCMP(tmp_line, "/") != 0) {
-                if (remaining < 1) return FALSE; // No space for "/"
-                STRNCAT(tmp_line, "/", remaining);
-                remaining--;
+                STRNCAT(tmp_line, "/", tmp_max_size - STRLEN(tmp_line) - 1);
             }
-            
-            // 3. Add the new path component
-            if (STRLEN(path) >= remaining) return FALSE; // Not enough space
-            STRNCAT(tmp_line, path, remaining);
+
+            // append relative component
+            STRNCAT(tmp_line, rel_path, tmp_max_size - STRLEN(tmp_line) - 1);
             break;
         }
 
@@ -181,14 +182,10 @@ BOOLEAN ResolvePath(PU8 path, PU8 out_buffer, size_t out_buffer_size) {
     // Normalize the path in-place
     NormalizePath(tmp_line);
 
-    // Final check: Does the result fit in the user's output buffer?
+    // Check buffer size
     size_t final_len = STRLEN(tmp_line);
-    if (final_len + 1 > out_buffer_size) {
-        // Resulting path is too long for the provided output buffer
-        return FALSE;
-    }
+    if (final_len + 1 > out_buffer_size) return FALSE;
 
-    // Safely copy the final, normalized path to the output buffer
     STRCPY(out_buffer, tmp_line);
     return TRUE;
 }
@@ -287,32 +284,46 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
     U32 cluster = ((U32)dir->entry.HIGH_CLUSTER_BITS << 16) | dir->entry.LOW_CLUSTER_BITS;
     U32 count = MAX_COUNT_DIRS;
     U32 res = FAT32_DIR_ENUMERATE(cluster, dirs, &count);
-    if(!res) return;
-    PRINTNEWLINE();
-    PUTS("Type  Size      Name\n");
-    PUTS("----  --------  ----\n");
+    if (!res) return;
+
+    PUTS("\n");
+    PUTS("Type  Size       Name\n");
+    PUTS("----  ----------  ------------------------------\n");
 
     for (U32 i = 0; i < count; i++) {
-        FAT_LFN_ENTRY *f = &dirs[i];
+        DIR_ENTRY *f = &dirs[i];
 
         // Type
-        if (f->entry.ATTRIB & FAT_ATTRB_DIR) {
-            PUTS("d     ");
-        } else {
-            PUTS("-     ");
-        }
+        if (f->ATTRIB & FAT_ATTRB_DIR)
+            PUTS("dir   ");
+        else
+            PUTS("file  ");
 
-        // Size (assuming you have a PUT_U32 or similar)
-        // This is a placeholder for your number-printing logic
-        PUT_DEC(f->entry.FILE_SIZE); // You must implement this
+        // Size (fixed width, right-aligned)
+        U8 size_buf[12];
+        MEMZERO(size_buf, sizeof(size_buf));
+        ITOA_U(f->FILE_SIZE, size_buf, 10);
+
+        // pad left to 10 characters
+        U32 len = STRLEN(size_buf);
+        for (U32 s = 0; s < 10 - len; s++)
+            PUTS(" ");
+
+        PUTS(size_buf);
         PUTS("  ");
-        
+
         // Name
-        PUTS(f->lfn);
+        U8 name_buf[13];
+        MEMZERO(name_buf, sizeof(name_buf));
+        STRNCPY(name_buf, f->FILENAME, 11);
+        name_buf[12] = '\0';
+        str_trim(name_buf);
+
+        PUTS(name_buf);
         PUTS("\n");
     }
 }
-
+    
 VOID PRINT_CONTENTS_PATH(PU8 path) {
     // 1. Resolve the path
     // We use tmp_line for the resolved path to keep tmp_line_out clean for CD/other uses, 
@@ -335,9 +346,6 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
         PUTS("dir: Not a directory.\n");
         return;
     }
-
-    // Optional: PUTS(tmp_line);
-    // Optional: PUT_HEX(ent.entry.LOW_CLUSTER_BITS); PUT_HEX(ent.entry.HIGH_CLUSTER_BITS);
 
     PRINT_CONTENTS(&ent);
 }
