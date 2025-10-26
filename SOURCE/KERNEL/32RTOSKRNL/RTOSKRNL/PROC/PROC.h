@@ -16,7 +16,7 @@ Basically, this is kernel-level user process management with context switching
 #define USER_BINARY_VADDR MEM_USER_SPACE_BASE
 #define MAX_PROC_AMOUNT 30 // max amount of processes including master
 // 4 KB. NOTE: Just a padding between binary and stack. Actual HEAP size is defined on the fly
-#define USER_HEAP_SIZE (1024 * 4) 
+#define USER_HEAP_SIZE (1024 * 4 * 4) 
 
 #define USER_STACK_SIZE (1 * 1024 * 1024) // 1 MB
 #define MAX_USER_BINARY_SIZE (16 * 1024 * 1024) // 16 MB max binary size
@@ -204,8 +204,8 @@ typedef struct TCB {
     VOIDPTR pages; // Pointer to allocated pages for this process (for freeing)
     U32 page_count; // Number of allocated pages
 
-    U32 binary_size;
-    U32 binary_pages;
+    U32 binary_size; // Size in bytes
+    U32 binary_pages; // Amount of pages
     U32 heap_size;
     U32 heap_pages;
     U32 stack_size;
@@ -268,7 +268,17 @@ U32 get_uptime_sec(void);
 /// @return TRUE on success, FALSE on failure
 /// @note The binary must be a flat binary. 
 /// @note IMPORTANT: Only for kernel
-BOOLEAN RUN_BINARY(U8 *proc_name, VOIDPTR file, U32 bin_size, U32 heap_size, U32 stack_size, U32 initial_state, U32 parent_pid);
+BOOLEAN RUN_BINARY(
+    U8 *proc_name, 
+    VOIDPTR file, 
+    U32 bin_size, 
+    U32 heap_size, 
+    U32 stack_size, 
+    U32 initial_state, 
+    U32 parent_pid,
+    PPU8 argv,
+    U32 argc
+);
 /// @brief Terminate a process by its PID
 /// @param pid Process ID to terminate
 /// @note IMPORTANT: Only for kernel

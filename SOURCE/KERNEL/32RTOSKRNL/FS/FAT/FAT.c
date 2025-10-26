@@ -414,12 +414,12 @@ U8 LFN_CHECKSUM(U8 *shortname) {
 
 VOID FAT_83FILENAMEFY(DIR_ENTRY *entry, const U8 *original) {
     if (!entry || !original) return;
-    
-    // Initialize all 12 bytes: 8 (name) + 1 (dot) + 3 (ext)
+
+    // Initialize 11-byte FAT name with spaces
     for (U32 i = 0; i < 11; i++)
         entry->FILENAME[i] = ' ';
-    
-    // Find last dot, if any
+
+    // Find the last dot in the name
     const U8 *dot = STRRCHR(original, '.');
     U32 base_len = 0, ext_len = 0;
 
@@ -430,28 +430,23 @@ VOID FAT_83FILENAMEFY(DIR_ENTRY *entry, const U8 *original) {
         base_len = STRLEN(original);
     }
 
-    // FAT base name is 8 chars max, extension is 3 chars max
+    // Clamp lengths to FAT limits
     if (base_len > 8) base_len = 8;
     if (ext_len > 3)  ext_len  = 3;
 
-    // Copy and uppercase base name (positions 0–7)
-    for (U32 i = 0; i < base_len; i++) {
+    // Copy base name (uppercase)
+    for (U32 i = 0; i < base_len; i++)
         entry->FILENAME[i] = TOUPPER(original[i]);
-    }
 
-    // Insert dot at position 8 (after name)
-    if (dot && ext_len > 0)
-        entry->FILENAME[7] = '.';
-    else
-        entry->FILENAME[8] = ' ';
-
-    // Copy and uppercase extension (positions 9–11)
-    if (dot && ext_len > 0) {
-        for (U32 i = 0; i < ext_len; i++) {
-            entry->FILENAME[8 + i] = TOUPPER(dot[1 + i]);
-        }
+    // If extension exists, add dot right after base name (not at position 8)
+    if (dot && ext_len > 0 && base_len < 8) {
+        entry->FILENAME[base_len] = '.';
+        // Copy extension immediately after the dot
+        for (U32 i = 0; i < ext_len; i++)
+            entry->FILENAME[base_len + 1 + i] = TOUPPER(dot[1 + i]);
     }
 }
+
 
 
 // For display: convert 8.3 name into printable string with dot

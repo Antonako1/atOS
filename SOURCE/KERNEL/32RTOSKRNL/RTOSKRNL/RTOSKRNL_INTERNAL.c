@@ -525,10 +525,19 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     if(!file) {
         panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
-
+    U8 *shell_argv[] = { (U8*)"atOShell" , NULLPTR };
     panic_if(
-        !RUN_BINARY("atOShell", file, sz, USER_HEAP_SIZE, USER_STACK_SIZE, 
-            TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 0), 
+        !RUN_BINARY(
+            "atOShell", 
+            file, 
+            sz, 
+            USER_HEAP_SIZE, 
+            USER_STACK_SIZE, 
+            TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
+            0,
+            shell_argv,
+            1
+        ), 
         "PANIC: Failed to run kernel shell!", 
         PANIC_KERNEL_SHELL_GENERAL_FAILURE
     );

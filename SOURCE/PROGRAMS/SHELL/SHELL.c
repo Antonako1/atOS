@@ -16,7 +16,7 @@ static SHELL_INSTANCE shndl ATTRIB_DATA = { 0 };
 U0 SHELL_LOOP(U0);
 U0 INITIALIZE_SHELL();
 
-U0 _start(U0) {
+U0 _start(U32 argc, PU8 argv[]) {
     draw_access_granted = FALSE;
     keyboard_access_granted = FALSE;
 
@@ -27,7 +27,8 @@ U0 _start(U0) {
         for(;;);
     }
     INITIALIZE_DIR(&shndl);
-
+    
+    PUT_HEX(argc);
     SHELL_LOOP();
 }
 
@@ -52,6 +53,10 @@ U0 INITIALIZE_SHELL() {
     shndl.previously_focused_pid = shndl.focused_pid;
     shndl.aborted = FALSE;
     SWITCH_LINE_EDIT_MODE();
+    while(1) {
+        MSG_LOOP();
+        if(draw_access_granted && keyboard_access_granted) break;
+    }
 }
 
 U0 SWITCH_CMD_INTERFACE_MODE(VOID) {
@@ -85,12 +90,8 @@ U0 SHELL_LOOP(U0) {
     U32 j = 0;
     U32 pass = 0;
     
-    while(1) {
-        MSG_LOOP();
-        if(draw_access_granted && keyboard_access_granted) break;
-    }
-    CLS();
-    RUN_BATSH_SCRIPT("/ATOS/ATOSHEL.SH");
+
+    RUN_BATSH_SCRIPT("/ATOS/ATOSHELL.SH");
     PUT_SHELL_START();
 
     while(1) {

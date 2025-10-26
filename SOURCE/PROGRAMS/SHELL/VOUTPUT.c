@@ -169,6 +169,7 @@ U0 INIT_SHELL_VOUTPUT(VOID) {
 
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     shndl = GET_SHNDL();
+    CLS();
 }
 OutputHandle GetOutputHandle(void) {
     return &cursor;
@@ -776,30 +777,31 @@ VOID NEW_ROW(VOID) {
 // ----------------- Line Editing Handlers -----------------
 
 void HANDLE_LE_ENTER() {
-    // Make sure current_line is null-terminated at edit_pos
-    if(edit_pos >= CUR_LINE_MAX_LENGTH) edit_pos = CUR_LINE_MAX_LENGTH - 1;
+    // Ensure null-terminated current line
+    if (edit_pos >= CUR_LINE_MAX_LENGTH)
+        edit_pos = CUR_LINE_MAX_LENGTH - 1;
     current_line[edit_pos] = '\0';
 
     RESTORE_CURSOR_BEFORE_MOVE();
-    
-    // Push the raw typed line into history
-    PUSH_TO_HISTORY(current_line);  // <- keep this as-is, raw line
 
-    // Execute the command
-    HANDLE_COMMAND(current_line);
+    // Keep original command in history
+    PUSH_TO_HISTORY(current_line);
 
+    BATSH_SET_MODE(FALSE);
+    HANDLE_BATSH_LINE(current_line);
 
-    // Clear line for next prompt
+    // Reset line buffer
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
 
-    // Print new prompt
+    // Print prompt again
     cursor.Column = 0;
     PUT_SHELL_START();
 
-    // Reset history browsing state
+    // Reset history state
     history_index = 0;
 }
+
 
 
 void HANDLE_LE_BACKSPACE() {

@@ -474,7 +474,6 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         return NULL;
     }
     // Map stack. Stack is right after heap
-    // U32 stack_vaddr = heap_vaddr + (layout.stack_base - layout.heap_end);
     U32 stack_vaddr = USER_BINARY_VADDR + (layout.stack_base - layout.bin_end);
     if(!map_user_stack_at(pages, stack_pages, &layout, proc->pagedir_phys, stack_vaddr, stack_size, proc)) {
         destroy_process_pagedir(proc->pagedir_phys);
@@ -557,28 +556,113 @@ void add_tcb_to_scheduler(TCB *new_tcb) {
     new_tcb->next = master;
 }
 
-BOOLEAN RUN_BINARY(U8 *proc_name, VOIDPTR file, U32 bin_size, U32 heap_size, U32 stack_size, U32 initial_state, U32 parent_pid) {
+// Helper: translate a virtual stack vaddr -> physical pointer into stack region
+static inline VOID *stack_phys_ptr(TCB *proc, U32 phys_offset) {
+    return (VOID *)((U8 *)proc->stack_phys_base + phys_offset);
+}
+
+
+BOOLEAN setup_user_stack_args(TCB *proc, U32 argc, U8 **argv) {
+    if (!proc) return FALSE;
+    if (argc > 1024) return FALSE;
+    if (argc > 0 && !argv) return FALSE;
+
+    U32 stack_size_bytes = proc->stack_pages * PAGE_SIZE;
+    U32 tf_offset = stack_size_bytes - sizeof(TrapFrame); // trapframe at top of stack
+    U32 cur_offset = 0;
+
+    // Compute total string size
+    U32 total_str_bytes = 0;
+    for (U32 i = 0; i < argc; i++) {
+        if (!argv[i]) return FALSE;
+        total_str_bytes += STRLEN(argv[i]) + 1;
+    }
+
+    // Space for argv pointers
+    U32 ptrs_bytes = (argc + 1) * sizeof(U32);
+    U32 argc_bytes = sizeof(U32);
+
+    // Align all regions
+    U32 align = 4;
+    U32 strings_start = tf_offset - total_str_bytes;
+    strings_start &= ~(align - 1);
+
+    U32 ptrs_start = strings_start - ptrs_bytes;
+    ptrs_start &= ~(align - 1);
+
+    U32 argc_offset = ptrs_start - argc_bytes;
+    argc_offset &= ~(align - 1);
+
+    // Check stack overflow
+    if (argc_offset < cur_offset) return FALSE;
+
+    // --- Copy strings into stack ---
+    U32 str_offset = strings_start;
+    for (U32 i = 0; i < argc; i++) {
+        U32 len = STRLEN(argv[i]) + 1;
+        MEMCPY(stack_phys_ptr(proc, str_offset), argv[i], len);
+        str_offset += len;
+    }
+
+    // --- Write argv pointers ---
+    U32 ptr_offset = ptrs_start;
+    str_offset = strings_start;
+    for (U32 i = 0; i < argc; i++) {
+        *(U32 *)stack_phys_ptr(proc, ptr_offset) = str_offset; // offset in physical stack
+        ptr_offset += sizeof(U32);
+        str_offset += STRLEN(argv[i]) + 1;
+    }
+
+    // Terminating NULL
+    *(U32 *)stack_phys_ptr(proc, ptr_offset) = 0;
+
+    // Write argc
+    *(U32 *)stack_phys_ptr(proc, argc_offset) = argc;
+
+    // Update trapframe ESP (physical stack only)
+    TrapFrame *k_tf = (TrapFrame *)stack_phys_ptr(proc, tf_offset);
+    k_tf->gpr.esp = argc_offset;
+
+    // Update TCB virtual trapframe pointer (optional, for scheduling)
+    if (proc->tf) proc->tf->gpr.esp = argc_offset;
+
+    return TRUE;
+}
+
+
+BOOLEAN RUN_BINARY(
+    U8 *proc_name, 
+    VOIDPTR file, 
+    U32 bin_size, 
+    U32 heap_size, 
+    U32 stack_size, 
+    U32 initial_state, 
+    U32 parent_pid,
+    PPU8 argv,
+    U32 argc
+) {
     KDEBUG_PUTS("[proc] RUN_BINARY enter name=\"");
     KDEBUG_PUTS(proc_name);
-    KDEBUG_PUTS("\" size=0x"); KDEBUG_HEX32(bin_size); KDEBUG_PUTS(" heap=0x"); KDEBUG_HEX32(heap_size); KDEBUG_PUTS(" stack=0x"); KDEBUG_HEX32(stack_size); KDEBUG_PUTS("\n");
-    if(!file || !proc_name) return FALSE;
-    if(!initialized) return FALSE; // multitasking not initialized
-    if(bin_size == 0 || bin_size > MAX_USER_BINARY_SIZE) {
-        return FALSE;
-    }
-    if(proc_amount >= MAX_PROC_AMOUNT) {
-        return FALSE; // too many tasks
-    }
+    KDEBUG_PUTS("\" size=0x"); 
+    KDEBUG_HEX32(bin_size); 
+    KDEBUG_PUTS(" heap=0x"); 
+    KDEBUG_HEX32(heap_size); 
+    KDEBUG_PUTS(" stack=0x"); 
+    KDEBUG_HEX32(stack_size); 
+    KDEBUG_PUTS("\n");
+
+    if (!file || !proc_name) return FALSE;
+    if (!initialized) return FALSE;
+    if (bin_size == 0 || bin_size > MAX_USER_BINARY_SIZE) return FALSE;
+    if (proc_amount >= MAX_PROC_AMOUNT) return FALSE;
 
     TCB *new_proc = KMALLOC(sizeof(TCB));
-    
     panic_if(!new_proc, "Unable to allocate memory for TCB!", PANIC_OUT_OF_MEMORY);
-    MEMZERO(new_proc, sizeof(TCB));    
-    
-    if(parent_pid != U32_MAX)
+    MEMZERO(new_proc, sizeof(TCB));
+
+    if (parent_pid != U32_MAX)
         new_proc->parent = get_tcb_by_pid(parent_pid);
 
-    // Setup memory + trap frame
     KDEBUG_PUTS("[proc] setup_user_process...\n");
     panic_if(!setup_user_process(new_proc, (U8 *)file, bin_size, heap_size, stack_size, initial_state),
              PANIC_TEXT("Failed to set up user process"), PANIC_OUT_OF_MEMORY);
@@ -589,10 +673,30 @@ BOOLEAN RUN_BINARY(U8 *proc_name, VOIDPTR file, U32 bin_size, U32 heap_size, U32
     new_proc->info.name[TASK_NAME_MAX_LEN - 1] = '\0';
 
     add_tcb_to_scheduler(new_proc);
-    KDEBUG_PUTS("[proc] added to scheduler pid=0x"); KDEBUG_HEX32(new_proc->info.pid); KDEBUG_PUTS("\n");
+    KDEBUG_PUTS("[proc] added to scheduler pid="); 
+    KDEBUG_HEX32(new_proc->info.pid); 
+    KDEBUG_PUTS("\n[proc] Stack at "); 
+    KDEBUG_HEX32(new_proc->stack_phys_base); 
+    KDEBUG_PUTS("\n");
+
+    // ---- Setup arguments if provided ----
+    if (argc > 0 && argv != NULLPTR) {
+        if (!setup_user_stack_args(new_proc, argc, argv)) {
+            KDEBUG_PUTS("[proc] Failed to setup argv for process\n");
+            KILL_PROCESS(new_proc->info.pid);
+            return FALSE;
+        }
+    } else {
+        // If no args, set default ESP below trapframe
+        U32 stack_vtop = (U32)new_proc->stack_vtop;
+        U32 tf_vaddr = stack_vtop - sizeof(TrapFrame);
+        TrapFrame *k_tf = (TrapFrame *)((U32)new_proc->stack_phys_base + (tf_vaddr - (stack_vtop - new_proc->stack_pages * PAGE_SIZE)));
+        k_tf->gpr.esp = tf_vaddr; // empty stack below trapframe
+    }
 
     return TRUE;
 }
+
 
 void remove_tcb_from_scheduler(TCB *tcb) {
     if (!tcb || tcb->info.state == TCB_STATE_IMMORTAL) return;

@@ -74,6 +74,14 @@ static const ShellCommand shell_commands[] ATTRIB_RODATA = {
 };
 #define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
 
+VOID BATSH_SET_MODE(U8 mode) {
+    batsh_mode = mode;
+}
+
+U8 BATSH_GET_MODE(void) {
+    return batsh_mode;
+}
+
 // Find variable index by name
 static S32 FIND_VAR(PU8 name) {
     for (U32 i = 0; i < shell_var_count; i++) {
@@ -184,7 +192,7 @@ BOOLEAN HANDLE_BATSH_LINE(PU8 line) {
 
     while (*line == ' ' || *line == '\t') line++;
 
-    if (*line == '\0' || *line == '#' || *line == ';' || STRNICMP(line, "rem", 3) == 0)
+    if (*line == '\0' || *line == '#')
         return TRUE;
 
     // Variable assignment
@@ -199,6 +207,7 @@ BOOLEAN HANDLE_BATSH_LINE(PU8 line) {
             STRNCPY(varvalue, line + i + 1, MAX_VAR_VALUE - 1);
             CREATE_VAR(varname, varvalue);
         }
+        if(!BATSH_GET_MODE()) PRINTNEWLINE();
         return TRUE;
     }
 
@@ -211,9 +220,7 @@ BOOLEAN HANDLE_BATSH_LINE(PU8 line) {
     }
 
     // Flag to indicate BATSH execution
-    batsh_mode = TRUE;
     HANDLE_COMMAND(line);
-    batsh_mode = FALSE;
 
     return TRUE;
 }
@@ -258,6 +265,7 @@ VOID HANDLE_COMMAND(U8 *line) {
 // ===================================================
 BOOLEAN RUN_BATSH_FILE(FILE *file) {
     if (!file) return FALSE;
+    BATSH_SET_MODE(TRUE);
     OutputHandle crs = GetOutputHandle();
     U32 prev = crs->CURSOR_VISIBLE;
     crs->CURSOR_VISIBLE = FALSE;
@@ -379,8 +387,7 @@ VOID CMD_DIR(PU8 raw_line) {
     else if (STRCMP(path_arg, "~") == 0) path_arg = (PU8)"/HOME";
     else if (!path_arg || *path_arg == '\0') path_arg = (PU8)".";
     PRINT_CONTENTS_PATH(path_arg);
-    PRINTNEWLINE();
-    PUT_SHELL_START();
+    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_MKDIR(PU8 raw_line) {
@@ -388,8 +395,7 @@ VOID CMD_MKDIR(PU8 raw_line) {
     STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
     PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 5);
     MAKE_DIR(path_arg);
-    PRINTNEWLINE();
-    PUT_SHELL_START();
+    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_RMDIR(PU8 raw_line) {
@@ -397,8 +403,7 @@ VOID CMD_RMDIR(PU8 raw_line) {
     STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
     PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 5);
     if (!REMOVE_DIR(path_arg)) return;
-    PRINTNEWLINE();
-    PUT_SHELL_START();
+    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID SETUP_BATSH_PROCESSER() {
