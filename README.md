@@ -9,6 +9,7 @@
 A custom 32-bit operating system written in **C** and **Assembly**.  
 Boots from an ISO image and runs as a raw binary.  
 Intentionally built without modern security constraints to encourage deep low-level learning, experimentation, and hacking.
+As of now, atOS includes shell with custom [shell language](DOCS/BATSH.md), multiprocessing and much more!
 
 ---
 

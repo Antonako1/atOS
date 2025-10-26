@@ -956,38 +956,60 @@ BOOLEAN FIND_DIR_ENTRY_BY_CLUSTER_NUMBER(U32 cluster, DIR_ENTRY *out) {
 }
 
 BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent_cluster, U8 *name) {
-    if (!out || !name) return FALSE;
+    if (!out || !name || !*name) return FALSE;
 
     DIR_ENTRY entries[MAX_CHILD_ENTIES];
     U32 cnt = MAX_CHILD_ENTIES;
     if (!DIR_ENUMERATE(parent_cluster, entries, &cnt)) return FALSE;
 
-    for (U32 i = 0; i < cnt; i++) {
-        if (entries[i].FILENAME[0] == 0x00) break; // no more entries
-        if (entries[i].ATTRIB == FAT_ATTRIB_LFN) continue; // skip LFN entries
+    // FAT LFN entries appear *before* the main entry.
+    LFN lfns[MAX_LFN_COUNT];
+    U32 lfn_count = 0;
 
-        LFN lfns[MAX_LFN_COUNT];
-        U32 lfn_count = 0;
-        if (READ_LFNS(&entries[i], lfns, &lfn_count) && lfn_count > 0) {
+    for (U32 i = 0; i < cnt; i++) {
+        if (entries[i].FILENAME[0] == 0x00)
+            break; // end of directory
+
+        if (entries[i].FILENAME[0] == FAT32_DELETED_ENTRY)
+            continue; // deleted entry
+
+        if (entries[i].ATTRIB == FAT_ATTRIB_LFN) {
+            // collect LFN segment
+            if (lfn_count < MAX_LFN_COUNT)
+                MEMCPY(&lfns[lfn_count++], &entries[i], sizeof(DIR_ENTRY));
+            continue;
+        }
+
+        // if we reach a normal entry, check accumulated LFNs first
+        if (lfn_count > 0) {
             if (LFN_MATCH(name, lfns, lfn_count)) {
                 MEMCPY(out, &entries[i], sizeof(DIR_ENTRY));
                 return TRUE;
             }
-        } else {
-            // Compare short 8.3 name
-            U8 shortname[13];
-            MEMZERO(shortname, 13);
-            // convert 8.3 to string
-            for (U32 j = 0; j < 8 && entries[i].FILENAME[j] != ' '; j++) shortname[j] = entries[i].FILENAME[j];
-            if (entries[i].FILENAME[8] != ' ') {
-                shortname[STRLEN(shortname)] = '.';
-                for (U32 j = 0; j < 3 && entries[i].FILENAME[8+j] != ' '; j++)
-                    shortname[STRLEN(shortname)] = entries[i].FILENAME[8+j];
-            }
-            if (STRCMP(shortname, name) == 0) {
-                MEMCPY(out, &entries[i], sizeof(DIR_ENTRY));
-                return TRUE;
-            }
+            lfn_count = 0; // reset after using them
+        }
+
+        // fallback: compare short 8.3 name
+        U8 shortname[13];
+        MEMZERO(shortname, sizeof(shortname));
+
+        // Copy base name (trim spaces)
+        U32 j = 0;
+        for (; j < 8 && entries[i].FILENAME[j] != ' ' && entries[i].FILENAME[j] != '\0'; j++)
+            shortname[j] = entries[i].FILENAME[j];
+
+        // Add dot + extension if present
+        if (entries[i].FILENAME[8] != ' ' && entries[i].FILENAME[8] != '\0') {
+            shortname[j++] = '.';
+            for (U32 k = 0; k < 3 && entries[i].FILENAME[8 + k] != ' ' && entries[i].FILENAME[8 + k] != '\0'; k++)
+                shortname[j++] = entries[i].FILENAME[8 + k];
+        }
+        shortname[j] = '\0';
+
+        // FAT short names are uppercase; make case-insensitive compare
+        if (STRICMP(shortname, name) == 0) {
+            MEMCPY(out, &entries[i], sizeof(DIR_ENTRY));
+            return TRUE;
         }
     }
 
@@ -1525,28 +1547,21 @@ BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *dir_entry, const char *name) {
     if (dir_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) return FALSE;
 
     U8 *cluster_buf = KMALLOC(CLUSTER_SIZE);
-    if(!cluster_buf) return FALSE;
+    if (!cluster_buf) return FALSE;
     MEMZERO(cluster_buf, CLUSTER_SIZE);
 
+    BOOL result = FALSE;
+
     while (dir_cluster >= FIRST_ALLOWED_CLUSTER_NUMBER && dir_cluster < FAT32_END_OF_CHAIN) {
-        if (!FAT_READ_CLUSTER(dir_cluster, cluster_buf)) {
-            Free(cluster_buf);
-            return FALSE;
-        }
+        if (!FAT_READ_CLUSTER(dir_cluster, cluster_buf)) break;
 
         for (U32 offset = 0; offset < CLUSTER_SIZE; offset += sizeof(DIR_ENTRY)) {
             DIR_ENTRY *ent = (DIR_ENTRY *)(cluster_buf + offset);
 
-            // End of directory
-            if (ent->FILENAME[0] == 0x00) {
-                Free(cluster_buf);
-                return FALSE;
-            }
-            // Skip deleted entries or long filename entries
+            if (ent->FILENAME[0] == 0x00) goto cleanup; // end of entries
             if (ent->FILENAME[0] == FAT32_DELETED_ENTRY || ent->ATTRIB == FAT_ATTRIB_LFN)
                 continue;
 
-            // Compare short name
             if (STRCMP(ent->FILENAME, name) == 0) {
                 // Free clusters if it’s a file or directory
                 U32 start_cluster = (ent->HIGH_CLUSTER_BITS << 16) | ent->LOW_CLUSTER_BITS;
@@ -1557,17 +1572,19 @@ BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *dir_entry, const char *name) {
                 // Mark directory entry as deleted
                 ent->FILENAME[0] = FAT32_DELETED_ENTRY;
 
-                // Write cluster back
-                if (!FAT_WRITE_CLUSTER(dir_cluster, cluster_buf)) return FALSE;
-                return FAT_FLUSH();
+                if (FAT_WRITE_CLUSTER(dir_cluster, cluster_buf) && FAT_FLUSH())
+                    result = TRUE;
+
+                goto cleanup;
             }
         }
 
-        // Move to next cluster in the directory chain
         dir_cluster = fat32[dir_cluster];
     }
+
+cleanup:
     Free(cluster_buf);
-    return FALSE; // not found
+    return result;
 }
 
 // -----------------------------------------------------------------------------

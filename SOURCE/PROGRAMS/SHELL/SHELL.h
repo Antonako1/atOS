@@ -2,7 +2,7 @@
 #define SHELL_H
 #include <STD/TYPEDEF.h>
 #include <PROGRAMS/SHELL/VOUTPUT.h>
-#include <PROGRAMS/SHELL/COMMANDS.h>
+#include <PROGRAMS/SHELL/BATSH.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
 #include <FAT/FAT.h>
 
@@ -20,6 +20,7 @@ typedef struct {
     U32 previously_focused_pid;
     OutputHandle cursor;
     SHELL_STATES state;
+    BOOLEAN aborted;    
     struct fat_info {
         U32 current_cluster;
         DIR_ENTRY current_path_dir_entry;
@@ -49,6 +50,8 @@ BOOLEAN CD_INTO(PU8 path);
 BOOLEAN CD_BACKWARDS_DIR();
 PU8 PARSE_CD_RAW_LINE(PU8 line, U32 cut_index);
 
+BOOLEAN MAKE_DIR(PU8 path);
+BOOLEAN REMOVE_DIR(PU8 path);
 
 VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir);
 VOID PRINT_CONTENTS_PATH(PU8 path);

@@ -1,7 +1,6 @@
 #include <PROGRAMS/SHELL/VOUTPUT.h>
 #include <PROGRAMS/SHELL/FONT8x16.h>
 #include <PROGRAMS/SHELL/SHELL.h>
-#include <PROGRAMS/SHELL/COMMANDS.h>
 #include <STD/DEBUG.h>
 #include <STD/STRING.h>
 #include <STD/PROC_COM.h>
@@ -158,7 +157,7 @@ U0 INIT_SHELL_VOUTPUT(VOID) {
     cursor.Row = 0;
     cursor.fgColor = VBE_GREEN;
     cursor.bgColor = VBE_BLACK;
-    cursor.CURSOR_STYLE = CURSOR_BLOCK;
+    cursor.CURSOR_STYLE = CURSOR_UNDERLINE;
     cursor.INSERT_MODE = TRUE;
     SET_CURSOR_BLINK(TRUE);
     SET_CURSOR_VISIBLE(TRUE);
@@ -777,23 +776,31 @@ VOID NEW_ROW(VOID) {
 // ----------------- Line Editing Handlers -----------------
 
 void HANDLE_LE_ENTER() {
+    // Make sure current_line is null-terminated at edit_pos
     if(edit_pos >= CUR_LINE_MAX_LENGTH) edit_pos = CUR_LINE_MAX_LENGTH - 1;
     current_line[edit_pos] = '\0';
 
     RESTORE_CURSOR_BEFORE_MOVE();
-    HANDLE_COMMAND(current_line);       // parse & execute
     
-    PUSH_TO_HISTORY(current_line);     // save to history
-    
+    // Push the raw typed line into history
+    PUSH_TO_HISTORY(current_line);  // <- keep this as-is, raw line
+
+    // Execute the command
+    HANDLE_COMMAND(current_line);
+
+
+    // Clear line for next prompt
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
-    
-    RESTORE_CURSOR_BEFORE_MOVE();
+
+    // Print new prompt
     cursor.Column = 0;
     PUT_SHELL_START();
-    
-    history_index = 0; // reset browsing state
+
+    // Reset history browsing state
+    history_index = 0;
 }
+
 
 void HANDLE_LE_BACKSPACE() {
     if(edit_pos == 0) return; // can't delete before prompt

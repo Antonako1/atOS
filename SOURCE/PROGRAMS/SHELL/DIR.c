@@ -203,20 +203,20 @@ BOOLEAN CD_INTO(PU8 path) {
     // 1. Resolve the path
     // tmp_line_out will contain the CLEAN, ABSOLUTE, NORMALIZED path (e.g., "/home/user")
     if (ResolvePath(path, tmp_line_out, sizeof(tmp_line_out)) == FALSE) {
-        PUTS("cd: Failed to resolve path.\n");
+        PUTS("\ncd: Failed to resolve path.\n");
         return FALSE;
     }
 
     // 2. Validate the resolved path: must exist and be a directory.
     FAT_LFN_ENTRY entry = { 0 };
     if (FAT32_PATH_RESOLVE_ENTRY(tmp_line_out, &entry) == FALSE) {
-        PUTS("cd: Path not found.\n");
+        PUTS("\ncd: Path not found.\n");
         return FALSE;
     }
     
     // Check for directory attribute
     if (!(entry.entry.ATTRIB & FAT_ATTRB_DIR)) {
-        PUTS("cd: Not a directory.\n");
+        PUTS("\ncd: Not a directory.\n");
         return FALSE;
     }
 
@@ -324,24 +324,22 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
     }
 }
     
+//==================== DIR ====================
+
 VOID PRINT_CONTENTS_PATH(PU8 path) {
-    // 1. Resolve the path
-    // We use tmp_line for the resolved path to keep tmp_line_out clean for CD/other uses, 
-    // although using either is generally fine as long as we avoid conflicts.
-    if (ResolvePath(path, tmp_line, sizeof(tmp_line)) == FALSE) {
+    if (!path || !*path) return;
+
+    if (!ResolvePath(path, tmp_line, sizeof(tmp_line))) {
         PUTS("dir: Failed to resolve path.\n");
         return;
     }
 
-    // 2. Resolve the entry
     FAT_LFN_ENTRY ent = { 0 };
-    BOOLEAN res = FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent);
-    if(!res) {
+    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
         PUTS("dir: Directory not found.\n");
         return;
     }
-    
-    // Check if it's a directory
+
     if (!(ent.entry.ATTRIB & FAT_ATTRB_DIR)) {
         PUTS("dir: Not a directory.\n");
         return;
@@ -350,7 +348,135 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
     PRINT_CONTENTS(&ent);
 }
 
+//==================== MKDIR ====================
 
+BOOLEAN MAKE_DIR(PU8 path) {
+    if (!path || !*path) {
+        PUTS("\nmkdir: No path specified.\n");
+        return FALSE;
+    }
+
+    if (!ResolvePath(path, tmp_line, sizeof(tmp_line))) {
+        PUTS("\nmkdir: Failed to resolve path.\n");
+        return FALSE;
+    }
+
+    // Split parent path + new directory name
+    PU8 last_slash = STRRCHR(tmp_line, '/');
+    if (!last_slash) return FALSE;
+
+    PU8 dir_name = last_slash + 1;
+    if (!*dir_name) {
+        PUTS("\nmkdir: Invalid directory name.\n");
+        return FALSE;
+    }
+
+    *last_slash = '\0'; // parent path
+    if (!*tmp_line) STRCPY(tmp_line, "/"); // root
+
+    FAT_LFN_ENTRY parent_entry;
+    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &parent_entry)) {
+        PUTS("\nmkdir: Parent directory not found.\n");
+        return FALSE;
+    }
+
+    if (!(parent_entry.entry.ATTRIB & FAT_ATTRB_DIR)) {
+        PUTS("\nmkdir: Parent is not a directory.\n");
+        return FALSE;
+    }
+
+    U32 parent_cluster = ((U32)parent_entry.entry.HIGH_CLUSTER_BITS << 16) | parent_entry.entry.LOW_CLUSTER_BITS;
+    if (FAT32_FIND_DIR_BY_NAME_AND_PARENT(parent_cluster, dir_name) != 0) {
+        PUTS("\nmkdir: Directory already exists.\n");
+        return FALSE;
+    }
+
+    U32 new_cluster;
+    if (!FAT32_CREATE_CHILD_DIR(parent_cluster, dir_name, FAT_ATTRB_DIR, &new_cluster)) {
+        PUTS("\nmkdir: Failed to create directory.\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+//==================== RMDIR ====================
+
+BOOLEAN REMOVE_DIR(PU8 path) {
+    if (!path || !*path) {
+        PUTS("\nrmdir: No path specified.\n");
+        return FALSE;
+    }
+
+    if (!ResolvePath(path, tmp_line, sizeof(tmp_line))) {
+        PUTS("\nrmdir: Failed to resolve path.\n");
+        return FALSE;
+    }
+
+    FAT_LFN_ENTRY entry;
+    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &entry)) {
+        PUTS("\nrmdir: Directory not found.\n");
+        return FALSE;
+    }
+
+    if (!(entry.entry.ATTRIB & FAT_ATTRB_DIR)) {
+        PUTS("\nrmdir: Not a directory.\n");
+        return FALSE;
+    }
+
+    // Root cannot be deleted
+    if (STRCMP(tmp_line, "/") == 0) {
+        PUTS("\nrmdir: Cannot remove root directory.\n");
+        return FALSE;
+    }
+
+    // Check directory contents (skip "." and "..")
+    U32 cluster = ((U32)entry.entry.HIGH_CLUSTER_BITS << 16) | entry.entry.LOW_CLUSTER_BITS;
+    DIR_ENTRY contents[MAX_CHILD_ENTIES];
+    U32 count = MAX_CHILD_ENTIES;
+    if (!FAT32_DIR_ENUMERATE(cluster, contents, &count)) {
+        PUTS("\nrmdir: Failed to read directory.\n");
+        return FALSE;
+    }
+
+    for (U32 i = 0; i < count; i++) {
+        U8 *name = contents[i].FILENAME;
+        if (name[0] == 0x00 || name[0] == 0xE5) continue;
+        if (STRNCMP(name, ".          ", 11) == 0 || STRNCMP(name, "..         ", 11) == 0) continue;
+
+        PUTS("\nrmdir: Directory is not empty.\n");
+        return FALSE;
+    }
+
+    // Get parent directory
+    PU8 last_slash = STRRCHR(tmp_line, '/');
+    if (!last_slash) return FALSE;
+
+    PU8 dir_name = last_slash + 1;
+    *last_slash = '\0';
+    if (!*tmp_line) STRCPY(tmp_line, "/");
+
+    FAT_LFN_ENTRY parent_entry;
+    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &parent_entry)) {
+        PUTS("\nrmdir: Parent directory not found.\n");
+        return FALSE;
+    }
+
+    U32 parent_cluster = ((U32)parent_entry.entry.HIGH_CLUSTER_BITS << 16) | parent_entry.entry.LOW_CLUSTER_BITS;
+
+    DIR_ENTRY dir_entry;
+    if (!FAT32_FIND_DIR_ENTRY_BY_NAME_AND_PARENT(&dir_entry, parent_cluster, dir_name)) {
+        PUTS("\nrmdir: Directory entry not found.\n");
+        return FALSE;
+    }
+
+    if (!FAT32_DIR_REMOVE_ENTRY(&dir_entry, dir_name)) {
+        PUTS("\nrmdir: Failed to remove directory.\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
 
 
 

@@ -118,6 +118,9 @@ typedef struct {
     CHAR lfn[FAT_MAX_FILENAME];  ///< Full long file name (ASCII, null-terminated)
 } FAT_LFN_ENTRY;
 
+
+
+
 #ifndef FAT_ONLY_DEFINES
 
 #define FIRST_ALLOWED_CLUSTER_NUMBER 2
@@ -252,6 +255,6 @@ BOOL DIR_ENTRY_IS_FREE(DIR_ENTRY *entry);
 BOOL DIR_ENTRY_IS_DIR(DIR_ENTRY *entry);
 // Returns TRUE if entry represents a directory (ATTRIB has FAT_ATTRB_DIR).
 
-
 #endif // FAT_ONLY_DEFINES
+
 #endif // FAT_H

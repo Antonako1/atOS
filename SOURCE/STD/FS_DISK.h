@@ -8,19 +8,61 @@
 
 #include <STD/TYPEDEF.h>
 
+#ifndef ISO9660_ONLY_DEFINES
 #define ISO9660_ONLY_DEFINES
+#endif 
 #include <FS/ISO9660/ISO9660.h> // For ISO9660 filesystem types
-
+#ifndef FAT_ONLY_DEFINES
 #define FAT_ONLY_DEFINES
+#endif 
 #include <FS/FAT/FAT.h>     // For FAT32 filesystem types
 
-#undef ISO9660_ONLY_DEFINES
-#undef FAT_ONLY_DEFINES
+
+
+/*+++
+Standard file manipulation functions.
+Raw ISO9660 and FAT32 functions are below
+---*/
+typedef enum {
+    MODE_R        = 0x0001,  // Read
+    MODE_W        = 0x0002,  // Write
+    MODE_RW       = MODE_R | MODE_W,   // Read & Write
+    MODE_A        = 0x0004,  // Append
+    MODE_FAT32    = 0x0100,  // FAT32 backend
+    MODE_ISO9660  = 0x0200,  // ISO9660 backend
+} FILEMODES;
 
 typedef struct {
-    VOIDPTR data;
-    U32 sz;
-} FILE;
+    VOIDPTR data;        // Raw data (allocated or mapped file buffer)
+    U32 sz;              // File size in bytes
+    U32 read_ptr;        // Current read position
+    FILEMODES mode;
+    union {
+        DIR_ENTRY fat_ent;
+        IsoDirectoryRecord iso_ent;
+    } ent;
+    U8 iso_padding[ISO9660_MAX_FILENAME_LENGTH]; // Padding in-case of iso
+} ATTRIB_PACKED FILE;
+
+BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode);
+VOID FCLOSE(FILE *file);
+U32 FREAD(FILE *file, VOIDPTR buffer, U32 len);
+U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len); // Returns byte written
+BOOLEAN FSEEK(FILE *file, U32 offset);
+U32 FTELL(FILE *file); // Returns current read pointer
+VOID FREWIND(FILE *file); // Reset read pointer to start
+U32 FSIZE(FILE *file); // Returns file size
+BOOLEAN FILE_EOF(FILE *file); // True if pointer is past or equal to sz
+BOOLEAN FILE_GET_LINE(FILE *file, PU8 line, U32 max_len); // Sets `line` to start of line. Returns TRUE if line is returned
+
+BOOLEAN FILE_DELETE(PU8 path); // Removes file
+BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force); // Removes dir, if force is false, only empty dir can be deleted
+BOOLEAN FILE_EXISTS(PU8 path);
+BOOLEAN DIR_EXISTS(PU8 path);
+BOOLEAN FILE_CREATE(PU8 path); // Creates new file
+BOOLEAN DIR_CREATE(PU8 path); // Creates new directory
+BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size); // Shrinks or expands size of a file
+BOOLEAN FILE_FLUSH(FILE *file); // Writes buffer to disk
 
 /**
  * ISO9660
@@ -119,7 +161,7 @@ DIR_ENTRY FAT32_GET_ROOT_DIR_ENTRY(void);
 
 
 /**
- * Disk IO
+ * Raw Disk IO functions
  */
 /// @brief Reads sectors from main CD-ROM drive.
 /// @param lba Logical Block Address to start reading from
@@ -143,4 +185,6 @@ U32 HDD_READ(U32 lba, U32 sectors, U8 *buf);
 /// @return Non zero on success, zero on failure
 U32 HDD_WRITE(U32 lba, U32 sectors, U8 *buf);
 
+#undef ISO9660_ONLY_DEFINES
+#undef FAT_ONLY_DEFINES
 #endif // STD_FS_DISK_H

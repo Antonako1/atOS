@@ -50,6 +50,7 @@ U0 INITIALIZE_SHELL() {
     shndl.cursor = GetOutputHandle();
     shndl.focused_pid = PROC_GETPID();
     shndl.previously_focused_pid = shndl.focused_pid;
+    shndl.aborted = FALSE;
     SWITCH_LINE_EDIT_MODE();
 }
 
@@ -78,6 +79,7 @@ U0 MSG_LOOP(U0) {
         FREE_MESSAGE(msg);
     }
 }
+
 U0 SHELL_LOOP(U0) {
     U32 i = 0;
     U32 j = 0;
@@ -88,9 +90,7 @@ U0 SHELL_LOOP(U0) {
         if(draw_access_granted && keyboard_access_granted) break;
     }
     CLS();
-
-    
-    PUTS("atOShell v0.1\r\nType 'help' for a list of commands.\r\n");
+    RUN_BATSH_SCRIPT("/ATOS/ATOSHEL.SH");
     PUT_SHELL_START();
 
     while(1) {

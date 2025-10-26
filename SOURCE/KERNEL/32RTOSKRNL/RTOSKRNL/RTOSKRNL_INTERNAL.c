@@ -553,6 +553,8 @@ BOOL initialize_filestructure(VOID) {
         return FALSE;
     }
     ISO9660_FREE_MEMORY(bin);
+    U32 tmp;
+    CREATE_CHILD_DIR(GET_ROOT_CLUSTER(), "HOME", 0, &tmp);
     // HLT;
     return TRUE;
 }
