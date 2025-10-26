@@ -1,0 +1,16 @@
+#include <PROGRAMS/ASTRAC/ASTRAC.h>
+#include <STD/PROC_COM.h>
+
+static U32 MSG_COUNT ATTRIB_DATA = 0; 
+
+U0 INITIALIZE_ASTRAC();
+
+U0 _start(U0) {
+    // PROC_INIT();
+    // while(!IS_PROC_INITIALIZED());
+    INITIALIZE_ASTRAC();
+}
+
+U0 INITIALIZE_ASTRAC() {
+
+}
