@@ -118,6 +118,9 @@ typedef struct {
     CHAR lfn[FAT_MAX_FILENAME];  ///< Full long file name (ASCII, null-terminated)
 } FAT_LFN_ENTRY;
 
+
+
+
 #ifndef FAT_ONLY_DEFINES
 
 #define FIRST_ALLOWED_CLUSTER_NUMBER 2
@@ -128,6 +131,7 @@ typedef struct {
 #define FAT32_BAD_CLUSTER        0x0FFFFFF7
 #define FAT32_END_OF_CHAIN       0x0FFFFFF8
 
+#define FAT32_DELETED_ENTRY      0xE5
 
 #define SECT_PER_CLUST     8
 #define BYTES_PER_SECT     512
@@ -183,6 +187,9 @@ BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent, U8 *name);
 /// @return TRUE if any LFN entries were found, FALSE otherwise
 BOOLEAN READ_LFNS(DIR_ENTRY *ent, LFN *out, U32 *size_out);
 
+// Returns the DIR_ENTRY representing the FAT32 root directory.
+// The FAT32 root has no parent entry on disk, so we synthesize one.
+DIR_ENTRY GET_ROOT_DIR_ENTRY(void);
 
 // ----- Directory and file creation -----
 
@@ -248,6 +255,6 @@ BOOL DIR_ENTRY_IS_FREE(DIR_ENTRY *entry);
 BOOL DIR_ENTRY_IS_DIR(DIR_ENTRY *entry);
 // Returns TRUE if entry represents a directory (ATTRIB has FAT_ATTRB_DIR).
 
-
 #endif // FAT_ONLY_DEFINES
+
 #endif // FAT_H

@@ -22,6 +22,11 @@ U0 _start(U0) {
 
     INITIALIZE_SHELL();
     INIT_SHELL_VOUTPUT();
+    OutputHandle hndl = GetOutputHandle();
+    if(hndl->Column != 0) {
+        for(;;);
+    }
+    INITIALIZE_DIR(&shndl);
 
     SHELL_LOOP();
 }
@@ -45,9 +50,8 @@ U0 INITIALIZE_SHELL() {
     shndl.cursor = GetOutputHandle();
     shndl.focused_pid = PROC_GETPID();
     shndl.previously_focused_pid = shndl.focused_pid;
+    shndl.aborted = FALSE;
     SWITCH_LINE_EDIT_MODE();
-    // shndl.path 
-    STRNCPY(shndl.path, '/', FAT_MAX_PATH);
 }
 
 U0 SWITCH_CMD_INTERFACE_MODE(VOID) {
@@ -75,6 +79,7 @@ U0 MSG_LOOP(U0) {
         FREE_MESSAGE(msg);
     }
 }
+
 U0 SHELL_LOOP(U0) {
     U32 i = 0;
     U32 j = 0;
@@ -85,10 +90,9 @@ U0 SHELL_LOOP(U0) {
         if(draw_access_granted && keyboard_access_granted) break;
     }
     CLS();
-
-    
-    PUTS("atOShell v0.1\r\nType 'help' for a list of commands.\r\n");
+    RUN_BATSH_SCRIPT("/ATOS/ATOSHEL.SH");
     PUT_SHELL_START();
+
     while(1) {
         switch (shndl.state) {
             case STATE_CMD_INTERFACE:

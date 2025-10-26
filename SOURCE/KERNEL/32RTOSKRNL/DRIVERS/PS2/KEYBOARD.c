@@ -319,6 +319,7 @@ KEYPRESS ParsePS2_CS2(U32 scancode1, U32 scancode2, U8 scancode1_bytes, U8 scanc
         case SC2_PRESSED_Y: keypress.keycode = KEY_Y; break;
         case SC2_PRESSED_6: keypress.keycode = KEY_6; break;
         case SC2_PRESSED_M: keypress.keycode = KEY_M; break;
+        case SC2_PRESSED_J: keypress.keycode = KEY_J; break;
         case SC2_PRESSED_U: keypress.keycode = KEY_U; break;
         case SC2_PRESSED_7: keypress.keycode = KEY_7; break;
         case SC2_PRESSED_8: keypress.keycode = KEY_8; break;

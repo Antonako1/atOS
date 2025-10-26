@@ -17,7 +17,7 @@ void SetGlobalPVD(PrimaryVolumeDescriptor *descriptor) {
 
 BOOLEAN ISO9660_IMAGE_CHECK(PrimaryVolumeDescriptor *pvd) {
     if (!pvd) return FALSE;
-    return STRNCMP(pvd->standardIdentifier, "CD001", 5);
+    return STRNCMP(pvd->standardIdentifier, "CD001", 5) == 0;
 }
 
 BOOLEAN ISO9660_READ_PVD(PrimaryVolumeDescriptor *descriptor, U32 size) {
@@ -166,7 +166,7 @@ BOOLEAN ISO9660_READ_FROM_DIRECTORY(
         record_name[record->fileNameLength] = '\0';
 
         if (record->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) {
-            if (STRCMP(record_name, target)) {
+            if (STRCMP(record_name, target) == 0) {
                 CHAR *slash = STRCHR(original_target, '/');
                 if (slash) {
                     U32 remaining = STRLEN(slash + 1);
@@ -191,7 +191,7 @@ BOOLEAN ISO9660_READ_FROM_DIRECTORY(
                 return res;
             }
         } else {
-            if (STRCMP(record_name, target)) {
+            if (STRCMP(record_name, target) == 0) {
                 MEMCPY(output, record, sizeof(IsoDirectoryRecord));
                 ISO9660_FREE_MEMORY_INTERNAL(&buffer);
                 return TRUE;
@@ -238,7 +238,7 @@ BOOLEAN ISO9660_PATH_TABLE_SEARCH(
     while(1) {
         ent = (PathTableEntry *)(buf + pos);
 
-        if (STRNCMP(target, ent->name, ent->nameLength) == TRUE &&
+        if (STRNCMP(target, ent->name, ent->nameLength) == 0 &&
             ent->parentDirNum == look_for_parent_id) {
             
             look_for_parent_id = ent->parentDirNum;

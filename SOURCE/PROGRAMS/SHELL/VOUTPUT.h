@@ -6,7 +6,7 @@
 #define VOUTPUT_H
 #include <DRIVERS/VIDEO/VBE.h>
 #include <STD/TYPEDEF.h>
-
+#include <DRIVERS/PS2/KEYBOARD.h>
 
 typedef enum {
     CURSOR_BLOCK = 0,
@@ -34,10 +34,6 @@ typedef struct {
 
     U32 X_POS; // Left-most pixel of the shell area
     U32 Y_POS; // Top-most pixel of the shell area
-
-    // Text buffer for the screen
-    // Each character is represented by a single byte
-    U8 *text_buffer;
 } OutputInfo;
 
 typedef OutputInfo* OutputHandle;
@@ -93,6 +89,12 @@ U0 SET_AUTO_WRAP(BOOLEAN enable);
 U32 PUTS(U8 *str);
 // Draws a single character at (x, y) in pixels
 U32 PUTC(U8 c);
+// Prints a U32 as BIN
+U32 PUT_BIN(U32 n);
+// Prints a U32 as HEX
+U32 PUT_HEX(U32 n);
+// Prints a U32 as DEC
+U32 PUT_DEC(U32 n);
 void RESTORE_CURSOR_UNDERNEATH(U32 col, U32 row);
 // Moves the cursor to the start of the next row
 VOID NEW_ROW(VOID);
@@ -135,5 +137,13 @@ VOID HANDLE_KEY_ENTER();
 VOID HANDLE_CTRL_C();
 VOID TOGGLE_INSERT_MODE();
 VOID SET_CURSOR_BLINK(BOOLEAN blink);
-
+VOID TOGGLE_INSERT_MODE();
+VOID HANDLE_LE_ENTER();
+VOID HANDLE_LE_BACKSPACE();
+VOID HANDLE_LE_DELETE();
+VOID HANDLE_LE_ARROW_LEFT();
+VOID HANDLE_LE_ARROW_RIGHT();
+VOID HANDLE_LE_ARROW_DOWN();
+VOID HANDLE_LE_ARROW_UP();
+VOID HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod);
 #endif // VOUTPUT_H

@@ -1,17 +1,21 @@
-CMOS syslist
-STD/TIME
-PROC_COM RTC
+CMOS to STD/TIME
+PROC_COM RTC update ticks
 
-RTL8139 to syslist
-STD/NET
-PROC_COM RTL8139 
+Panic TCB info
 
-Speaker driver
+Keyboard driver. 
+    Update keys and modifiers to HEAP, return pointer to proc
 
-BYTEMAP atmp
+Bitmap image support
 shell lang batsh
 
 Shell proc handler
+Args as RUN_BINARY arg. Allocate in HEAP and push argc, argv as first args in PIT handler
 
 Compiler
-Server
+
+
+Server?
+RTL8139 to syslist
+STD/NET
+PROC_COM RTL8139 
