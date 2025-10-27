@@ -446,7 +446,6 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     MFree(full_path);
 
     PU8 abs_path = tmp_line;
-    PUTS(abs_path);
 
     // Verify file exists
     FAT_LFN_ENTRY ent;
