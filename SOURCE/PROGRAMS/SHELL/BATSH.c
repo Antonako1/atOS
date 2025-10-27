@@ -327,7 +327,6 @@ VOID CMD_EXIT(U8 *line) { (void)line; PRINTNEWLINE(); PUTS((U8*)"Exiting shell..
 VOID CMD_ECHO(U8 *line) {
     PRINTNEWLINE();
     if (STRLEN(line) > 5) PUTS(line + 5);
-    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_TONE(U8 *line) {
@@ -360,7 +359,7 @@ VOID CMD_SOUNDOFF(U8 *line) { (void)line; AUDIO_STOP(); PUTS((U8*)"AC97: stopped
 VOID CMD_UNKNOWN(U8 *line) {
     if(!RUN_PROCESS(line)) {
         PRINTNEWLINE();
-        PUTS((U8*)"Unknown command or executable file not found: ");
+        PUTS((U8*)"Unknown command or file type: ");
         PUTS(line);
         PRINTNEWLINE();
     }
@@ -376,8 +375,6 @@ VOID CMD_CD(PU8 raw_line) {
     else if (STRCMP(path_arg, "~") == 0) CD_INTO((PU8)"/HOME");
     else if (!path_arg || *path_arg == '\0') CD_INTO((PU8)"/");
     else CD_INTO(path_arg);
-
-    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_CD_BACKWARDS(PU8 line) { (void)line; CD_BACKWARDS_DIR(); PRINTNEWLINE(); }
@@ -391,7 +388,6 @@ VOID CMD_DIR(PU8 raw_line) {
     else if (STRCMP(path_arg, "~") == 0) path_arg = (PU8)"/HOME";
     else if (!path_arg || *path_arg == '\0') path_arg = (PU8)".";
     PRINT_CONTENTS_PATH(path_arg);
-    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_MKDIR(PU8 raw_line) {
@@ -399,7 +395,6 @@ VOID CMD_MKDIR(PU8 raw_line) {
     STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
     PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 5);
     MAKE_DIR(path_arg);
-    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_RMDIR(PU8 raw_line) {
@@ -407,7 +402,6 @@ VOID CMD_RMDIR(PU8 raw_line) {
     STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
     PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 5);
     if (!REMOVE_DIR(path_arg)) return;
-    if (!batsh_mode) PRINTNEWLINE();
 }
 
 VOID SETUP_BATSH_PROCESSER() {
@@ -418,31 +412,45 @@ VOID SETUP_BATSH_PROCESSER() {
 BOOLEAN RUN_PROCESS(PU8 line) {
     if (!line || !*line) return FALSE;
 
+    // Copy and trim input line
     STRNCPY(tmp_line, line, sizeof(tmp_line) - 1);
     str_trim(tmp_line);
 
-    // Extract program name (everything until first space)
+    // Extract first token (program path)
     PU8 first_space = STRCHR(tmp_line, ' ');
     U32 prog_len = first_space ? (U32)(first_space - tmp_line) : STRLEN(tmp_line);
 
+    // argv[0] = program name only (last path component)
     PU8 prog_name = MAlloc(prog_len + 1);
     STRNCPY(prog_name, tmp_line, prog_len);
     prog_name[prog_len] = 0;
 
-    // Resolve path relative to current shell path
-    if (!ResolvePath(prog_name, tmp_line, sizeof(tmp_line))) {
-        PUTS("\nError: Failed to resolve path.\n");
+    PU8 last_slash = STRRCHR(prog_name, '/');
+    if (last_slash) {
+        PU8 tmp = STRDUP(last_slash + 1);
         MFree(prog_name);
-        return FALSE;
+        prog_name = tmp;
     }
 
-    // Extract file name from path
-    PU8 file_name = STRRCHR(tmp_line, '/');
-    if (file_name) file_name++;
-    else file_name = tmp_line;
+    // Resolve full path (absolute)
+    PU8 full_path = MAlloc(prog_len + 1);
+    STRNCPY(full_path, tmp_line, prog_len);
+    full_path[prog_len] = 0;
 
+    if (!ResolvePath(full_path, tmp_line, sizeof(tmp_line))) {
+        PUTS("\nError: Failed to resolve path.\n");
+        MFree(prog_name);
+        MFree(full_path);
+        return FALSE;
+    }
+    MFree(full_path);
+
+    PU8 abs_path = tmp_line;
+    PUTS(abs_path);
+
+    // Verify file exists
     FAT_LFN_ENTRY ent;
-    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
+    if (!FAT32_PATH_RESOLVE_ENTRY(abs_path, &ent)) {
         PUTS("\nError: File not found.\n");
         MFree(prog_name);
         return FALSE;
@@ -458,41 +466,58 @@ BOOLEAN RUN_PROCESS(PU8 line) {
 
     U32 pid = PROC_GETPID();
 
-    // Parse arguments
+    // -------------------------
+    // Argument parsing
+    // -------------------------
     #define MAX_ARGS 12
     PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
+    argv[argc++] = prog_name; // argv[0]
 
-    argv[argc++] = prog_name; // argv[0] = program name
-
-    // Remaining line after first space
     PU8 args_start = first_space ? first_space + 1 : NULL;
-
     if (args_start && *args_start) {
         PU8 p = args_start;
         while (*p && argc < MAX_ARGS) {
-            // Skip spaces
-            while (*p == ' ') p++;
+            while (*p == ' ' || *p == '\t') p++;
             if (!*p) break;
 
             PU8 arg_start = p;
-            while (*p && *p != ' ') p++;
-            U32 len = p - arg_start;
+            BOOL in_quotes = FALSE;
 
+            if (*p == '"') {
+                in_quotes = TRUE;
+                arg_start = ++p;
+                while (*p && *p != '"') p++;
+            } else {
+                while (*p && *p != ' ' && *p != '\t') p++;
+            }
+
+            U32 len = p - arg_start;
             PU8 arg = MAlloc(len + 1);
             STRNCPY(arg, arg_start, len);
             arg[len] = 0;
 
             argv[argc++] = arg;
+
+            if (in_quotes && *p == '"') p++;
         }
     }
 
-    // argv freed by kernel
-    U32 res = START_PROCESS(file_name, data, sz, TCB_STATE_ACTIVE, pid, argv, argc);
+    // -------------------------
+    // Determine file type and execute
+    // -------------------------
+    PU8 ext = STRRCHR(abs_path, '.');
+    if (ext) ext++; // skip dot
+    else ext = (PU8)"";
 
-    if (res) PRINTNEWLINE();
-
-    return res != 0;
+    if (STRICMP(ext, "BIN") == 0) {
+        // Execute binary
+        U32 res = START_PROCESS(abs_path, data, sz, TCB_STATE_ACTIVE, pid, argv, argc);
+        if (res) PRINTNEWLINE();
+        return res != 0;
+    } else if (STRICMP(ext, "SH") == 0) {
+        // TODO: run as shell script
+    } else {
+        return FALSE;
+    }
 }
-
-

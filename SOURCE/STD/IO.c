@@ -34,8 +34,6 @@ void puts(U8 *str) {
     stdout->buf[stdout->buf_end] = '\0'; // ensure null-terminated
     
     stdout->proc_seq++;
-    DEBUG_HEX32(stdout);
-    DEBUG_PUTC("<");
 }
 
 

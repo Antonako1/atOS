@@ -64,11 +64,6 @@ U0 EDIT_LINE_MSG_LOOP() {
                 PROC_MESSAGE res;
                 if (CREATE_STDOUT(msg->sender_pid)) {
                     STDOUT *ptr = GET_STDOUT(msg->sender_pid);
-                    DEBUG_PUTS("STDOUT POINTER FOR ");
-                    DEBUG_HEX32(msg->sender_pid);
-                    DEBUG_PUTS(" AT ");
-                    DEBUG_HEX32(ptr);
-                    DEBUG_PUTS("\n");
                     res = CREATE_PROC_MSG_RAW(msg->sender_pid, SHELL_RES_STDOUT_CREATED, ptr, sizeof(STDOUT*), 0);
                     MEMORY_DUMP(&res, sizeof(PROC_MESSAGE));
                 } else {

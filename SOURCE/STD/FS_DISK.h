@@ -64,6 +64,9 @@ BOOLEAN DIR_CREATE(PU8 path); // Creates new directory
 BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size); // Shrinks or expands size of a file
 BOOLEAN FILE_FLUSH(FILE *file); // Writes buffer to disk
 
+BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, DIR_ENTRY *ent);
+BOOLEAN FILE_FROM_RAW_ISO_DATA(FILE *file, VOIDPTR data, U32 sz, IsoDirectoryRecord *ent);
+
 /**
  * ISO9660
  */

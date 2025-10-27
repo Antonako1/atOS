@@ -194,9 +194,6 @@ BOOLEAN IS_PROC_INITIALIZED() {
             case PROC_FRAMEBUFFER_GRANTED: ___draw_access_granted = TRUE; break;
             case SHELL_RES_STDOUT_CREATED: 
                 if(msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
-                    DEBUG_PUTS("STDOUT PTR GOT IS: ");
-                    MEMORY_DUMP(msg, sizeof(PROC_MESSAGE));
-                    DEBUG_PUTS("\n");
                     stdout = msg->raw_data;
                     ___STDOUT_CREATED = TRUE; 
                 } else 

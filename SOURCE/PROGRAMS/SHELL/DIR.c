@@ -226,7 +226,7 @@ BOOLEAN CD_INTO(PU8 path) {
 
     // 4. Update the current cluster and directory entry
     shndl->fat_info.current_cluster = ((U32)entry.entry.HIGH_CLUSTER_BITS << 16) | entry.entry.LOW_CLUSTER_BITS;
-    // shndl->fat_info.current_path_dir_entry = entry; // Assuming this copies the entry structure
+    MEMCPY_OPT(&shndl->fat_info.current_path_dir_entry, &entry, sizeof(DIR_ENTRY));
 
     // Optional: PUTS(tmp_line_out); // Print new path
     return TRUE;
@@ -281,6 +281,8 @@ BOOLEAN CD_BACKWARDS_DIR() {
 }
 
 VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
+    if (!dir) return;
+
     U32 cluster = ((U32)dir->entry.HIGH_CLUSTER_BITS << 16) | dir->entry.LOW_CLUSTER_BITS;
     U32 count = MAX_COUNT_DIRS;
     U32 res = FAT32_DIR_ENUMERATE(cluster, dirs, &count);
@@ -293,6 +295,9 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
     for (U32 i = 0; i < count; i++) {
         DIR_ENTRY *f = &dirs[i];
 
+        // Skip empty or deleted entries
+        if (f->FILENAME[0] == 0x00 || f->FILENAME[0] == 0xE5) continue;
+
         // Type
         if (f->ATTRIB & FAT_ATTRB_DIR)
             PUTS("dir   ");
@@ -304,7 +309,6 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
         MEMZERO(size_buf, sizeof(size_buf));
         ITOA_U(f->FILE_SIZE, size_buf, 10);
 
-        // pad left to 10 characters
         U32 len = STRLEN(size_buf);
         for (U32 s = 0; s < 10 - len; s++)
             PUTS(" ");
@@ -323,8 +327,6 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
         PUTS("\n");
     }
 }
-    
-//==================== DIR ====================
 
 VOID PRINT_CONTENTS_PATH(PU8 path) {
     if (!path || !*path) return;
@@ -336,17 +338,44 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
 
     FAT_LFN_ENTRY ent = { 0 };
     if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
-        PUTS("dir: Directory not found.\n");
+        PUTS("dir: Entry not found.\n");
         return;
     }
 
-    if (!(ent.entry.ATTRIB & FAT_ATTRB_DIR)) {
-        PUTS("dir: Not a directory.\n");
-        return;
-    }
+    // If it's a directory, list contents
+    if (ent.entry.ATTRIB & FAT_ATTRB_DIR) {
+        PRINT_CONTENTS(&ent);
+    } else {
+        // It's a file: print just the file info
+        PUTS("\nType  Size       Name\n");
+        PUTS("----  ----------  ------------------------------\n");
 
-    PRINT_CONTENTS(&ent);
+        PUTS("file  ");
+
+        // Size
+        U8 size_buf[12];
+        MEMZERO(size_buf, sizeof(size_buf));
+        ITOA_U(ent.entry.FILE_SIZE, size_buf, 10);
+
+        U32 len = STRLEN(size_buf);
+        for (U32 s = 0; s < 10 - len; s++)
+            PUTS(" ");
+
+        PUTS(size_buf);
+        PUTS("  ");
+
+        // Name
+        U8 name_buf[13];
+        MEMZERO(name_buf, sizeof(name_buf));
+        STRNCPY(name_buf, ent.entry.FILENAME, 11);
+        name_buf[12] = '\0';
+        str_trim(name_buf);
+
+        PUTS(name_buf);
+        PUTS("\n");
+    }
 }
+
 
 //==================== MKDIR ====================
 

@@ -594,6 +594,11 @@ BOOLEAN RUN_BINARY(
     KDEBUG_PUTS(" stack=0x"); 
     KDEBUG_HEX32(stack_size); 
     KDEBUG_PUTS("\n");
+    for(U32 i = 0; i < argc; i++) {
+        KDEBUG_PUTS(argv[i]);
+        KDEBUG_PUTS(" | ");
+    }
+    KDEBUG_PUTS("\n");
 
     if (!file || !proc_name) return FALSE;
     if (!initialized) return FALSE;

@@ -293,6 +293,23 @@ failure:
     return FALSE;
 }
 
+BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, DIR_ENTRY *ent) {
+    file->data = data;
+    file->sz = sz;
+    file->read_ptr = 0;
+    MEMCPY_OPT(&file->ent.fat_ent, ent, sizeof(DIR_ENTRY));
+    file->mode |= MODE_FAT32 | MODE_RW;
+}
+BOOLEAN FILE_FROM_RAW_ISO_DATA(FILE *file, VOIDPTR data, U32 sz, IsoDirectoryRecord *ent) {
+    file->data = data;
+    file->sz = sz;
+    file->read_ptr = 0;
+    MEMCPY_OPT(&file->ent.iso_ent, ent, sizeof(IsoDirectoryRecord));
+    file->mode |= MODE_ISO9660 | MODE_RW;
+
+}
+
+
 VOID FCLOSE(FILE *file) {
     if (!file) return;
     if (file->data) {

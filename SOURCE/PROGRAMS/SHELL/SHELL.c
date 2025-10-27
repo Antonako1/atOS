@@ -118,11 +118,6 @@ BOOLEAN CREATE_STDOUT(U32 borrowers_pid) {
     alloc->proc_seq = 0;
     alloc->shell_seq = 0;
     MEMZERO(alloc->buf, STDOUT_MAX_LENGTH);
-    DEBUG_PUTS("CREATED STDOUT POINTER FOR ");
-    DEBUG_HEX32(borrowers_pid);
-    DEBUG_PUTS(" AT ");
-    DEBUG_HEX32(alloc);
-    DEBUG_PUTS("\n");
     shndl.stdouts[shndl.stdout_count++] = alloc;
     return TRUE;
 }
