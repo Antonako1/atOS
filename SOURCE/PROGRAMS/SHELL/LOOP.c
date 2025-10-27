@@ -92,10 +92,10 @@ U0 EDIT_LINE_MSG_LOOP() {
                 }
 
                 // Print termination message
-                PUTS("Process pid ");
-                PUT_DEC(msg->sender_pid);
-                PUTS(" terminated with code ");
-                PUT_DEC(msg->signal);
+                PUTS("Process pid 0x");
+                PUT_HEX(msg->sender_pid);
+                PUTS(" terminated with code 0x");
+                PUT_HEX(msg->signal);
                 PUTC('\n');
 
                 // Restore shell prompt

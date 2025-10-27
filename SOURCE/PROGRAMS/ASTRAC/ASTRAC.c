@@ -16,7 +16,7 @@ U0 _start(U32 argc, PPU8 argv) {
         putc('\n');
     }
     puts(line_end);
-    EXIT(0);
+    EXIT(0x12345678);
 }
 
 U0 INITIALIZE_ASTRAC() {
