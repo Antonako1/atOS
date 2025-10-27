@@ -28,7 +28,6 @@ U0 _start(U32 argc, PU8 argv[]) {
     }
     INITIALIZE_DIR(&shndl);
     
-    PUT_HEX(argc);
     SHELL_LOOP();
 }
 
