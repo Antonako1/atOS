@@ -17,6 +17,11 @@
 #include <PROC/PROC.h>
 #include <DRIVERS/PS2/KEYBOARD.h> // for KEYPRESS and MODIFIERS structs
 
+void PROC_INIT_CONSOLE();
+BOOLEAN IS_PROC_INITIALIZED();
+VOID KILL_SELF();
+VOID START_HALT();
+VOID EXIT(U32 n);
 /**
  * PROC_COM
  */
@@ -34,13 +39,14 @@ TCB *GET_PARENT_TCB(void); // Get your parent's TCB, NULL if no
 void FREE_TCB(TCB *tcb); // Free a TCB received via GET_TCB_BY_PID
 
 #define KERNEL_PID 0
-#define CREATE_PROC_MSG(receiver, msg_type, data_ptr, signal_val) \
+#define CREATE_PROC_MSG(receiver, msg_type, data_ptr, data_sz, signal_val) \
     (PROC_MESSAGE){ \
         .sender_pid = PROC_GETPID(), \
         .receiver_pid = receiver, \
         .type = msg_type, \
         .data_provided = (data_ptr != NULL), \
         .data = data_ptr, \
+        .data_size = data_sz, \
         .signal = signal_val, \
         .timestamp = 0, /* to be filled by kernel */ \
         .read = FALSE, \
@@ -87,4 +93,15 @@ typedef enum {
     SHELL_CMD_PUTS = 11,
     SHELL_CMD_PUTC = 12,
 } SHELL_COMMAND_TYPE;
+
+BOOLEAN START_PROCESS(
+    U8 *proc_name, 
+    VOIDPTR file, 
+    U32 bin_size, 
+    U32 initial_state, 
+    U32 parent_pid,
+    PPU8 argv,
+    U32 argc
+);
+VOID KILL_PROCESS(U32 pid);
 #endif //PROC_COM_H

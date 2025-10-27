@@ -100,6 +100,10 @@ typedef struct TaskInfo {
 #define PROC_MSG_QUEUE_SIZE 30
 #define PROC_MSG_SIZE 128
 
+
+/*+++
+All different types of predefined messages to kernel
+---*/
 typedef enum {
     PROC_MSG_NONE = 0,
 
@@ -117,8 +121,17 @@ typedef enum {
     PROC_MSG_MOUSE = 0x00000002,
 
     // User sent a terminate request to kernel
-    // Data, signal and message are ignored
+    // Data, and message is ignored
+    // Put termination code in signal
     PROC_MSG_TERMINATE_SELF = 0x00000004, // terminate self
+
+    // Creates new process.
+    // Signal ignored. Data must contain RUN_BINARY_STRUCT struct
+    PROC_MSG_CREATE_PROCESS = 0x00000005,
+
+    // Kills process
+    // Signal == pid to kill
+    PROC_MSG_KILL_PROCESS = 0x00000006,
 
     // User sent a sleep request to kernel
     // Data, signal and message are ignored
@@ -227,7 +240,23 @@ typedef struct TCB {
     
     U32 child_count; // Number of child processes
     VOIDPTR children[MAX_PROC_AMOUNT - 2]; // List of pointers to child TCBs (excluding master and self)
+
+    U32 argc;
+    PPU8 argv;
 } __attribute__((packed)) TCB;
+
+
+
+typedef struct {
+    U8 proc_name[255]; 
+    VOIDPTR file; 
+    U32 bin_size; 
+    U32 initial_state; 
+    U32 parent_pid;
+    PPU8 argv;
+    U32 argc;
+} RUN_BINARY_STRUCT;
+
 
 #ifdef __RTOS__
 TCB *get_master_tcb(void);

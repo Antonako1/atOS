@@ -1,5 +1,5 @@
 #include "./STRING.h"
-
+#include "./MEM.h"
 U32 STRLEN(CONST U8* str) {
     U32 res = 0;
     while (*str++) res++;
@@ -510,4 +510,24 @@ PU8 STRTOK(PU8 str, PU8 delim) {
         
         return token_start;
     }
+}
+
+PU8 STRDUP(PU8 src) {
+    if (!src) return NULLPTR;
+    U32 len = STRLEN(src);
+    PU8 dup = MAlloc(len + 1);
+    if (!dup) return NULLPTR;
+    STRCPY(dup, src);
+    return dup;
+}
+
+PU8 STRNDUP(PU8 src, U32 n) {
+    if (!src) return NULLPTR;
+    U32 len = STRLEN(src);
+    if (len > n) len = n;
+    PU8 dup = MAlloc(len + 1);
+    if (!dup) return NULLPTR;
+    STRNCPY(dup, src, len);
+    dup[len] = '\0';
+    return dup;
 }

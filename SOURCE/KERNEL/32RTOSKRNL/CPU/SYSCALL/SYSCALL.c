@@ -150,6 +150,15 @@ U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unus
     t->msg_queue_head = (t->msg_queue_head + 1) % PROC_MSG_QUEUE_SIZE;
     t->msg_count--;
 
+    KDEBUG_PUTS("[syscall] Message requested by ");
+    KDEBUG_HEX32(msg->receiver_pid);
+    KDEBUG_PUTS(" with type ");
+    KDEBUG_HEX32(msg->type);
+    KDEBUG_PUTS(" with signal ");
+    KDEBUG_HEX32(msg->signal);
+    KDEBUG_PUTS("\n");
+    
+
     return (U32)msg_copy;
 }
 
@@ -159,6 +168,15 @@ U32 SYS_SEND_MESSAGE(U32 msg_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unu
 
     // Allocated in kheap, we have access to it. 
     PROC_MESSAGE *msg = (PROC_MESSAGE *)msg_ptr;
+
+    KDEBUG_PUTS("[syscall] Message sent by ");
+    KDEBUG_HEX32(msg->sender_pid);
+    KDEBUG_PUTS(" with type ");
+    KDEBUG_HEX32(msg->type);
+    KDEBUG_PUTS(" with signal ");
+    KDEBUG_HEX32(msg->signal);
+    KDEBUG_PUTS("\n");
+    
     send_msg(msg);
     return 0;
 }
@@ -366,6 +384,29 @@ U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5) {
     return h(a1, a2, a3, a4, a5);
 }
 
+
+U32 SYS_RUN_BINARY(U32 sc, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    TCB *master = get_master_tcb();
+    TCB *cur = get_current_tcb();
+    RUN_BINARY_STRUCT *sct = (RUN_BINARY_STRUCT*)sc;
+    U32 res = RUN_BINARY(
+        sct->proc_name,
+        sct->file,
+        sct->bin_size,
+        USER_HEAP_SIZE,
+        USER_STACK_SIZE,
+        sct->initial_state,
+        sct->parent_pid,
+        sct->argv,
+        sct->argc
+    );
+    return res;
+}
+
+U32 SYS_KILL_BINARY(U32 pid, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    KILL_PROCESS(pid);
+}
 
 U32 SYS_PIT_SLEEP(U32 ms, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;

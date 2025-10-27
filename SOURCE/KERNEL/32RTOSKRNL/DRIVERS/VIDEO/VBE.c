@@ -48,6 +48,7 @@ VOIDPTR __memcpy_safe_chunks(VOIDPTR dest, const VOIDPTR src, U32 n) {
 #include <PROC/PROC.h>
 #include <STD/ASM.h>
 static VOIDPTR focused_task_framebuffer ATTRIB_DATA = FRAMEBUFFER_ADDRESS;
+static VOIDPTR current_frambuffer ATTRIB_DATA = FRAMEBUFFER_ADDRESS;
 static BOOLEAN early_mode = TRUE;
 
 static inline int paging_is_enabled(void) {
@@ -70,46 +71,53 @@ static inline void *__memcpy_fast(void *dest, const void *src, U32 n) {
     return dest;
 }
 
-
 void flush_focused_framebuffer() {
-    if(early_mode) {
-        focused_task_framebuffer = FRAMEBUFFER_ADDRESS;
-    } else {
-        TCB *focused = get_focused_task();
-        if (!focused) {
-            focused_task_framebuffer = NULL;
-            return;
-        }
-        
-        if(!focused->framebuffer_mapped) {
-            focused_task_framebuffer = NULL;
-            return;
-        }
-        focused_task_framebuffer = (VOIDPTR)((U32)focused->framebuffer_virt);
-    }
     VBE_MODEINFO* mode = GET_VBE_MODE();
     if (!mode) return;
-
-    // Copy only the required framebuffer bytes
+    
     U32 copy_size = mode->BytesPerScanLineLinear * mode->YResolution;
-    __memcpy_fast((void*)mode->PhysBasePtr, (void*)focused_task_framebuffer, copy_size);
+    if (copy_size == 0) return;
+
+    if (early_mode) {
+        // If early mode uses identity mapping or kernel mapping, use that:
+        void *src_kv = (void*)FRAMEBUFFER_ADDRESS;    // kernel-mapped early buffer
+        void *dst_kv = (void*)(mode->PhysBasePtr);    // treat as kernel-virt in kernel CR3
+        // If mode->PhysBasePtr is physical, the kernel page table must map it to the same VA.
+        __memcpy_fast(dst_kv, src_kv, copy_size);
+        return;
+    }
+
+    TCB *focused = get_focused_task();
+    if (!focused || !focused->framebuffer_mapped) {
+        focused_task_framebuffer = NULL;
+        return;
+    }
+
+    if(get_current_tcb()->info.pid == get_master_tcb()->info.pid)
+        focused_task_framebuffer = focused->framebuffer_phys;
+    else if(focused->info.pid == get_current_tcb()->info.pid) 
+        focused_task_framebuffer = focused->framebuffer_virt;
+    else focused_task_framebuffer = NULLPTR;
+
+    if(!focused_task_framebuffer) return;
+    __memcpy_fast(mode->PhysBasePtr, (void*)focused_task_framebuffer, copy_size);
 }
 
 void update_current_framebuffer() {
     if(early_mode) {
-        focused_task_framebuffer = FRAMEBUFFER_ADDRESS;
+        current_frambuffer = FRAMEBUFFER_ADDRESS;
         return;
     }
     TCB *current = get_current_tcb();
     if (!current) {
-        focused_task_framebuffer = NULL;
+        current_frambuffer = NULL;
         return;
     }
     if(!current->framebuffer_mapped) {
-        focused_task_framebuffer = NULL;
+        current_frambuffer = NULL;
         return;
     }
-    focused_task_framebuffer = current->framebuffer_virt;
+    current_frambuffer = current->framebuffer_virt;
 }
 
 void debug_vram_start() {
@@ -219,7 +227,7 @@ U0 VBE_STOP_DRAWING(U0) {
 BOOLEAN VBE_DRAW_FRAMEBUFFER(U32 pos, VBE_PIXEL_COLOUR colour) {
     VBE_MODEINFO* mode = (VBE_MODEINFO*)(VBE_MODE_LOAD_ADDRESS_PHYS);
     #ifdef __RTOS__
-    U8* framebuffer = (U8*)focused_task_framebuffer;
+    U8* framebuffer = (U8*)current_frambuffer;
     if(!framebuffer) return FALSE;
     #else
     U8* framebuffer = (U8*)(FRAMEBUFFER_ADDRESS);

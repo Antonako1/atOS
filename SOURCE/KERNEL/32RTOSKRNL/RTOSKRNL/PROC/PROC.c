@@ -26,7 +26,7 @@ static U32 proc_amount __attribute__((section(".data"))) = 0;
 static TCB *last_tcb __attribute__((section(".data"))) = &master_tcb;
 
 // Shell informs kernel what task is focused
-static TCB *focused_task __attribute__((section(".data"))) = NULL;
+static volatile TCB *focused_task __attribute__((section(".data"))) = NULL;
 
 static inline U32 PROC_READ_ESP(void) {
     U32 esp;
@@ -212,8 +212,11 @@ void copy_kernel_pdes_with_offset(U32 *new_pd, U32 *kernel_pd) {
 PD_HANDLE create_process_pagedir(void) {
     VOIDPTR new_pd_phys = (VOIDPTR)KREQUEST_USER_PAGE();
     if (!new_pd_phys) return (PD_HANDLE){0,0};
-
+    KDEBUG_PUTS("[proc] Got pages:");
+    KDEBUG_HEX32(new_pd_phys);
+    KDEBUG_PUTS("\n");
     MEMZERO(new_pd_phys, PAGE_SIZE);
+    KDEBUG_PUTS("[proc] Zeroed.\n");
 
     // Virtual starting point of maps is at the same position as USER_BINARY_VADDR
     return (PD_HANDLE){ .virt = USER_BINARY_VADDR, .phys = (U32)new_pd_phys };
@@ -403,9 +406,11 @@ void init_task_context(TCB *tcb, void (*entry)(void), U32 stack_size, U32 initia
 
 
 U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size, U32 stack_size, U32 initial_state) {
+    KDEBUG_PUTS("[proc] Entered setup_user_process\n");
     // Create page directory
     PD_HANDLE pdh = create_process_pagedir();
     if (!pdh.virt) return NULL;
+    KDEBUG_PUTS("[proc] Created process pagedir\n");
     proc->pagedir = pdh.virt; // Virtual pointer to page directory, used by the process
     proc->pagedir_phys = pdh.phys; // Physical address of page directory, loaded into CR3 on context switch
     
@@ -415,6 +420,7 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         destroy_process_pagedir(proc->pagedir_phys);
         return NULL;
     }
+    KDEBUG_PUTS("[proc] Got kernel pd\n");
 
 
     // Compute memory layout
@@ -443,7 +449,7 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         destroy_process_pagedir(proc->pagedir_phys);
         return NULL;
     }
-    
+    KDEBUG_PUTS("[proc] Got pages\n");
     proc->pages = pages;
     proc->page_count = amount_of_pages_needed;
 
@@ -458,6 +464,7 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
     
     // Copy kernel PDEs
     copy_kernel_pdes_with_offset(proc->pagedir_phys, kernel_pd_raw);
+    KDEBUG_PUTS("[proc] Kernel PDEs copied\n");
 
     
     // Map binary
@@ -466,6 +473,7 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         destroy_process_pagedir(proc->pagedir_phys);
         return NULL;
     }
+    KDEBUG_PUTS("[proc] Mapped binary\n");
 
     // Map heap. Heap is right after binary
     U32 heap_vaddr = USER_BINARY_VADDR + (layout.heap_base - layout.bin_end);
@@ -473,12 +481,14 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         destroy_process_pagedir(proc->pagedir_phys);
         return NULL;
     }
+    KDEBUG_PUTS("[proc] Mapped stack\n");
     // Map stack. Stack is right after heap
     U32 stack_vaddr = USER_BINARY_VADDR + (layout.stack_base - layout.bin_end);
     if(!map_user_stack_at(pages, stack_pages, &layout, proc->pagedir_phys, stack_vaddr, stack_size, proc)) {
         destroy_process_pagedir(proc->pagedir_phys);
         return NULL;
     }
+    KDEBUG_PUTS("[proc] Mapped heap\n");
 
     // Map pages ONLY after all physical pages are allocated and binary is copied
     #ifndef MAP_IN_FUNCTIONS
@@ -488,20 +498,23 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         map_page(proc->pagedir_phys, vaddr, phys, PAGE_PRW);
     }
     #endif
+    KDEBUG_PUTS("[proc] Mapped pagedir\n");
 
     // +1 is to adjust for padding between stack and framebuffer
     proc->framebuffer_phys = (VOIDPTR)( (U32)pages + ( (bin_pages + heap_pages + stack_pages + 1) * PAGE_SIZE) );
     proc->framebuffer_virt = (VOIDPTR)USER_BINARY_VADDR + ( (bin_pages + heap_pages + stack_pages + 1) * PAGE_SIZE);
     proc->framebuffer_mapped = FALSE; // Flagged as not mapped yet. User process must request to draw to framebuffer
+    KDEBUG_PUTS("[proc] Framebuffer initialized\n");
 
     // copy parent's framebuffer into virt
     if(proc->parent != NULL) {
         MEMCPY_OPT(proc->framebuffer_phys, proc->parent->framebuffer_phys, framebuffer_sz);
+        KDEBUG_PUTS("[proc] Frambuffer copied\n");
     }
 
     // Initialize trap frame
     init_task_context(proc, (void (*)(void))USER_BINARY_VADDR, stack_size, initial_state);
-    
+    KDEBUG_PUTS("[proc] Trapframe initialized\n");
     return proc->pagedir_phys;
 }
 
@@ -561,75 +574,6 @@ static inline VOID *stack_phys_ptr(TCB *proc, U32 phys_offset) {
     return (VOID *)((U8 *)proc->stack_phys_base + phys_offset);
 }
 
-
-BOOLEAN setup_user_stack_args(TCB *proc, U32 argc, U8 **argv) {
-    if (!proc) return FALSE;
-    if (argc > 1024) return FALSE;
-    if (argc > 0 && !argv) return FALSE;
-
-    U32 stack_size_bytes = proc->stack_pages * PAGE_SIZE;
-    U32 tf_offset = stack_size_bytes - sizeof(TrapFrame); // trapframe at top of stack
-    U32 cur_offset = 0;
-
-    // Compute total string size
-    U32 total_str_bytes = 0;
-    for (U32 i = 0; i < argc; i++) {
-        if (!argv[i]) return FALSE;
-        total_str_bytes += STRLEN(argv[i]) + 1;
-    }
-
-    // Space for argv pointers
-    U32 ptrs_bytes = (argc + 1) * sizeof(U32);
-    U32 argc_bytes = sizeof(U32);
-
-    // Align all regions
-    U32 align = 4;
-    U32 strings_start = tf_offset - total_str_bytes;
-    strings_start &= ~(align - 1);
-
-    U32 ptrs_start = strings_start - ptrs_bytes;
-    ptrs_start &= ~(align - 1);
-
-    U32 argc_offset = ptrs_start - argc_bytes;
-    argc_offset &= ~(align - 1);
-
-    // Check stack overflow
-    if (argc_offset < cur_offset) return FALSE;
-
-    // --- Copy strings into stack ---
-    U32 str_offset = strings_start;
-    for (U32 i = 0; i < argc; i++) {
-        U32 len = STRLEN(argv[i]) + 1;
-        MEMCPY(stack_phys_ptr(proc, str_offset), argv[i], len);
-        str_offset += len;
-    }
-
-    // --- Write argv pointers ---
-    U32 ptr_offset = ptrs_start;
-    str_offset = strings_start;
-    for (U32 i = 0; i < argc; i++) {
-        *(U32 *)stack_phys_ptr(proc, ptr_offset) = str_offset; // offset in physical stack
-        ptr_offset += sizeof(U32);
-        str_offset += STRLEN(argv[i]) + 1;
-    }
-
-    // Terminating NULL
-    *(U32 *)stack_phys_ptr(proc, ptr_offset) = 0;
-
-    // Write argc
-    *(U32 *)stack_phys_ptr(proc, argc_offset) = argc;
-
-    // Update trapframe ESP (physical stack only)
-    TrapFrame *k_tf = (TrapFrame *)stack_phys_ptr(proc, tf_offset);
-    k_tf->gpr.esp = argc_offset;
-
-    // Update TCB virtual trapframe pointer (optional, for scheduling)
-    if (proc->tf) proc->tf->gpr.esp = argc_offset;
-
-    return TRUE;
-}
-
-
 BOOLEAN RUN_BINARY(
     U8 *proc_name, 
     VOIDPTR file, 
@@ -672,27 +616,38 @@ BOOLEAN RUN_BINARY(
     STRNCPY((char *)new_proc->info.name, (char *)proc_name, TASK_NAME_MAX_LEN);
     new_proc->info.name[TASK_NAME_MAX_LEN - 1] = '\0';
 
+    new_proc->argc = argc;
+    if(argc > 0) {
+        new_proc->argv = KMALLOC(argc * sizeof(PU8) + 1);
+        if(!argv) {
+            KILL_PROCESS(new_proc);
+        }
+        U32 i;
+        for(i = 0; i < argc; i++){
+            U32 len = STRLEN(argv[i]) + 1;
+            PU8 p = KMALLOC(len);
+            STRCPY(p, argv[i]);
+            new_proc->argv[i] = p;
+        }
+        new_proc->argv[i] = NULL;
+    } else {
+        new_proc->argv = NULLPTR;
+    }
+    // VBE_CLEAR_SCREEN(VBE_RED);
+
+    // DUMP_MEMORY(new_proc->argv, 100);
+    // for(U32 i = 0; i < new_proc->argc;i++) {
+    //     DUMP_MEMORY(new_proc->argv[i], 100);
+    //     DUMP_STRING(new_proc->argv[i]);
+    // }
+    // HLT;
+
     add_tcb_to_scheduler(new_proc);
     KDEBUG_PUTS("[proc] added to scheduler pid="); 
     KDEBUG_HEX32(new_proc->info.pid); 
     KDEBUG_PUTS("\n[proc] Stack at "); 
     KDEBUG_HEX32(new_proc->stack_phys_base); 
     KDEBUG_PUTS("\n");
-
-    // ---- Setup arguments if provided ----
-    if (argc > 0 && argv != NULLPTR) {
-        if (!setup_user_stack_args(new_proc, argc, argv)) {
-            KDEBUG_PUTS("[proc] Failed to setup argv for process\n");
-            KILL_PROCESS(new_proc->info.pid);
-            return FALSE;
-        }
-    } else {
-        // If no args, set default ESP below trapframe
-        U32 stack_vtop = (U32)new_proc->stack_vtop;
-        U32 tf_vaddr = stack_vtop - sizeof(TrapFrame);
-        TrapFrame *k_tf = (TrapFrame *)((U32)new_proc->stack_phys_base + (tf_vaddr - (stack_vtop - new_proc->stack_pages * PAGE_SIZE)));
-        k_tf->gpr.esp = tf_vaddr; // empty stack below trapframe
-    }
 
     return TRUE;
 }
@@ -718,34 +673,62 @@ void remove_tcb_from_scheduler(TCB *tcb) {
 
 
 void KILL_PROCESS(U32 pid) {
-    if (pid == 0) return; // cannot kill master
-    TCB *master = get_master_tcb();
-    TCB *prev = master;
-    TCB *curr = master->next;
+    if (pid == 0) return; // cannot kill master process
 
-    while(curr != master) {
-        if(curr->info.pid == pid) {
-            // Found the process to kill
-            prev->next = curr->next; // remove from list
+    TCB *target = get_tcb_by_pid(pid);
+    if (!target) return;
 
-            // Free resources
-            if(curr->stack_phys_base) {
-                KFREE_PAGE(curr->stack_phys_base);
-            }
-            if(curr->pagedir) {
-                // Free page directory and tables (not implemented here)
-                // You would need to walk the page directory and free all user pages and tables
-                destroy_process_pagedir(curr->pagedir);
-            }
-            remove_tcb_from_scheduler(curr);
-            KFREE_USER_PAGES(curr->pages, curr->page_count);
-            KFREE(curr);
-            return;
-            proc_amount--;
-        }
-        prev = curr;
-        curr = curr->next;
+    if (target->info.state == TCB_STATE_IMMORTAL) return; // don't kill kernel task
+
+    // If the process being killed is currently running, switch to master first
+    if (target == current_tcb) {
+        KDEBUG_PUTS("[proc] Killing current task, switching to master...\n");
+        current_tcb = &master_tcb;
+        write_cr3((U32)master_tcb.pagedir);
     }
+
+    // If this was the focused task, reset focus to master
+    if (target == focused_task) {
+        focused_task = &master_tcb;
+    }
+
+    // Remove from scheduler (this adjusts proc_amount automatically)
+    remove_tcb_from_scheduler(target);
+
+    // Free argv if present
+    if (target->argv) {
+        for (U32 i = 0; i < target->argc; i++) {
+            if (target->argv[i]) {
+                KFREE(target->argv[i]);
+                target->argv[i] = NULL;
+            }
+        }
+        KFREE(target->argv);
+        target->argv = NULL;
+    }
+
+    // Free process memory pages
+    if (target->pages && target->page_count > 0) {
+        KFREE_USER_PAGES(target->pages, target->page_count);
+        target->pages = NULL;
+    }
+
+    // Free page directory
+    if (target->pagedir) {
+        destroy_process_pagedir(target->pagedir);
+        target->pagedir = NULL;
+    }
+
+    // Free stack (redundant if included in pages)
+    if (target->stack_phys_base) {
+        KFREE_PAGE(target->stack_phys_base);
+        target->stack_phys_base = NULL;
+    }
+
+    // Finally free the TCB itself
+    KFREE(target);
+
+    KDEBUG_PUTS("[proc] Process killed successfully\n");
 }
 
 volatile static U32 tcks __attribute__((section(".data"))) = 0;
@@ -781,11 +764,16 @@ TCB *find_next_active_task(void) {
 // Arg: current trap frame (already pushed by ISR)
 // Returns: new trap frame to load (or same if no switch)
 // Called from PIT ISR to perform task switch
+static U32 past = FALSE;
 TrapFrame* pit_handler_task_control(TrapFrame *cur) {
     // todo: tick counter here
     tcks++;
-    if(EVERY_HZ(tcks, REFRESH_HZ)) {
-        flush_focused_framebuffer(); 
+    if(EVERY_HZ(tcks, REFRESH_HZ) || past) {
+        past = TRUE;
+        if(current_tcb->info.pid == master_tcb.info.pid || current_tcb->info.pid == focused_task->info.pid) {
+            flush_focused_framebuffer(); 
+            past = FALSE;
+        }
     }
     if (!initialized) {
         return cur;
@@ -807,7 +795,7 @@ TrapFrame* pit_handler_task_control(TrapFrame *cur) {
     update_current_framebuffer();
     current_tcb->info.num_switches++;
 
-
+    set_args(current_tcb);
     set_next_task_esp_val((U32)current_tcb->tf);
     set_next_task_cr3_val((U32)current_tcb->pagedir_phys);
     set_next_task_pid(current_tcb->info.pid);
@@ -946,6 +934,9 @@ void handle_kernel_messages(void) {
         PROC_MESSAGE *msg = &master->msg_queue[master->msg_queue_head];
         switch(msg->type) {
             case PROC_MSG_SET_FOCUS:
+                KDEBUG_PUTS("[proc_msg] Switching focus to ");
+                KDEBUG_HEX32(msg->signal);
+                KDEBUG_PUTS("\n");
                 focused_task = get_tcb_by_pid(msg->signal);
                 break;
             case PROC_MSG_TERMINATE_SELF:
@@ -1040,11 +1031,38 @@ void handle_kernel_messages(void) {
                     FLAG_UNSET(t->info.event_types, PROC_EVENT_INFORM_ON_MOUSE_EVENTS);
                 }
                 break;
+            case PROC_MSG_CREATE_PROCESS: 
+                {
+                    if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) break;
+                    KDEBUG_PUTS("[proc_msg] Creating new process\n");
+                    RUN_BINARY_STRUCT *sct = msg->data;
+                    RUN_BINARY(
+                        sct->proc_name,
+                        sct->file,
+                        sct->bin_size,
+                        USER_HEAP_SIZE,
+                        USER_STACK_SIZE,
+                        sct->initial_state,
+                        sct->parent_pid,
+                        sct->argv,
+                        sct->argc
+                    );
+                    for(U32 i = 0; i < sct->argc; i++) {
+                        KFREE(sct->argv[i]);
+                    }
+                    KFREE(sct->argv);
+                    KFREE(msg->data);
+                }
+                break;
+            case PROC_MSG_KILL_PROCESS:
+                KILL_PROCESS(msg->signal);
+                break;
             case PROC_MSG_NONE:
             default:
                 // Unknown message type
                 break;
         }
+        // next message
         master->msg_queue_head = (master->msg_queue_head + 1) % PROC_MSG_QUEUE_SIZE;
         if(master->msg_count > 0) master->msg_count--;
     }

@@ -2,6 +2,7 @@
 #include <CPU/SYSCALL/SYSCALL.h>
 #include <STD/MEM.h>
 #include <STD/STRING.h>
+#include <PROC/PROC.h>
 
 static TCB process ATTRIB_DATA = {0};
 static BOOLEAN process_fetched ATTRIB_DATA = FALSE;
@@ -141,4 +142,89 @@ U32 GET_SYS_SECONDS() {
 
 U32 CPU_SLEEP(U32 ms) {
     return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
+}
+
+VOID EXIT(U32 n) {
+    PROC_MESSAGE msg;
+
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPPID());
+    SEND_MESSAGE(&msg);
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_TERMINATE_SELF, NULL, 0, n);
+    SEND_MESSAGE(&msg);
+    for(;;);
+}
+
+static U8 ___keyboard_access_granted = FALSE;
+static U8 ___draw_access_granted = FALSE;
+
+void PRIC_INIT_GRAPHICAL() {
+    PROC_INIT_CONSOLE();
+}
+
+void PROC_INIT_CONSOLE() {
+    PROC_MESSAGE msg;
+
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_FRAMEBUFFER, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+    
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPID());
+    SEND_MESSAGE(&msg);
+
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_KEYBOARD_EVENTS, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+
+    ___keyboard_access_granted = FALSE;
+    ___draw_access_granted = FALSE;
+}
+BOOLEAN IS_PROC_INITIALIZED() {
+    U32 msg_count = MESSAGE_AMOUNT();
+    for(U32 i = 0; i <= msg_count; i++) {
+        PROC_MESSAGE *msg = GET_MESSAGE(); // Gets last message. Marked as read
+        if (!msg) break;
+        switch(msg->type) {
+            case PROC_KEYBOARD_EVENTS_GRANTED:
+                ___keyboard_access_granted = TRUE;
+                break;
+            case PROC_FRAMEBUFFER_GRANTED:
+                ___draw_access_granted = TRUE;
+                break;
+        }
+        FREE_MESSAGE(msg);
+    }
+    return (___keyboard_access_granted && ___draw_access_granted) ? TRUE : FALSE;
+}
+
+BOOLEAN START_PROCESS(
+    U8 *proc_name, 
+    VOIDPTR file, 
+    U32 bin_size, 
+    U32 initial_state, 
+    U32 parent_pid,
+    PPU8 argv,
+    U32 argc
+) {
+    RUN_BINARY_STRUCT *sc = MAlloc(sizeof(RUN_BINARY_STRUCT)); // Will be freed by kernel
+    if(!sc) return FALSE;
+    STRNCPY(sc->proc_name, proc_name, 255);
+    sc->file = file; 
+    sc->bin_size = bin_size; 
+    sc->initial_state = initial_state; 
+    sc->parent_pid = parent_pid;
+    sc->argv = argv;
+    sc->argc = argc;
+    PROC_MESSAGE msg;
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_CREATE_PROCESS, sc, sizeof(RUN_BINARY_STRUCT), 0xDEADBEEF);
+    SEND_MESSAGE(&msg);
+    return TRUE;
+}
+
+VOID KILL_PROCESS(U32 pid) {
+    // SYSCALL1(SYSCALL_KILL_BINARY, pid);
+}
+
+VOID KILL_SELF() {
+    // SYSCALL1(SYSCALL_KILL_BINARY, PROC_GETPID());
+}
+VOID START_HALT() {
+    for(;;) yield();
 }

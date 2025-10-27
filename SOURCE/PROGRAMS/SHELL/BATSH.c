@@ -1,9 +1,11 @@
+#include <PROC/PROC.h>
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <PROGRAMS/SHELL/BATSH.h>
 #include <STD/FS_DISK.h>
 #include <STD/STRING.h>
 #include <STD/AUDIO.h>
 #include <STD/MEM.h>
+#include <STD/PROC_COM.h>
 
 #define LEND "\r\n"
 
@@ -415,5 +417,59 @@ VOID SETUP_BATSH_PROCESSER() {
 
 BOOLEAN RUN_PROCESS(PU8 line) {
     U8 process[64] = { 0 };
-    return FALSE;
+    STRNCPY(process, line, sizeof(process));
+    str_trim(process);
+
+    PU8 space = STRCHR(process, ' ');
+    if(space) *space = '\0'; // terminate command name
+
+    PU8 file = STRRCHR(process, '/');
+    if(file) file++;
+    else file = process;
+
+    FAT_LFN_ENTRY ent;
+    if(!FAT32_PATH_RESOLVE_ENTRY(line, &ent)) return FALSE;
+    U32 sz = 0;
+    VOIDPTR data = FAT32_READ_FILE_CONTENTS(&sz, &ent.entry);
+    U32 pid = PROC_GETPID();
+
+    // parse args
+    #define MAX_ARGS 12
+    PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS); // array of PU8 pointers
+    U32 argc = 0;
+    
+    // Add program name as argv[0]
+    argv[argc++] = STRDUP(process);
+
+    // Parse remaining args (same as before)
+    PU8 arg_ptr = space ? space + 1 : NULL;
+    while (arg_ptr && argc < MAX_ARGS) {
+        PU8 next_space = STRCHR(arg_ptr, ' ');
+        U32 len = next_space ? (U32)(next_space - arg_ptr) : STRLEN(arg_ptr);
+
+        PU8 arg_copy = MAlloc(len + 1);
+        STRNCPY(arg_copy, arg_ptr, len);
+        arg_copy[len] = '\0';
+
+        argv[argc++] = arg_copy;
+
+        if (next_space)
+            arg_ptr = next_space + 1;
+        else
+            break;
+    }
+
+
+    U32 res = START_PROCESS(
+        file,
+        data,
+        sz,
+        TCB_STATE_ACTIVE,
+        pid,
+        argv,
+        argc
+    );
+    if(res) PRINTNEWLINE();
+    // args freed when process is killed
+    return res != 0;
 }

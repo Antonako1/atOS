@@ -525,7 +525,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     if(!file) {
         panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
-    U8 *shell_argv[] = { (U8*)"atOShell" , NULLPTR };
+    U8 *shell_argv[] = { SHELL_PATH , NULLPTR };
     panic_if(
         !RUN_BINARY(
             "atOShell", 

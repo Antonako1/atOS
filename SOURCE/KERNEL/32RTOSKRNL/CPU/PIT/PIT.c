@@ -39,6 +39,14 @@ static volatile U32 current_task_esp __attribute__((section(".data"))) = 0;
 static volatile U32 next_task_num_switches __attribute__((section(".data"))) = 0;
 static volatile U32 next_task_pid __attribute__((section(".data"))) = 0;
 
+static volatile U32 PROC_ARGC ATTRIB_DATA = 0;
+static volatile PPU8 PROC_ARGV ATTRIB_DATA = 0;
+
+void set_args(TCB *tcb) {
+    PROC_ARGC = tcb->argc;
+    PROC_ARGV = tcb->argv;
+}
+
 static BOOL BLOCK_TASK_SWITCH ATTRIB_DATA = FALSE;
 void set_next_task_pid(U32 pid) {
     next_task_pid = pid;
@@ -145,10 +153,13 @@ __attribute__((naked)) void isr_pit(void) {
 
         This is a bad hack, but it works for now.
 
-        if next_task neq 0 and num_switches neq 1 then
+        if next_task neq 0 and num_switches equ 1 then
             re-set registers
             eax, ecx, edx, ebx, esp , ebp, esi, edi = 0
             ds, es, fs, gs = KDS
+
+            push argc and argv... (bruh)
+            
             cs = KCS
             eflags = EFLAGS_IF (0x200)
             eip = entry point
@@ -158,7 +169,7 @@ __attribute__((naked)) void isr_pit(void) {
         */
         "cmpl $0, next_task_pid\n\t"
         "je normal_task_switch\n\t" // if next_task_pid == 0, normal switch
-
+        
         "cmpl $1, next_task_num_switches\n\t"
         "jne normal_task_switch\n\t" // if num_switches != 1, normal switch
         // New task, first time switch
@@ -177,9 +188,18 @@ __attribute__((naked)) void isr_pit(void) {
         "movw %%ax, %%fs\n\t"
         "movw %%ax, %%gs\n\t"   
 
-        // "movw $" _STR(KCS) ", %%ax\n\t"
-        // "movw %%ax, %%cs\n\t"
-        // "movw %%ax, %%ss\n\t"
+        "pushl $0x0\n\t" //fuckass alignment
+        
+        // push argv pointer (U8 **)
+        "movl PROC_ARGV, %%eax\n\t"
+        "pushl %%eax\n\t"
+        // push argc (U32)
+        "movl PROC_ARGC, %%eax\n\t"
+        "pushl %%eax\n\t"
+
+        "pushl $0x0\n\t" //fuckass alignment pt2
+        
+
 
         // Set up eip, cs, eflags for iret
         "pushl $0x200\n\t"  // eflags with IF set
