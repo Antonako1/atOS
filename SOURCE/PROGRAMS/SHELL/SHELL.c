@@ -105,3 +105,51 @@ U0 SHELL_LOOP(U0) {
         }
     }
 }
+
+
+BOOLEAN CREATE_STDOUT(U32 borrowers_pid) {
+    if (shndl.stdout_count >= MAX_STDOUT_BUFFS) return FALSE;
+
+    STDOUT *alloc = MAlloc(sizeof(STDOUT));
+    if (!alloc) return FALSE;
+
+    alloc->borrowers_pid = borrowers_pid;
+    alloc->owner_pid = PROC_GETPID();
+    alloc->proc_seq = 0;
+    alloc->shell_seq = 0;
+    MEMZERO(alloc->buf, STDOUT_MAX_LENGTH);
+    DEBUG_PUTS("CREATED STDOUT POINTER FOR ");
+    DEBUG_HEX32(borrowers_pid);
+    DEBUG_PUTS(" AT ");
+    DEBUG_HEX32(alloc);
+    DEBUG_PUTS("\n");
+    shndl.stdouts[shndl.stdout_count++] = alloc;
+    return TRUE;
+}
+
+BOOLEAN DELETE_STDOUT(U32 borrowers_pid) {
+    for (U32 i = 0; i < shndl.stdout_count; i++) {
+        if (shndl.stdouts[i]->borrowers_pid == borrowers_pid) {
+            // MFree the memory for this STDOUT
+            MFree(shndl.stdouts[i]);
+            shndl.stdouts[i] = NULL;
+
+            // Shift remaining stdouts down
+            for (U32 j = i; j < shndl.stdout_count - 1; j++) {
+                shndl.stdouts[j] = shndl.stdouts[j + 1];
+            }
+
+            shndl.stdouts[--shndl.stdout_count] = NULL;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+STDOUT* GET_STDOUT(U32 borrowers_pid) {
+    for (U32 i = 0; i < shndl.stdout_count; i++) {
+        if (shndl.stdouts[i]->borrowers_pid == borrowers_pid)
+            return shndl.stdouts[i];
+    }
+    return NULLPTR;
+}

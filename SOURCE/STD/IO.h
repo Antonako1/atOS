@@ -28,11 +28,13 @@ Function table:
 #ifndef IO_H
 #define IO_H
 
+
 #include <STD/TYPEDEF.h>
 #include <DRIVERS/PS2/KEYBOARD.h> // For definitions
 
+#define line_end "\r\n"
 void putc(U8 c);
-void puts(const U8 *str);
+void puts(U8 *str);
 
 KP_DATA *get_kp_data();
 KEYPRESS *get_last_keypress();

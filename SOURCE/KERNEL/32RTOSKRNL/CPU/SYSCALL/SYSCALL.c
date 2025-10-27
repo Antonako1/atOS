@@ -120,7 +120,7 @@ U32 SYS_MESSAGE_AMOUNT(U32 pid, U32 msg_ptr, U32 length, U32 signal, U32 unused5
     return (U32)res;
 }
 U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
-    (void)unused5;
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     TCB *t = get_current_tcb();
     if (!t) return 0;
     if (t->msg_count == 0) return 0; // no messages
@@ -131,22 +131,28 @@ U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unus
 
     MEMCPY(msg_copy, msg, sizeof(PROC_MESSAGE));
 
-    if (msg->data_provided && msg->data) {
-        // Determine how much data needs to be copied.
-        // This should be stored in the message (you can add msg->data_size field)
-        U32 data_size = msg->signal; // or another field that holds the size
-        if (data_size == 0) data_size = sizeof(KEYPRESS) + sizeof(MODIFIERS); // fallback
-        VOIDPTR data_copy = KMALLOC(data_size);
+    // --- Deep copy normal data ---
+    if (msg->data_provided && msg->data && msg->data_size > 0) {
+        VOIDPTR data_copy = KMALLOC(msg->data_size);
         if (data_copy) {
-            MEMCPY(data_copy, msg->data, data_size);
+            MEMCPY(data_copy, msg->data, msg->data_size);
             msg_copy->data = data_copy;
         } else {
             msg_copy->data_provided = FALSE;
             msg_copy->data = NULL;
+            msg_copy->data_size = 0;
         }
+    } else {
+        msg_copy->data_provided = FALSE;
+        msg_copy->data = NULL;
+        msg_copy->data_size = 0;
     }
 
-    // Advance queue head
+    // --- Keep raw_data as shared pointer ---
+    // (Do not copy or allocate; remains valid as-is)
+    // msg_copy->raw_data and msg_copy->raw_data_size already set
+
+    // Advance message queue
     t->msg_queue_head = (t->msg_queue_head + 1) % PROC_MSG_QUEUE_SIZE;
     t->msg_count--;
 
@@ -156,11 +162,13 @@ U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unus
     KDEBUG_HEX32(msg->type);
     KDEBUG_PUTS(" with signal ");
     KDEBUG_HEX32(msg->signal);
+    KDEBUG_PUTS(" from ");
+    KDEBUG_HEX32(msg->sender_pid);
     KDEBUG_PUTS("\n");
-    
 
     return (U32)msg_copy;
 }
+
 
 U32 SYS_SEND_MESSAGE(U32 msg_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;
@@ -175,6 +183,8 @@ U32 SYS_SEND_MESSAGE(U32 msg_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unu
     KDEBUG_HEX32(msg->type);
     KDEBUG_PUTS(" with signal ");
     KDEBUG_HEX32(msg->signal);
+    KDEBUG_PUTS(" to ");
+    KDEBUG_HEX32(msg->receiver_pid);
     KDEBUG_PUTS("\n");
     
     send_msg(msg);

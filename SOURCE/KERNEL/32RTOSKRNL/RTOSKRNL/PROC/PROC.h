@@ -201,6 +201,9 @@ typedef struct proc_message {
 
     U32 timestamp; // time sent in seconds since boot
     BOOLEAN read; // TRUE if message has been read
+
+    VOIDPTR raw_data; // Raw data. Sender's job to clear
+    U32 raw_data_size; // Raw data. Sender's job to clear
 } PROC_MESSAGE;
 
 typedef struct TCB {

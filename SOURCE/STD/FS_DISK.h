@@ -71,19 +71,19 @@ BOOLEAN FILE_FLUSH(FILE *file); // Writes buffer to disk
 /// @brief Reads an ISO9660 file record from the filesystem.
 /// @param path Path to the file/ directory inside the ISO9660 image
 /// @note Path must NOT be ISO9660 normalized, the function will do it.
-/// @note Free the returned pointer with FREE_ISO9660_MEMORY when done.
+/// @note MFree the returned pointer with FREE_ISO9660_MEMORY when done.
 /// @return Pointer to the file record structure or NULL on failure
 IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path);
 
 /// @brief Reads the contents of an ISO9660 file.
 /// @param dir_ptr Pointer to the file record structure
-/// @note Free the returned pointer with FREE_ISO9660_MEMORY when done.
+/// @note MFree the returned pointer with FREE_ISO9660_MEMORY when done.
 /// @return Pointer to the file contents or NULL on failure
 VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr);
 
 /// @brief Frees memory allocated by ISO9660 functions.
 /// @param ptr Pointer to the memory to free
-/// @note Not really necessary, just legacy code... Free does the same job.
+/// @note Not really necessary, just legacy code... MFree does the same job.
 VOID FREE_ISO9660_MEMORY(VOIDPTR ptr);
 
 U32 FAT32_GET_ROOT_CLUSTER();

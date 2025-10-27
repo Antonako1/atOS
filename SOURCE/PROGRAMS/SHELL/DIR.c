@@ -257,7 +257,7 @@ BOOLEAN CD_BACKWARDS_DIR() {
     // find last slash
     PU8 slash = STRRCHR(tmp, '/');
     if (!slash) {
-        Free(tmp);
+        MFree(tmp);
         return FALSE;
     }
 
@@ -276,7 +276,7 @@ BOOLEAN CD_BACKWARDS_DIR() {
     }
 
     BOOLEAN result = CD_INTO(tmp);
-    Free(tmp);
+    MFree(tmp);
     return result;
 }
 

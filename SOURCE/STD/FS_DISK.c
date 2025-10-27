@@ -16,7 +16,7 @@ IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path) {
     MEMSET(p, 0, ISO9660_MAX_PATH);
     U32 path_len = STRLEN(path);
     if (path_len >= ISO9660_MAX_PATH) {
-        Free(p);
+        MFree(p);
         return NULLPTR;
     }
     STRCPY(p, path);
@@ -52,7 +52,7 @@ U32 FAT32_FIND_DIR_BY_NAME_AND_PARENT(U32 parent, U8 *name) {
     if(!tmp) return 0;
     STRCPY(tmp, name);
     U32 res = SYSCALL2(SYSCALL_FIND_DIR_BY_NAME_AND_PARENT, parent, tmp);
-    Free(tmp);
+    MFree(tmp);
     return res;
 }
 U32 FAT32_FIND_FILE_BY_NAME_AND_PARENT(U32 parent, U8 *name) {
@@ -60,7 +60,7 @@ U32 FAT32_FIND_FILE_BY_NAME_AND_PARENT(U32 parent, U8 *name) {
     if(!tmp) return 0;
     STRCPY(tmp, name);
     U32 res = SYSCALL2(SYSCALL_FIND_FILE_BY_NAME_AND_PARENT, parent, tmp);
-    Free(tmp);
+    MFree(tmp);
     return res;
 }
 
@@ -70,15 +70,15 @@ BOOLEAN FAT32_FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent, U8 *
     STRCPY(tmp, name);
     DIR_ENTRY *out_tmp = MAlloc(sizeof(DIR_ENTRY));
     if(!out_tmp) {
-        Free(tmp);
+        MFree(tmp);
         return FALSE;
     }
     U32 res = SYSCALL3(SYSCALL_FIND_DIR_ENTRY_BY_NAME_AND_PARENT, out_tmp, parent, tmp);
     if(res) {
         MEMCPY(out, out_tmp, sizeof(DIR_ENTRY));
     }
-    Free(out_tmp);
-    Free(tmp);
+    MFree(out_tmp);
+    MFree(tmp);
     return res;
 }
 BOOLEAN FAT32_READ_LFNS(DIR_ENTRY *ent, LFN *out, U32 out_size, U32 *size_out) {
@@ -89,13 +89,13 @@ BOOLEAN FAT32_READ_LFNS(DIR_ENTRY *ent, LFN *out, U32 out_size, U32 *size_out) {
     if(!ent_tmp) return FALSE;
     LFN *lfn_tmp = MAlloc(sizeof(LFN) * MAX_LFN_COUNT);
     if(!lfn_tmp) {
-        Free(ent_tmp);
+        MFree(ent_tmp);
         return FALSE;
     }
     PU32 size_out_tmp = MAlloc(sizeof(U32));
     if(!size_out_tmp) {
-        Free(ent_tmp);
-        Free(lfn_tmp);
+        MFree(ent_tmp);
+        MFree(lfn_tmp);
         return FALSE;
     }
     U32 res = SYSCALL3(SYSCALL_READ_LFNS, ent_tmp, lfn_tmp, size_out_tmp);
@@ -104,9 +104,9 @@ BOOLEAN FAT32_READ_LFNS(DIR_ENTRY *ent, LFN *out, U32 out_size, U32 *size_out) {
         MEMCPY(out, lfn_tmp, sizeof(DIR_ENTRY) * MAX_LFN_COUNT);
         MEMCPY(size_out, size_out_tmp, sizeof(U32));
     }
-    Free(size_out_tmp);
-    Free(ent_tmp);
-    Free(size_out_tmp);
+    MFree(size_out_tmp);
+    MFree(ent_tmp);
+    MFree(size_out_tmp);
     return res;
 }
 BOOLEAN FAT32_CREATE_CHILD_DIR(U32 parent_cluster, U8 *name, U8 attrib, U32 *cluster_out) {
@@ -119,7 +119,7 @@ BOOLEAN FAT32_CREATE_CHILD_DIR(U32 parent_cluster, U8 *name, U8 attrib, U32 *clu
 
     PU32 cluster_out_temp = MAlloc(sizeof(U32));
     if (!cluster_out_temp) {
-        Free(ent_tmp);
+        MFree(ent_tmp);
         return FALSE;
     }
 
@@ -128,8 +128,8 @@ BOOLEAN FAT32_CREATE_CHILD_DIR(U32 parent_cluster, U8 *name, U8 attrib, U32 *clu
         *cluster_out = *cluster_out_temp;
     }
 
-    Free(ent_tmp);
-    Free(cluster_out_temp);
+    MFree(ent_tmp);
+    MFree(cluster_out_temp);
     return res;
 }
 
@@ -143,7 +143,7 @@ BOOLEAN FAT32_CREATE_CHILD_FILE(U32 parent_cluster, U8 *name, U8 attrib, PU8 fil
 
     PU32 cluster_out_temp = MAlloc(sizeof(U32));
     if (!cluster_out_temp) {
-        Free(ent_tmp);
+        MFree(ent_tmp);
         return FALSE;
     }
 
@@ -152,8 +152,8 @@ BOOLEAN FAT32_CREATE_CHILD_FILE(U32 parent_cluster, U8 *name, U8 attrib, PU8 fil
         *cluster_out = *cluster_out_temp;
     }
 
-    Free(ent_tmp);
-    Free(cluster_out_temp);
+    MFree(ent_tmp);
+    MFree(cluster_out_temp);
     return res;
 }
 
@@ -167,7 +167,7 @@ BOOL FAT32_DIR_ENUMERATE_LFN(U32 dir_cluster, FAT_LFN_ENTRY *out_entries, U32 *m
     BOOL res = SYSCALL3(SYSCALL_DIR_ENUMERATE_LFN, dir_cluster, out_entries, max_count_tmp);
     if (res) *max_count = *max_count_tmp;
 
-    Free(max_count_tmp);
+    MFree(max_count_tmp);
     return res;
 }
 
@@ -181,7 +181,7 @@ BOOL FAT32_DIR_ENUMERATE(U32 dir_cluster, DIR_ENTRY *out_entries, U32 *max_count
     BOOL res = SYSCALL3(SYSCALL_DIR_ENUMERATE, dir_cluster, out_entries, max_count_tmp);
     if (res) *max_count = *max_count_tmp;
 
-    Free(max_count_tmp);
+    MFree(max_count_tmp);
     return res;
 }
 
@@ -199,7 +199,7 @@ VOIDPTR FAT32_READ_FILE_CONTENTS(U32 *size_out, DIR_ENTRY *entry) {
     VOIDPTR buffer = (VOIDPTR)SYSCALL2(SYSCALL_READ_FILE_CONTENTS, entry, size_tmp);
     if (buffer) *size_out = *size_tmp;
 
-    Free(size_tmp);
+    MFree(size_tmp);
     return buffer;
 }
 
@@ -223,7 +223,7 @@ U32 FAT32_FILE_GET_SIZE(DIR_ENTRY *entry) {
 }
 BOOL FAT32_DIR_ENTRY_IS_FREE(DIR_ENTRY *entry) {
     if (!entry) return TRUE;
-    // Free if first byte is 0x00 (never used) or 0xE5 (deleted)
+    // MFree if first byte is 0x00 (never used) or 0xE5 (deleted)
     return (entry->FILENAME[0] == 0x00 || entry->FILENAME[0] == 0xE5);
 }
 BOOL FAT32_DIR_ENTRY_IS_DIR(DIR_ENTRY *entry) {
@@ -236,7 +236,7 @@ DIR_ENTRY FAT32_GET_ROOT_DIR_ENTRY() {
     DIR_ENTRY res1 = { 0 };
     if(res0) {
         MEMCPY(&res1, res0, sizeof(DIR_ENTRY));
-        Free(res0);
+        MFree(res0);
     }
     return res1;
 }
@@ -260,7 +260,7 @@ BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
         IsoDirectoryRecord *ent = READ_ISO9660_FILERECORD(path);
         if (!ent) goto failure;
         if (ent->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) {
-            Free(ent);
+            MFree(ent);
             goto failure;
         }
 
@@ -269,7 +269,7 @@ BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
         file->sz = ent->extentLengthLE;
         file->data = READ_ISO9660_FILECONTENTS(ent);
 
-        Free(ent);
+        MFree(ent);
 
         if (!file->data) goto failure;
         return TRUE;
@@ -296,7 +296,7 @@ failure:
 VOID FCLOSE(FILE *file) {
     if (!file) return;
     if (file->data) {
-        Free(file->data);
+        MFree(file->data);
         file->data = NULL;
     }
     file->sz = 0;
@@ -449,7 +449,7 @@ BOOLEAN FILE_EXISTS(PU8 path) {
     // check ISO9660
     IsoDirectoryRecord *iso_ent = READ_ISO9660_FILERECORD((CHAR*)path);
     if (iso_ent) {
-        Free(iso_ent);
+        MFree(iso_ent);
         return TRUE;
     }
 
@@ -468,7 +468,7 @@ BOOLEAN DIR_EXISTS(PU8 path) {
     IsoDirectoryRecord *iso_ent = READ_ISO9660_FILERECORD((CHAR*)path);
     if (iso_ent) {
         BOOLEAN is_dir = (iso_ent->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) != 0;
-        Free(iso_ent);
+        MFree(iso_ent);
         if (is_dir) return TRUE;
     }
 
@@ -528,7 +528,7 @@ BOOLEAN FILE_CREATE(PU8 path) {
     if (!(parent[0] == '/' && parent[1] == '\0')) {
         FAT_LFN_ENTRY parent_ent = {0};
         if (!FAT32_PATH_RESOLVE_ENTRY(parent, &parent_ent)) {
-            Free(parent);
+            MFree(parent);
             return FALSE;
         }
         // We don't know the exact field for starting cluster in DIR_ENTRY here,
@@ -541,7 +541,7 @@ BOOLEAN FILE_CREATE(PU8 path) {
     // create empty file (attrib = archive)
     U32 out_cluster = 0;
     BOOLEAN res = FAT32_CREATE_CHILD_FILE(parent_cluster, (U8*)name, 0x20 /* archive attrib */, NULL, 0, &out_cluster);
-    Free(parent);
+    MFree(parent);
     return res;
 }
 
@@ -557,7 +557,7 @@ BOOLEAN DIR_CREATE(PU8 path) {
     if (!(parent[0] == '/' && parent[1] == '\0')) {
         FAT_LFN_ENTRY parent_ent = {0};
         if (!FAT32_PATH_RESOLVE_ENTRY(parent, &parent_ent)) {
-            Free(parent);
+            MFree(parent);
             return FALSE;
         }
         // Same note as FILE_CREATE: real implementation should extract parent cluster.
@@ -566,7 +566,7 @@ BOOLEAN DIR_CREATE(PU8 path) {
 
     U32 out_cluster = 0;
     BOOLEAN res = FAT32_CREATE_CHILD_DIR(parent_cluster, (U8*)name, FAT_ATTRB_DIR, &out_cluster);
-    Free(parent);
+    MFree(parent);
     return res;
 }
 
@@ -589,13 +589,13 @@ BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size) {
 
     // write to disk (overwrite)
     if (!FAT32_FILE_WRITE(&file->ent.fat_ent, temp, new_size)) {
-        if (temp) Free(temp);
+        if (temp) MFree(temp);
         return FALSE;
     }
 
     // update in-memory representation: free old data and set new
     if (file->data) {
-        Free(file->data);
+        MFree(file->data);
         file->data = NULL;
     }
     if (new_size > 0) {
@@ -606,7 +606,7 @@ BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size) {
     }
     file->sz = new_size;
 
-    if (temp) Free(temp);
+    if (temp) MFree(temp);
     return TRUE;
 }
 

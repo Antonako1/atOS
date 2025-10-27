@@ -16,6 +16,7 @@
 #include <STD/TYPEDEF.h>
 #include <PROC/PROC.h>
 #include <DRIVERS/PS2/KEYBOARD.h> // for KEYPRESS and MODIFIERS structs
+#include <PROGRAMS/SHELL/SHELL.h> // For STDOUT 
 
 void PROC_INIT_CONSOLE();
 BOOLEAN IS_PROC_INITIALIZED();
@@ -34,23 +35,41 @@ U32 PROC_GETPID_BY_NAME(U8 *name); // Get PID of process by name, returns -1 if 
 
 TCB *GET_CURRENT_TCB(void); // Get your own TCB, NULL on error
 TCB *GET_MASTER_TCB(void); // Get the master TCB, should never be NULL
-TCB *GET_TCB_BY_PID(U32 pid); // Get TCB of process by PID, NULL if not found. Free with FREE_TCB
+TCB *GET_TCB_BY_PID(U32 pid); // Get TCB of process by PID, NULL if not found. MFree with FREE_TCB
 TCB *GET_PARENT_TCB(void); // Get your parent's TCB, NULL if no
-void FREE_TCB(TCB *tcb); // Free a TCB received via GET_TCB_BY_PID
+void FREE_TCB(TCB *tcb); // MFree a TCB received via GET_TCB_BY_PID
 
 #define KERNEL_PID 0
 #define CREATE_PROC_MSG(receiver, msg_type, data_ptr, data_sz, signal_val) \
     (PROC_MESSAGE){ \
         .sender_pid = PROC_GETPID(), \
-        .receiver_pid = receiver, \
-        .type = msg_type, \
-        .data_provided = (data_ptr != NULL), \
-        .data = data_ptr, \
-        .data_size = data_sz, \
-        .signal = signal_val, \
-        .timestamp = 0, /* to be filled by kernel */ \
+        .receiver_pid = (receiver), \
+        .type = (msg_type), \
+        .data_provided = ((data_ptr) != NULL), \
+        .data = (data_ptr), \
+        .data_size = (data_sz), \
+        .signal = (signal_val), \
+        .timestamp = 0, /* filled by kernel */ \
         .read = FALSE, \
+        .raw_data = NULL, \
+        .raw_data_size = 0, \
     }
+
+#define CREATE_PROC_MSG_RAW(receiver, msg_type, raw_ptr, raw_sz, signal_val) \
+    (PROC_MESSAGE){ \
+        .sender_pid = PROC_GETPID(), \
+        .receiver_pid = (receiver), \
+        .type = (msg_type), \
+        .data_provided = FALSE, \
+        .data = NULL, \
+        .data_size = 0, \
+        .signal = (signal_val), \
+        .timestamp = 0, \
+        .read = FALSE, \
+        .raw_data = (raw_ptr), \
+        .raw_data_size = (raw_sz), \
+    }
+
 
 /**
  * KRNLCOM
@@ -66,7 +85,7 @@ U32 MESSAGE_AMOUNT();
 // Removed from message queue after calling
 PROC_MESSAGE *GET_MESSAGE();
 
-// Free a message received via GET_MESSAGE
+// MFree a message received via GET_MESSAGE
 VOID FREE_MESSAGE(PROC_MESSAGE *msg);
 
 U32 GET_PIT_TICKS();
@@ -79,19 +98,10 @@ U32 CPU_SLEEP(U32 ms); // Sleep for ms milliseconds, returns 0 on success, 1 on 
  * SHELLCOM
  */
 typedef enum {
-    SHELL_CMD_NONE = 0,
-    SHELL_CMD_CLEAR_SCREEN = 1,
-    SHELL_CMD_SET_TITLE = 2,
-    SHELL_CMD_SET_FG = 3,
-    SHELL_CMD_SET_BG = 4,
-    SHELL_CMD_RESET_COLORS = 5,
-    SHELL_CMD_SET_CURSOR_POS = 6,
-    SHELL_CMD_GET_CURSOR_POS = 7,
-    SHELL_CMD_GET_SCREEN_SIZE = 8,
-    SHELL_CMD_ENABLE_CURSOR = 9,
-    SHELL_CMD_DISABLE_CURSOR = 10,
-    SHELL_CMD_PUTS = 11,
-    SHELL_CMD_PUTC = 12,
+    SHELL_CMD_CREATE_STDOUT,
+    SHELL_RES_STDOUT_CREATED,
+    SHELL_RES_STDOUT_FAILED,
+    SHELL_CMD_ENDED_MYSELF,
 } SHELL_COMMAND_TYPE;
 
 BOOLEAN START_PROCESS(
@@ -104,4 +114,7 @@ BOOLEAN START_PROCESS(
     U32 argc
 );
 VOID KILL_PROCESS(U32 pid);
+
+STDOUT *GET_PROC_STDOUT();
+
 #endif //PROC_COM_H

@@ -10,7 +10,7 @@
 #include <STD/STRING.h>
 #include <STD/BINARY.h>
 
-#define Free(ptr) Free(ptr); ptr = NULLPTR; 
+#define Free(ptr) KFREE(ptr); ptr = NULLPTR; 
 
 static BPB bpb ATTRIB_DATA = { 0 };
 static U32 *fat32 ATTRIB_DATA = NULLPTR;

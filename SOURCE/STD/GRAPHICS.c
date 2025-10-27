@@ -16,7 +16,7 @@ BOOLEAN DRAW_8x8_STRING(U32 x, U32 y, U8 *str, VBE_COLOUR fg, VBE_COLOUR bg) {
     PU8 m_str = MAlloc(STRLEN(str) + 1);
     MEMCPY(m_str, str, STRLEN(str) + 1);
     SYSCALL(SYSCALL_VBE_DRAW_STRING, (U32)x, (U32)y, (U32)m_str, (U32)fg, (U32)bg);
-    Free(m_str);
+    MFree(m_str);
 }
 void CLEAR_SCREEN_COLOUR(VBE_COLOUR colour) {
     SYSCALL(SYSCALL_VBE_CLEAR_SCREEN, (U32)colour, 0, 0, 0, 0);

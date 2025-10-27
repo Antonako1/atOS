@@ -202,7 +202,7 @@ VOID PUSH_TO_HISTORY(U8 *line) {
     if (history_count < CMD_LINE_HISTORY) {
         line_history[history_count++] = new_line;
     } else {
-        Free(line_history[0]);
+        MFree(line_history[0]);
         for (U32 i = 1; i < CMD_LINE_HISTORY; i++) {
             line_history[i - 1] = line_history[i];
         }
@@ -214,7 +214,7 @@ VOID PUSH_TO_HISTORY(U8 *line) {
 VOID CLEAR_HISTORY() {
     for (U32 i = 0; i < history_count; i++) {
         if (line_history[i]) {
-            Free(line_history[i]);
+            MFree(line_history[i]);
             line_history[i] = NULLPTR;
         }
     }

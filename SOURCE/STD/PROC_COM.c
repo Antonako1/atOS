@@ -3,13 +3,19 @@
 #include <STD/MEM.h>
 #include <STD/STRING.h>
 #include <PROC/PROC.h>
+#include <STD/DEBUG.h>
 
+static STDOUT *stdout = NULLPTR;
 static TCB process ATTRIB_DATA = {0};
 static BOOLEAN process_fetched ATTRIB_DATA = FALSE;
 static TCB *master ATTRIB_DATA = NULL;
 static BOOLEAN master_fetched ATTRIB_DATA = FALSE;
 static TCB *parent ATTRIB_DATA = NULL;
 static BOOLEAN parent_fetched ATTRIB_DATA = FALSE;
+
+STDOUT *GET_PROC_STDOUT() {
+    return stdout;
+}
 
 U32 MESSAGE_AMOUNT() {
     U32 res  = (U32 *)SYSCALL(SYSCALL_MESSAGE_AMOUNT, 0, 0, 0, 0, 0);
@@ -22,7 +28,7 @@ VOID SEND_MESSAGE(PROC_MESSAGE *msg) {
     if (!msg_copy) return;
     MEMCPY(msg_copy, msg, sizeof(PROC_MESSAGE));
     SYSCALL1(SYSCALL_SEND_MESSAGE, (U32)msg_copy);
-    Free(msg_copy);
+    MFree(msg_copy);
 }
     
 PROC_MESSAGE *GET_MESSAGE() {
@@ -32,10 +38,10 @@ PROC_MESSAGE *GET_MESSAGE() {
 VOID FREE_MESSAGE(PROC_MESSAGE *msg) {
     if (!msg) return;
     if (msg->data_provided && msg->data) {
-        Free(msg->data);
+        MFree(msg->data);
     } 
     msg->read = TRUE;
-    Free(msg);
+    MFree(msg);
 }
 
 U32 PROC_GETPID(U0) {
@@ -71,7 +77,7 @@ TCB *GET_CURRENT_TCB(void) {
     
     if(t) {
         MEMCPY(&process, t, sizeof(TCB));
-        Free(t);
+        MFree(t);
         process_fetched = TRUE;
         return &process;
     }
@@ -84,11 +90,11 @@ TCB *GET_MASTER_TCB(void) {
     if(t) {
         master = (TCB *)MAlloc(sizeof(TCB));
         if(!master) {
-            Free(t);
+            MFree(t);
             return NULL;
         }
         MEMCPY(master, t, sizeof(TCB));
-        Free(t);
+        MFree(t);
         master_fetched = TRUE;
         return master;
     }
@@ -100,11 +106,11 @@ TCB *GET_TCB_BY_PID(U32 pid) {
     if(t) {
         TCB *copy = (TCB *)MAlloc(sizeof(TCB));
         if(!copy) {
-            Free(t);
+            MFree(t);
             return NULL;
         }
         MEMCPY(copy, t, sizeof(TCB));
-        Free(t);
+        MFree(t);
         return copy;
     }
     return NULL;
@@ -117,11 +123,11 @@ TCB *GET_PARENT_TCB(void) {
     if(t) {
         parent = (TCB *)MAlloc(sizeof(TCB));
         if(!parent) {
-            Free(t);
+            MFree(t);
             return NULL;
         }
         MEMCPY(parent, t, sizeof(TCB));
-        Free(t);
+        MFree(t);
         parent_fetched = TRUE;
         return parent;
     }
@@ -129,7 +135,7 @@ TCB *GET_PARENT_TCB(void) {
 }
 void FREE_TCB(TCB *tcb) {
     if (!tcb) return;
-    Free(tcb);
+    MFree(tcb);
 }
 
 U32 GET_PIT_TICKS() {
@@ -149,14 +155,16 @@ VOID EXIT(U32 n) {
 
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPPID());
     SEND_MESSAGE(&msg);
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_ENDED_MYSELF, NULL, 0, n);
+    SEND_MESSAGE(&msg);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_TERMINATE_SELF, NULL, 0, n);
     SEND_MESSAGE(&msg);
-    for(;;);
+    for(;;); // Loop here until safe to continue
 }
 
 static U8 ___keyboard_access_granted = FALSE;
 static U8 ___draw_access_granted = FALSE;
-
+static U8 ___STDOUT_CREATED = FALSE;
 void PRIC_INIT_GRAPHICAL() {
     PROC_INIT_CONSOLE();
 }
@@ -166,15 +174,15 @@ void PROC_INIT_CONSOLE() {
 
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_FRAMEBUFFER, NULL, 0, 0);
     SEND_MESSAGE(&msg);
-    
-    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPID());
-    SEND_MESSAGE(&msg);
 
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_KEYBOARD_EVENTS, NULL, 0, 0);
     SEND_MESSAGE(&msg);
 
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_CREATE_STDOUT, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
     ___keyboard_access_granted = FALSE;
     ___draw_access_granted = FALSE;
+    ___STDOUT_CREATED = FALSE;
 }
 BOOLEAN IS_PROC_INITIALIZED() {
     U32 msg_count = MESSAGE_AMOUNT();
@@ -182,16 +190,27 @@ BOOLEAN IS_PROC_INITIALIZED() {
         PROC_MESSAGE *msg = GET_MESSAGE(); // Gets last message. Marked as read
         if (!msg) break;
         switch(msg->type) {
-            case PROC_KEYBOARD_EVENTS_GRANTED:
-                ___keyboard_access_granted = TRUE;
+            case PROC_KEYBOARD_EVENTS_GRANTED: ___keyboard_access_granted = TRUE; break;
+            case PROC_FRAMEBUFFER_GRANTED: ___draw_access_granted = TRUE; break;
+            case SHELL_RES_STDOUT_CREATED: 
+                if(msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
+                    DEBUG_PUTS("STDOUT PTR GOT IS: ");
+                    MEMORY_DUMP(msg, sizeof(PROC_MESSAGE));
+                    DEBUG_PUTS("\n");
+                    stdout = msg->raw_data;
+                    ___STDOUT_CREATED = TRUE; 
+                } else 
+                    EXIT(1);
                 break;
-            case PROC_FRAMEBUFFER_GRANTED:
-                ___draw_access_granted = TRUE;
-                break;
+            case SHELL_RES_STDOUT_FAILED: EXIT(1); break;
         }
         FREE_MESSAGE(msg);
     }
-    return (___keyboard_access_granted && ___draw_access_granted) ? TRUE : FALSE;
+    return (
+        ___keyboard_access_granted && 
+        ___draw_access_granted &&
+        ___STDOUT_CREATED 
+    ) ? TRUE : FALSE;
 }
 
 BOOLEAN START_PROCESS(
@@ -218,13 +237,10 @@ BOOLEAN START_PROCESS(
     return TRUE;
 }
 
-VOID KILL_PROCESS(U32 pid) {
-    // SYSCALL1(SYSCALL_KILL_BINARY, pid);
-}
 
 VOID KILL_SELF() {
-    // SYSCALL1(SYSCALL_KILL_BINARY, PROC_GETPID());
+    EXIT(0);
 }
 VOID START_HALT() {
-    for(;;) yield();
+    for(;;) ;
 }

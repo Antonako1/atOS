@@ -421,13 +421,22 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     STRNCPY(tmp_line, line, sizeof(tmp_line) - 1);
     str_trim(tmp_line);
 
+    // Extract program name (everything until first space)
+    PU8 first_space = STRCHR(tmp_line, ' ');
+    U32 prog_len = first_space ? (U32)(first_space - tmp_line) : STRLEN(tmp_line);
+
+    PU8 prog_name = MAlloc(prog_len + 1);
+    STRNCPY(prog_name, tmp_line, prog_len);
+    prog_name[prog_len] = 0;
+
     // Resolve path relative to current shell path
-    if (!ResolvePath(tmp_line, tmp_line, sizeof(tmp_line))) {
+    if (!ResolvePath(prog_name, tmp_line, sizeof(tmp_line))) {
         PUTS("\nError: Failed to resolve path.\n");
+        MFree(prog_name);
         return FALSE;
     }
 
-    // Extract file name
+    // Extract file name from path
     PU8 file_name = STRRCHR(tmp_line, '/');
     if (file_name) file_name++;
     else file_name = tmp_line;
@@ -435,13 +444,17 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     FAT_LFN_ENTRY ent;
     if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
         PUTS("\nError: File not found.\n");
+        MFree(prog_name);
         return FALSE;
     }
 
     // Read file contents
     U32 sz = 0;
     VOIDPTR data = FAT32_READ_FILE_CONTENTS(&sz, &ent.entry);
-    if (!data) return FALSE;
+    if (!data) {
+        MFree(prog_name);
+        return FALSE;
+    }
 
     U32 pid = PROC_GETPID();
 
@@ -450,28 +463,36 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
 
-    // argv[0] = program name
-    argv[argc++] = STRDUP(file_name);
+    argv[argc++] = prog_name; // argv[0] = program name
 
-    // Parse remaining args
-    PU8 arg_ptr = STRCHR(line, ' ');
-    if (arg_ptr) arg_ptr++; // skip space
-    while (arg_ptr && argc < MAX_ARGS) {
-        PU8 next_space = STRCHR(arg_ptr, ' ');
-        U32 len = next_space ? (U32)(next_space - arg_ptr) : STRLEN(arg_ptr);
+    // Remaining line after first space
+    PU8 args_start = first_space ? first_space + 1 : NULL;
 
-        PU8 arg_copy = MAlloc(len + 1);
-        STRNCPY(arg_copy, arg_ptr, len);
-        arg_copy[len] = '\0';
-        argv[argc++] = arg_copy;
+    if (args_start && *args_start) {
+        PU8 p = args_start;
+        while (*p && argc < MAX_ARGS) {
+            // Skip spaces
+            while (*p == ' ') p++;
+            if (!*p) break;
 
-        if (next_space) arg_ptr = next_space + 1;
-        else break;
+            PU8 arg_start = p;
+            while (*p && *p != ' ') p++;
+            U32 len = p - arg_start;
+
+            PU8 arg = MAlloc(len + 1);
+            STRNCPY(arg, arg_start, len);
+            arg[len] = 0;
+
+            argv[argc++] = arg;
+        }
     }
 
+    // argv freed by kernel
     U32 res = START_PROCESS(file_name, data, sz, TCB_STATE_ACTIVE, pid, argv, argc);
 
     if (res) PRINTNEWLINE();
 
     return res != 0;
 }
+
+

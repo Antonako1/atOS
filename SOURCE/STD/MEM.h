@@ -20,6 +20,6 @@ U0 *MEMMOVE32_OPT(U0* dest, CONST U0* src, U32 dwordCount);
 U0 *MAlloc(U32 size);
 U0 *CAlloc(U32 num, U32 size);
 U0 *ReAlloc(U0* ptr, U32 newSize);
-VOID Free(U0* ptr);
+VOID MFree(U0* ptr);
 
 #endif // STD_MEM_H

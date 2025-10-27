@@ -1,12 +1,44 @@
 #include <STD/IO.h>
 #include <STD/PROC_COM.h>
-#include <CPU/SYSCALL/SYSCALL.h>
-#include <DRIVERS/PS2/KEYBOARD.h> // For definitions
+#include <STD/STRING.h>
 #include <STD/MEM.h>
 
-void putc(U8 c);
-void puts(const U8 *str);
-void cls(void);
+#include <CPU/SYSCALL/SYSCALL.h>
+#include <DRIVERS/PS2/KEYBOARD.h> // For definitions
+#include <PROGRAMS/SHELL/SHELL.h>
+#include <STD/DEBUG.h>
+
+void putc(U8 c) {
+    STDOUT *stdout = GET_PROC_STDOUT();
+    if (!stdout) return;
+
+    if (stdout->buf_end < STDOUT_MAX_LENGTH - 1) {
+        stdout->buf[stdout->buf_end++] = c;
+        stdout->buf[stdout->buf_end] = '\0';  // keep null-terminated
+    }
+
+
+    stdout->proc_seq++;
+}
+
+void puts(U8 *str) {
+    STDOUT *stdout = GET_PROC_STDOUT();
+    if (!stdout || !str) return;
+    U32 len = STRNLEN(str, STDOUT_MAX_LENGTH);
+    U32 space_left = STDOUT_MAX_LENGTH - 1 - stdout->buf_end;
+    
+    if (len > space_left)
+    len = space_left;
+    
+    MEMCPY(&stdout->buf[stdout->buf_end], str, len);
+    stdout->buf_end += len;
+    stdout->buf[stdout->buf_end] = '\0'; // ensure null-terminated
+    
+    stdout->proc_seq++;
+    DEBUG_HEX32(stdout);
+    DEBUG_PUTC("<");
+}
+
 
 static U32 prev_seq ATTRIB_DATA = 0;
 static KP_DATA *kp ATTRIB_DATA = NULLPTR;

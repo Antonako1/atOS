@@ -3,8 +3,8 @@
 #include <STD/TYPEDEF.h>
 #include <STD/FS_DISK.h>
 
+#ifdef __SHELL__
 #define SHELL_SCRIPT_LINE_MAX_LEN 512
-
 
 U0 HANDLE_COMMAND(U8 *line);
 
@@ -18,5 +18,5 @@ U8 SHELL_GET_ECHO(void);
 VOID BATSH_SET_MODE(U8 mode);
 U8 BATSH_GET_MODE(void);
 BOOLEAN RUN_PROCESS(PU8 line);
-
+#endif __SHELL__
 #endif // BATSH_H
