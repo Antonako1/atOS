@@ -543,7 +543,6 @@ VOID BLINK_CURSOR(VOID) {
 VOID PUT_SHELL_START(VOID) {
     RESTORE_CURSOR_BEFORE_MOVE();
     cursor.Column = 0;
-
     PUT_CURRENT_PATH();
     PUTS(PATH_END_CHAR);
 
@@ -789,13 +788,14 @@ void HANDLE_LE_ENTER() {
     
     BATSH_SET_MODE(FALSE);
     HANDLE_BATSH_LINE(current_line);
-    
+    if(STRLEN(current_line) == 0)
+        PRINTNEWLINE();
     // Reset line buffer
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
     
     // Print prompt again
-    PRINTNEWLINE();
+    
     cursor.Column = 0;
     PUT_SHELL_START();
 
@@ -956,7 +956,6 @@ void LE_CLS(void) {
 
     cursor.Row = 0;
     cursor.Column = 0;
-
     PUT_SHELL_START();
 }
 

@@ -101,16 +101,15 @@ PU8 GET_VAR_VALUE(PU8 name) {
 
 // Accepts: TRUE, FALSE, ON, OFF, 1, 0
 BOOLEAN VAR_VALUE_TRUE(PU8 name) {
-    PU8 val = NULLPTR;
-    for (U32 i = 0; i < shell_var_count; i++) {
-        if (STRICMP(name, shell_vars[i].name) == 0) val = shell_vars[i].value;
-    }
-    if(!val) return FALSE;
-    if(
+    PU8 val = GET_VAR_VALUE(name);  // Use GET_VAR to find variable once
+    if (!val || !*val) return FALSE;
+
+    if (
         STRICMP(val, "1") == 0 ||
         STRICMP(val, "ON") == 0 ||
         STRICMP(val, "TRUE") == 0
     ) return TRUE;
+
     return FALSE;
 }
 
@@ -182,9 +181,11 @@ VOID REPLACE_VARS_IN_LINE(PU8 line) {
 VOID SHELL_SET_ECHO(U8 on) { 
     CREATE_VAR("echo", on ? "on" : "off");
 }
+
 U8 SHELL_GET_ECHO(void) { 
     return VAR_VALUE_TRUE("echo"); 
 }
+
 
 // ===================================================
 // BATSH Line Parser
@@ -235,7 +236,6 @@ VOID HANDLE_COMMAND(U8 *line) {
     cursor->CURSOR_VISIBLE = FALSE;
 
     if (STRLEN(line) == 0) {
-        PRINTNEWLINE();
         cursor->CURSOR_VISIBLE = TRUE;
         return;
     }
@@ -267,6 +267,7 @@ VOID HANDLE_COMMAND(U8 *line) {
 // ===================================================
 BOOLEAN RUN_BATSH_FILE(FILE *file) {
     if (!file) return FALSE;
+    SHELL_SET_ECHO(TRUE);
     BATSH_SET_MODE(TRUE);
     OutputHandle crs = GetOutputHandle();
     U32 prev = crs->CURSOR_VISIBLE;
@@ -327,6 +328,7 @@ VOID CMD_EXIT(U8 *line) { (void)line; PRINTNEWLINE(); PUTS((U8*)"Exiting shell..
 VOID CMD_ECHO(U8 *line) {
     PRINTNEWLINE();
     if (STRLEN(line) > 5) PUTS(line + 5);
+    PRINTNEWLINE();
 }
 
 VOID CMD_TONE(U8 *line) {
