@@ -17,7 +17,6 @@ void putc(U8 c) {
         stdout->buf[stdout->buf_end] = '\0';  // keep null-terminated
     }
 
-
     stdout->proc_seq++;
 }
 

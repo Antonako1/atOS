@@ -10,8 +10,10 @@ U0 INITIALIZE_ASTRAC();
 U0 _start(U32 argc, PPU8 argv) {
     PROC_INIT_CONSOLE();
     while(!IS_PROC_INITIALIZED());
+    if(argc < 1) EXIT(1);
     puts("AstraC C compiler and Assembler!\n");
     for(U32 i = 0; i < argc;i++) {
+        if(STRCMP(argv[i], "--nothing") == 0) EXIT(-1);
         puts(argv[i]);
         putc('\n');
     }
