@@ -34,14 +34,10 @@ Function table:
 void putc(U8 c);
 void puts(const U8 *str);
 
-/*
-Do NOT use:
-void reset_keyboard(void);
-void get_last_keypress(KEYPRESS *kp);
-// KEYPRESS MUST be freed with free_keypress after use
-KEYPRESS *get_current_keypress(void);
-void free_keypress(KEYPRESS *kp);
-void get_modifiers(MODIFIERS *mod);
-*/
+KP_DATA *get_kp_data();
+KEYPRESS *get_last_keypress();
+KEYPRESS *get_latest_keypress();
+MODIFIERS *get_modifiers();
+U32 get_kp_seq();
 U8 keypress_to_char(U32 kcode);
 #endif // IO_H

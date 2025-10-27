@@ -606,6 +606,16 @@ typedef struct {
     BOOLEAN scrolllock;
 } MODIFIERS;
 
+typedef struct {
+    KEYPRESS cur;
+    KEYPRESS prev;
+    MODIFIERS mods;
+    U32 seq; // incremented by kernel on every new keypress. if prev_seq != seq, new keypress has happened
+} KP_DATA;
+
+KP_DATA* GET_KP_DATA();
+VOID UPDATE_KP_DATA();
+
 #define DEFAULT_SCANCODESET SCANCODESET2
 #define SECONDARY_SCANCODESET SCANCODESET1
 

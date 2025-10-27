@@ -9,6 +9,21 @@ static PS2_INFO ps2_info __attribute__((section(".data"))) = {0};
 static KEYPRESS last_key __attribute__((section(".data"))) = {0}; // Store the last key pressed to avoid repeats
 static MODIFIERS modifiers __attribute__((section(".data"))) = {0};
 
+static volatile KP_DATA GLOBAL_KP_DATA ATTRIB_DATA = { 0 };
+
+KP_DATA* GET_KP_DATA() {
+    return &GLOBAL_KP_DATA;
+}
+VOID UPDATE_KP_DATA() {
+    KEYPRESS kp = GET_CURRENT_KEY_PRESSED();
+    if(kp.keycode != KEY_UNKNOWN) {
+        GLOBAL_KP_DATA.seq++;
+        GLOBAL_KP_DATA.cur = kp;
+        GLOBAL_KP_DATA.prev = last_key;
+        GLOBAL_KP_DATA.mods = modifiers;
+    }
+}
+
 PS2_INFO *GET_PS2_INFO(VOID) {
     return &ps2_info;
 }

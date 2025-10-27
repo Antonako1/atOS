@@ -1052,36 +1052,5 @@ void handle_kernel_messages(void) {
     // Handle messages sent by kernel to tasks
     TCB *t = get_current_tcb();
     if (!t) return;
-    KEYPRESS k = GET_CURRENT_KEY_PRESSED(); // saved for every process
-
-    do {
-        if(t->info.pid == 0) continue; // skip master
-        PROC_EVENT_TYPE ev = t->info.event_types;
-        if(IS_FLAG_SET(ev, PROC_EVENT_INFORM_ON_KB_EVENTS)) {
-            if(!k.keycode == KEY_UNKNOWN) {
-                MODIFIERS *mods = GET_KEYBOARD_MODIFIERS();
-    
-                PROC_MESSAGE *msg = KMALLOC(sizeof(PROC_MESSAGE));
-                msg->sender_pid = 0; // from kernel
-                msg->receiver_pid = t->info.pid;
-                msg->type = PROC_MSG_KEYBOARD;
-    
-                msg->data_provided = TRUE;
-                msg->data = KMALLOC(sizeof(KEYPRESS) + sizeof(MODIFIERS));
-                if(!msg->data) {
-                    KFREE(msg);
-                    continue;
-                }
-                MEMZERO(msg->data, sizeof(KEYPRESS) + sizeof(MODIFIERS));
-                MEMCPY(msg->data, &k, sizeof(KEYPRESS));
-                MEMCPY((U8 *)msg->data + sizeof(KEYPRESS), mods, sizeof(MODIFIERS));
-    
-                msg->timestamp = get_uptime_sec();
-                msg->read = FALSE;
-    
-                send_msg(msg);
-                free_message(msg);
-            } 
-        }
-    } while((t = t->next) != get_master_tcb());
+    UPDATE_KP_DATA();
 }

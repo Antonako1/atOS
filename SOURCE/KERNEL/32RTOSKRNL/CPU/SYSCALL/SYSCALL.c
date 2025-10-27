@@ -215,6 +215,11 @@ U32 SYS_PROC_GETPID_BY_NAME(U32 name_ptr, U32 unused2, U32 unused3, U32 unused4,
     return pid;
 }
 
+U32 SYS_GET_KP_DATA(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    return GET_KP_DATA();
+}
+
 U32 SYS_KMALLOC(U32 size, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     static U32 rki_row = 0;

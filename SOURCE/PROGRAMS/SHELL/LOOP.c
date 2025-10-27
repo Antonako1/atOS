@@ -19,16 +19,21 @@ U0 CMD_INTERFACE_MSG_LOOP() {
     for(U32 i = 0; i <= msg_count; i++) {
         PROC_MESSAGE *msg = GET_MESSAGE();
         if (!msg) break;
-        switch(msg->type) {
-            case PROC_MSG_KEYBOARD:
-                if (msg->data_provided && msg->data) {
-                    KEYPRESS *kp = (KEYPRESS *)msg->data;
-                    MODIFIERS *mods = (MODIFIERS *)((U8 *)msg->data + sizeof(KEYPRESS));
-                    HANDLE_KB_CMDI(kp, mods);
-                }
-                break;
-        }
+        // switch(msg->type) {
+        //     case PROC_MSG_KEYBOARD:
+        //         if (msg->data_provided && msg->data) {
+        //             KEYPRESS *kp = (KEYPRESS *)msg->data;
+        //             MODIFIERS *mods = (MODIFIERS *)((U8 *)msg->data + sizeof(KEYPRESS));
+        //             HANDLE_KB_CMDI(kp, mods);
+        //         }
+        //         break;
+        // }
         FREE_MESSAGE(msg);
+    }
+    KEYPRESS *kp = (KEYPRESS *)get_latest_keypress();
+    if(kp) {
+        MODIFIERS *mods = (MODIFIERS *)get_modifiers();
+        HANDLE_KB_EDIT_LINE(kp, mods);
     }
 }
 
@@ -47,12 +52,17 @@ U0 EDIT_LINE_MSG_LOOP() {
         PROC_MESSAGE *msg = GET_MESSAGE();
         if (!msg) break;
 
-        if (msg->type == PROC_MSG_KEYBOARD && msg->data_provided && msg->data) {
-            KEYPRESS *kp = (KEYPRESS *)msg->data;
-            MODIFIERS *mods = (MODIFIERS *)((U8 *)msg->data + sizeof(KEYPRESS));
-            HANDLE_KB_EDIT_LINE(kp, mods);
-        }
+        // if (msg->type == PROC_MSG_KEYBOARD && msg->data_provided && msg->data) {
+        //     KEYPRESS *kp = (KEYPRESS *)msg->data;
+        //     MODIFIERS *mods = (MODIFIERS *)((U8 *)msg->data + sizeof(KEYPRESS));
+        //     HANDLE_KB_EDIT_LINE(kp, mods);
+        // }
         FREE_MESSAGE(msg);
+    }
+    KEYPRESS *kp = (KEYPRESS *)get_latest_keypress();
+    if(kp) {
+        MODIFIERS *mods = (MODIFIERS *)get_modifiers();
+        HANDLE_KB_EDIT_LINE(kp, mods);
     }
 }
 

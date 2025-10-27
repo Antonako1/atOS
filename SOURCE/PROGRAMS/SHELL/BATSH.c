@@ -356,10 +356,12 @@ VOID CMD_TONE(U8 *line) {
 VOID CMD_SOUNDOFF(U8 *line) { (void)line; AUDIO_STOP(); PUTS((U8*)"AC97: stopped" LEND); }
 
 VOID CMD_UNKNOWN(U8 *line) {
-    PRINTNEWLINE();
-    PUTS((U8*)"Unknown command: ");
-    PUTS(line);
-    PRINTNEWLINE();
+    if(!RUN_PROCESS(line)) {
+        PRINTNEWLINE();
+        PUTS((U8*)"Unknown command or executable file not found: ");
+        PUTS(line);
+        PRINTNEWLINE();
+    }
 }
 
 // Directory-related
@@ -408,4 +410,10 @@ VOID CMD_RMDIR(PU8 raw_line) {
 
 VOID SETUP_BATSH_PROCESSER() {
     CREATE_VAR("echo", "on");
+}
+
+
+BOOLEAN RUN_PROCESS(PU8 line) {
+    U8 process[64] = { 0 };
+    return FALSE;
 }
