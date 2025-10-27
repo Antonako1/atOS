@@ -416,33 +416,46 @@ VOID SETUP_BATSH_PROCESSER() {
 
 
 BOOLEAN RUN_PROCESS(PU8 line) {
-    U8 process[64] = { 0 };
-    STRNCPY(process, line, sizeof(process));
-    str_trim(process);
+    if (!line || !*line) return FALSE;
 
-    PU8 space = STRCHR(process, ' ');
-    if(space) *space = '\0'; // terminate command name
+    STRNCPY(tmp_line, line, sizeof(tmp_line) - 1);
+    str_trim(tmp_line);
 
-    PU8 file = STRRCHR(process, '/');
-    if(file) file++;
-    else file = process;
+    // Resolve path relative to current shell path
+    if (!ResolvePath(tmp_line, tmp_line, sizeof(tmp_line))) {
+        PUTS("\nError: Failed to resolve path.\n");
+        return FALSE;
+    }
+
+    // Extract file name
+    PU8 file_name = STRRCHR(tmp_line, '/');
+    if (file_name) file_name++;
+    else file_name = tmp_line;
 
     FAT_LFN_ENTRY ent;
-    if(!FAT32_PATH_RESOLVE_ENTRY(line, &ent)) return FALSE;
+    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
+        PUTS("\nError: File not found.\n");
+        return FALSE;
+    }
+
+    // Read file contents
     U32 sz = 0;
     VOIDPTR data = FAT32_READ_FILE_CONTENTS(&sz, &ent.entry);
+    if (!data) return FALSE;
+
     U32 pid = PROC_GETPID();
 
-    // parse args
+    // Parse arguments
     #define MAX_ARGS 12
-    PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS); // array of PU8 pointers
+    PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
-    
-    // Add program name as argv[0]
-    argv[argc++] = STRDUP(process);
 
-    // Parse remaining args (same as before)
-    PU8 arg_ptr = space ? space + 1 : NULL;
+    // argv[0] = program name
+    argv[argc++] = STRDUP(file_name);
+
+    // Parse remaining args
+    PU8 arg_ptr = STRCHR(line, ' ');
+    if (arg_ptr) arg_ptr++; // skip space
     while (arg_ptr && argc < MAX_ARGS) {
         PU8 next_space = STRCHR(arg_ptr, ' ');
         U32 len = next_space ? (U32)(next_space - arg_ptr) : STRLEN(arg_ptr);
@@ -450,26 +463,15 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         PU8 arg_copy = MAlloc(len + 1);
         STRNCPY(arg_copy, arg_ptr, len);
         arg_copy[len] = '\0';
-
         argv[argc++] = arg_copy;
 
-        if (next_space)
-            arg_ptr = next_space + 1;
-        else
-            break;
+        if (next_space) arg_ptr = next_space + 1;
+        else break;
     }
 
+    U32 res = START_PROCESS(file_name, data, sz, TCB_STATE_ACTIVE, pid, argv, argc);
 
-    U32 res = START_PROCESS(
-        file,
-        data,
-        sz,
-        TCB_STATE_ACTIVE,
-        pid,
-        argv,
-        argc
-    );
-    if(res) PRINTNEWLINE();
-    // args freed when process is killed
+    if (res) PRINTNEWLINE();
+
     return res != 0;
 }

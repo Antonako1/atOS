@@ -53,6 +53,8 @@ PU8 PARSE_CD_RAW_LINE(PU8 line, U32 cut_index);
 BOOLEAN MAKE_DIR(PU8 path);
 BOOLEAN REMOVE_DIR(PU8 path);
 
+BOOLEAN ResolvePath(PU8 path, PU8 out_buffer, size_t out_buffer_size);
+
 VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir);
 VOID PRINT_CONTENTS_PATH(PU8 path);
 

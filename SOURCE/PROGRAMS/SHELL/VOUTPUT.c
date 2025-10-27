@@ -780,21 +780,22 @@ void HANDLE_LE_ENTER() {
     // Ensure null-terminated current line
     if (edit_pos >= CUR_LINE_MAX_LENGTH)
         edit_pos = CUR_LINE_MAX_LENGTH - 1;
-    current_line[edit_pos] = '\0';
+    current_line[STRNLEN(current_line, CUR_LINE_MAX_LENGTH)] = '\0';
 
     RESTORE_CURSOR_BEFORE_MOVE();
 
     // Keep original command in history
     PUSH_TO_HISTORY(current_line);
-
+    
     BATSH_SET_MODE(FALSE);
     HANDLE_BATSH_LINE(current_line);
-
+    
     // Reset line buffer
     MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
     edit_pos = 0;
-
+    
     // Print prompt again
+    PRINTNEWLINE();
     cursor.Column = 0;
     PUT_SHELL_START();
 
@@ -957,4 +958,135 @@ void LE_CLS(void) {
     cursor.Column = 0;
 
     PUT_SHELL_START();
+}
+
+void HANDLE_LE_HOME() {
+    edit_pos = 0;
+    HANDLE_LE_CURSOR();
+}
+
+void HANDLE_LE_END() {
+    edit_pos = STRLEN(current_line);
+    HANDLE_LE_CURSOR();
+}
+
+void HANDLE_LE_CTRL_LEFT() {
+    if (edit_pos == 0) return;
+
+    // Skip spaces
+    while (edit_pos > 0 && current_line[edit_pos - 1] == ' ')
+        edit_pos--;
+
+    // Skip word
+    while (edit_pos > 0 && current_line[edit_pos - 1] != ' ')
+        edit_pos--;
+
+    HANDLE_LE_CURSOR();
+}
+
+void HANDLE_LE_CTRL_RIGHT() {
+    U32 len = STRLEN(current_line);
+    if (edit_pos >= len) return;
+
+    // Skip spaces
+    while (edit_pos < len && current_line[edit_pos] == ' ')
+        edit_pos++;
+
+    // Skip word
+    while (edit_pos < len && current_line[edit_pos] != ' ')
+        edit_pos++;
+
+    HANDLE_LE_CURSOR();
+}
+
+static char yank_buffer[CUR_LINE_MAX_LENGTH];
+
+
+void HANDLE_LE_CTRL_A() { HANDLE_LE_HOME(); }
+void HANDLE_LE_CTRL_E() { HANDLE_LE_END(); }
+
+void HANDLE_LE_CTRL_U() {
+    if (edit_pos == 0) return;
+
+    // Save text being cut into yank buffer
+    STRNCPY(yank_buffer, current_line, edit_pos);
+    yank_buffer[edit_pos] = '\0';
+
+    // Shift remaining text to beginning
+    U32 len = STRLEN(current_line);
+    for (U32 i = 0; i <= len - edit_pos; i++) {
+        current_line[i] = current_line[i + edit_pos];
+    }
+
+    edit_pos = 0;
+    REDRAW_CURRENT_LINE();
+    HANDLE_LE_CURSOR();
+}
+
+void HANDLE_LE_CTRL_W() {
+    if (edit_pos == 0) return;
+
+    // Skip spaces first
+    while (edit_pos > 0 && current_line[edit_pos - 1] == ' ')
+        edit_pos--;
+
+    U32 end = edit_pos;
+    while (edit_pos > 0 && current_line[edit_pos - 1] != ' ')
+        edit_pos--;
+
+    U32 start = edit_pos;
+    U32 len = STRLEN(current_line);
+
+    // Save cut text to yank buffer
+    STRNCPY(yank_buffer, &current_line[start], end - start);
+    yank_buffer[end - start] = '\0';
+
+    // Delete range
+    for (U32 i = start; i <= len - (end - start); i++)
+        current_line[i] = current_line[i + (end - start)];
+
+    REDRAW_CURRENT_LINE();
+    HANDLE_LE_CURSOR();
+}
+
+
+void HANDLE_LE_CTRL_K() {
+    U32 len = STRLEN(current_line);
+    if (edit_pos >= len) return;
+
+    STRCPY(yank_buffer, &current_line[edit_pos]);
+    current_line[edit_pos] = '\0';
+    REDRAW_CURRENT_LINE();
+    HANDLE_LE_CURSOR();
+}
+
+void HANDLE_LE_CTRL_Y() {
+    if (yank_buffer[0] == '\0') return;
+    U32 len = STRLEN(current_line);
+    U32 yank_len = STRLEN(yank_buffer);
+
+    if (len + yank_len >= CUR_LINE_MAX_LENGTH - 1) return;
+
+    for (U32 i = len + yank_len; i > edit_pos; i--) {
+        current_line[i] = current_line[i - yank_len];
+    }
+
+    for (U32 i = 0; i < yank_len; i++) {
+        current_line[edit_pos + i] = yank_buffer[i];
+    }
+
+    edit_pos += yank_len;
+    REDRAW_CURRENT_LINE();
+    HANDLE_LE_CURSOR();
+}
+
+void HANDLE_LE_CTRL_L() {
+    LE_CLS();
+}
+
+void HANDLE_LE_CTRL_TAB() {
+
+}
+void HANDLE_LE_SHIFT_ALT_DEL() {
+    
 }

@@ -41,7 +41,26 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
         case KEY_ARROW_RIGHT: HANDLE_LE_ARROW_RIGHT(); break;
         case KEY_ARROW_DOWN: HANDLE_LE_ARROW_DOWN(); break;
         case KEY_ARROW_UP: HANDLE_LE_ARROW_UP(); break;
-        default: HANDLE_LE_DEFAULT(kp, mod); break;
+        case KEY_HOME: HANDLE_LE_HOME(); break;
+        case KEY_END: HANDLE_LE_END(); break;
+        default: 
+            if(mod->ctrl) {
+                switch(kp->keycode) {
+                    case KEY_ARROW_RIGHT: HANDLE_LE_CTRL_RIGHT(); break;
+                    case KEY_ARROW_LEFT: HANDLE_LE_CTRL_LEFT(); break;
+                    case KEY_A: HANDLE_LE_CTRL_A(); break;
+                    case KEY_E: HANDLE_LE_CTRL_E(); break;
+                    case KEY_U: HANDLE_LE_CTRL_U(); break;
+                    case KEY_K: HANDLE_LE_CTRL_K(); break;
+                    case KEY_W: HANDLE_LE_CTRL_W(); break;
+                    case KEY_Y: HANDLE_LE_CTRL_Y(); break;
+                    case KEY_L: HANDLE_LE_CTRL_L(); break;
+                    case KEY_TAB: HANDLE_LE_CTRL_TAB(); break;
+                }
+            }
+            else
+                HANDLE_LE_DEFAULT(kp, mod); 
+            break;
     }
     HANDLE_LE_CURSOR();
 }
