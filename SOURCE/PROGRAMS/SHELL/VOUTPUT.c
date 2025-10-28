@@ -1,3 +1,6 @@
+#ifndef __SHELL__
+#define __SHELL__
+#endif 
 #include <PROGRAMS/SHELL/VOUTPUT.h>
 #include <PROGRAMS/SHELL/FONT8x16.h>
 #include <PROGRAMS/SHELL/SHELL.h>
@@ -787,7 +790,7 @@ void HANDLE_LE_ENTER() {
     PUSH_TO_HISTORY(current_line);
     
     BATSH_SET_MODE(FALSE);
-    HANDLE_BATSH_LINE(current_line);
+    PARSE_BATSH_INPUT(current_line, NULL);
     if(STRLEN(current_line) == 0)
         PRINTNEWLINE();
     // Reset line buffer

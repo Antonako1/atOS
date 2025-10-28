@@ -531,3 +531,13 @@ PU8 STRNDUP(PU8 src, U32 n) {
     dup[len] = '\0';
     return dup;
 }
+
+BOOLEAN ISALNUM(CHAR c) {
+    // Check if character is 0-9, a-z, or A-Z
+    if ((c >= '0' && c <= '9') ||
+        (c >= 'A' && c <= 'Z') ||
+        (c >= 'a' && c <= 'z')) {
+        return TRUE;
+    }
+    return FALSE;
+}

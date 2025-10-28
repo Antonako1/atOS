@@ -1,3 +1,6 @@
+#ifndef __SHELL__
+#define __SHELL__
+#endif 
 #include <PROC/PROC.h>
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <PROGRAMS/SHELL/BATSH.h>
@@ -10,14 +13,7 @@
 
 #define LEND "\r\n"
 
-#define MAX_VARS 64
-#define MAX_VAR_NAME 32
-#define MAX_VAR_VALUE 128
 
-typedef struct {
-    U8 name[MAX_VAR_NAME];
-    U8 value[MAX_VAR_VALUE];
-} ShellVar;
 
 
 // ===================================================
@@ -60,22 +56,6 @@ CMD_FUNC(DIR);
 CMD_FUNC(MKDIR);
 CMD_FUNC(RMDIR);
 
-static const ShellCommand shell_commands[] ATTRIB_RODATA = {
-    { "help",     CMD_HELP,     "Show this help message" },
-    { "clear",    CMD_CLEAR,    "Clear the screen" },
-    { "cls",      CMD_CLEAR,    "Clear the screen" },
-    { "version",  CMD_VERSION,  "Show shell version" },
-    { "exit",     CMD_EXIT,     "Exit the shell" },
-    { "echo",     CMD_ECHO,     "Echo text back to screen" },
-    { "tone",     CMD_TONE,     "Play tone: tone <freqHz> <ms> [amp] [rate]" },
-    { "soundoff", CMD_SOUNDOFF, "Stop AC97 playback" },
-    { "cd",       CMD_CD,       "Change directory" },
-    { "cd..",     CMD_CD_BACKWARDS, "Change directory backwards" },
-    { "dir",      CMD_DIR,      "List directory contents" },
-    { "mkdir",    CMD_MKDIR,    "Create a directory" },
-    { "rmdir",    CMD_RMDIR,    "Remove a directory" },
-};
-#define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
 
 VOID BATSH_SET_MODE(U8 mode) {
     batsh_mode = mode;
@@ -176,58 +156,699 @@ VOID REPLACE_VARS_IN_LINE(PU8 line) {
     STRNCPY(line, buffer, SHELL_SCRIPT_LINE_MAX_LEN - 1);
 }
 
-// ===================================================
-// Shell Echo Control
-// ===================================================
-VOID SHELL_SET_ECHO(U8 on) { 
-    CREATE_VAR("echo", on ? "on" : "off");
-}
-
-U8 SHELL_GET_ECHO(void) { 
-    return VAR_VALUE_TRUE("echo"); 
-}
-
-
-// ===================================================
-// BATSH Line Parser
-// ===================================================
-BOOLEAN HANDLE_BATSH_LINE(PU8 line) {
-    if (!line || !*line) return TRUE;
-
-    while (*line == ' ' || *line == '\t') line++;
-
-    if (*line == '\0' || *line == '#')
-        return TRUE;
-
-    // Variable assignment
-    if (*line == '@') {
-        line++; // skip '@'
-        U8 varname[MAX_VAR_NAME] = {0};
-        U8 varvalue[MAX_VAR_VALUE] = {0};
-        U32 i = 0;
-        while (line[i] && line[i] != '=' && i < MAX_VAR_NAME - 1) { varname[i] = line[i]; i++; }
-        varname[i] = '\0';
-        if (line[i] == '=') {
-            STRNCPY(varvalue, line + i + 1, MAX_VAR_VALUE - 1);
-            CREATE_VAR(varname, varvalue);
-        }
-        if(!BATSH_GET_MODE()) PRINTNEWLINE();
-        return TRUE;
-    }
-
-    REPLACE_VARS_IN_LINE(line);
-
-    if (STRNICMP(line, "pause", 5) == 0) {
-        PUTS((PU8)"Press any key to continue..." LEND);
-        // SHELL_WAIT_KEY();
-        return TRUE;
-    }
-
-    // Flag to indicate BATSH execution
-    HANDLE_COMMAND(line);
-
+BOOLEAN SET_INST_VAR(PU8 name, PU8 value, BATSH_INSTANCE *inst) {
+    if(!inst) return FALSE;
+    if(inst->shell_var_count + 1 > MAX_VARS) return FALSE;
+    STRNCPY(inst->shell_vars[inst->shell_var_count].name, name, MAX_VAR_NAME);
+    STRNCPY(inst->shell_vars[inst->shell_var_count++].value, value, MAX_VAR_VALUE);
     return TRUE;
 }
+PU8 GET_INST_VAR(PU8 name, BATSH_INSTANCE *inst) {
+    for(U32 i = 0; i < inst->shell_var_count; i++) {
+        if(STRICMP(name, inst->shell_vars[i].name) == 0) return inst->shell_vars[i].value;
+    }
+    return NULL;
+}
+
+
+// =====================================
+//
+// Batsh tokenizer and parser
+// Raw commands can be at `Command Implementations`
+// Command tables defined below
+//
+// =====================================
+
+typedef enum {
+    TOK_UNKNOWN,
+
+    // Keywords
+    TOK_CMD, // built-in commands
+    TOK_WORD,
+    TOK_STRING,
+    TOK_AND,         // AND
+    TOK_OR,          // OR
+    TOK_EQU, // EQU
+    TOK_NEQ, // NEQ
+    TOK_LSS, // LSS
+    TOK_LEQ, // LEQ
+    TOK_GTR, // GTR
+    TOK_GEQ, // GEQ
+    TOK_IF, // IF
+    TOK_THEN, // THEN
+    TOK_ELSE, // ELSE
+    TOK_FI, // FI
+    TOK_LOOP, // LOOP
+    TOK_END, // END
+    TOK_EXISTS, // EXISTS
+    TOK_COMMENT,    // rem, #
+
+    // Other tokens
+    TOK_PIPE, // |
+    TOK_PLUS, // +
+    TOK_MINUS, // -
+    TOK_MUL, // *
+    TOK_DIV, // /
+    TOK_LPAREN, // (
+    TOK_RPAREN, // )
+    TOK_LBRACE, // {
+    TOK_RBRACE, // }
+    TOK_ASSIGN, // =
+    TOK_VAR, // @
+    TOK_REDIR_OUT,   // >
+    TOK_REDIR_IN,    // <
+    TOK_SEMI, // ;
+    TOK_ESCAPE, // \ 
+
+    
+    TOK_EOL,         // end of line
+} BATSH_TOKEN_TYPE;
+
+typedef struct {
+    const CHAR *keyword;
+    BATSH_TOKEN_TYPE type;
+} KEYWORD;
+
+static const KEYWORD KEYWORDS[] ATTRIB_RODATA = {
+    // built-in
+    { "cd", TOK_CMD },
+    { "cd..", TOK_CMD },
+    { "help", TOK_CMD },
+    { "clear", TOK_CMD },
+    { "cls", TOK_CMD },
+    { "version", TOK_CMD },
+    { "exit", TOK_CMD },
+    { "echo", TOK_CMD },
+    { "tone", TOK_CMD },
+    { "soundoff", TOK_CMD },
+    { "dir", TOK_CMD },
+    { "mkdir", TOK_CMD },
+    { "rmdir", TOK_CMD },
+
+    // Logic & conditionals
+    { "and",    TOK_AND },
+    { "or",     TOK_OR },
+    { "equ",    TOK_EQU },
+    { "neq",    TOK_NEQ },
+    { "lss",    TOK_LSS },
+    { "leq",    TOK_LEQ },
+    { "gtr",    TOK_GTR },
+    { "geq",    TOK_GEQ },
+
+    // Flow control
+    { "if",     TOK_IF },
+    { "then",   TOK_THEN },
+    { "else",   TOK_ELSE },
+    { "fi",     TOK_FI },
+    { "loop",   TOK_LOOP },
+    { "end",    TOK_END },
+    { "exists", TOK_EXISTS },
+
+    // Misc
+    { "rem",    TOK_COMMENT },
+
+    // Single character
+    { "\"", TOK_STRING },
+    { "|", TOK_PIPE },
+    { "+", TOK_PLUS },
+    { "-", TOK_MINUS },
+    { "*", TOK_MUL },
+    { "/", TOK_DIV },
+    { "(", TOK_LPAREN },
+    { ")", TOK_RPAREN },
+    { "{", TOK_LBRACE },
+    { "}", TOK_RBRACE },
+    { "=", TOK_ASSIGN },
+    { "@", TOK_VAR },
+    { ">", TOK_REDIR_OUT },
+    { "<", TOK_REDIR_IN },
+    { ";", TOK_SEMI },
+    { "\\", TOK_ESCAPE },
+    { "#", TOK_COMMENT },
+};
+#define KEYWORDS_COUNT (sizeof(KEYWORDS) / sizeof(KEYWORDS[0]))
+
+KEYWORD *GET_KEYWORD_S(PU8 keyword) {
+    for(U32 i = 0; i<KEYWORDS_COUNT;i++) {
+        if(STRICMP(keyword, KEYWORDS[i].keyword) == 0) return &KEYWORDS[i];
+    }
+    return NULLPTR;
+}
+KEYWORD *GET_KEYWORD_C(CHAR c) {
+    U8 buf[2];
+    buf[0] = c;
+    buf[1] = '\0';
+    for(U32 i = 0; i<KEYWORDS_COUNT;i++) {
+        if(STRICMP(buf, KEYWORDS[i].keyword) == 0) return &KEYWORDS[i];
+    }
+    return NULLPTR;
+}
+static const ShellCommand shell_commands[] ATTRIB_RODATA = {
+    { "help",     CMD_HELP,     "Show this help message" },
+    { "clear",    CMD_CLEAR,    "Clear the screen" },
+    { "cls",      CMD_CLEAR,    "Clear the screen" },
+    { "version",  CMD_VERSION,  "Show shell version" },
+    { "exit",     CMD_EXIT,     "Exit the shell" },
+    { "echo",     CMD_ECHO,     "Echo text back to screen" },
+    { "tone",     CMD_TONE,     "Play tone: tone <freqHz> <ms> [amp] [rate]" },
+    { "soundoff", CMD_SOUNDOFF, "Stop AC97 playback" },
+    { "cd",       CMD_CD,       "Change directory" },
+    { "cd..",     CMD_CD_BACKWARDS, "Change directory backwards" },
+    { "dir",      CMD_DIR,      "List directory contents" },
+    { "mkdir",    CMD_MKDIR,    "Create a directory" },
+    { "rmdir",    CMD_RMDIR,    "Remove a directory" },
+
+    // Any commands added here must be added 
+    //   into the KEYWORDS array above as TOK_CMD in built-ins section!
+};
+
+#define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
+
+struct pos {
+    U32 line;
+    U32 row;
+};
+
+typedef struct {
+    BATSH_TOKEN_TYPE type;
+    char text[CUR_LINE_MAX_LENGTH];
+    struct pos;
+} BATSH_TOKEN;
+
+typedef struct BATSH_COMMAND {
+    BATSH_TOKEN_TYPE type;
+
+    char **argv;
+    int argc;
+
+    // For compound commands (pipe, if, loop)
+    struct BATSH_COMMAND *left;
+    struct BATSH_COMMAND *right;
+
+    // Optional for future
+    struct BATSH_COMMAND *next; // for sequential execution
+
+    struct pos;
+} BATSH_COMMAND;
+
+
+BATSH_COMMAND *parse_command(BATSH_TOKEN **tokens, U32 *pos, U32 token_len);
+BATSH_COMMAND *parse_simple(BATSH_TOKEN **tokens, U32 *pos, U32 token_len);
+BATSH_COMMAND *parse_if(BATSH_TOKEN **tokens, U32 *pos, U32 token_len);
+BATSH_COMMAND *parse_loop(BATSH_TOKEN **tokens, U32 *pos, U32 token_len);
+BATSH_COMMAND *parse_sequence(BATSH_TOKEN **tokens, U32 *pos, U32 token_len);
+BATSH_COMMAND *parse_arith_expr(BATSH_TOKEN **tokens, U32 *pos, U32 token_len);
+
+BATSH_TOKEN *peek_token(BATSH_TOKEN **tokens, U32 pos, U32 token_len) {
+    return pos < token_len ? tokens[pos] : NULL;
+}
+
+BATSH_TOKEN *consume_token(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    return (*pos < token_len) ? tokens[(*pos)++] : NULL;
+}
+
+BOOLEAN match_token(BATSH_TOKEN **tokens, U32 *pos, U32 token_len, BATSH_TOKEN_TYPE type) {
+    BATSH_TOKEN *tok = peek_token(tokens, *pos, token_len);
+    if (!tok) return FALSE;
+    if (tok->type == type) {
+        (*pos)++;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+BATSH_COMMAND *parse_sequence(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    BATSH_COMMAND *head = parse_command(tokens, pos, token_len);
+    if (!head) return NULL;
+
+    BATSH_COMMAND *current = head;
+    while (*pos < token_len) {
+        if (match_token(tokens, pos, token_len, TOK_SEMI)) {
+            BATSH_COMMAND *next_cmd = parse_command(tokens, pos, token_len);
+            if (!next_cmd) break;
+            current->next = next_cmd;
+            current = next_cmd;
+        } else {
+            break;
+        }
+    }
+    return head;
+}
+
+BATSH_COMMAND *parse_simple(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    BATSH_TOKEN *tok = peek_token(tokens, *pos, token_len);
+    if (!tok) return NULL;
+
+    BATSH_COMMAND *cmd = MAlloc(sizeof(BATSH_COMMAND));
+    MEMZERO(cmd, sizeof(BATSH_COMMAND));
+    
+    // Determine type
+    if (tok->type == TOK_CMD) {
+        cmd->type = TOK_CMD;  // built-in
+    } else if (tok->type == TOK_WORD) {
+        cmd->type = TOK_WORD; // external/script
+    } else if (tok->type == TOK_VAR) {
+        cmd->type = TOK_VAR;  // variable expansion
+    }
+
+    // argv collection (all three handled the same way here)
+    cmd->argv = MAlloc(sizeof(char*) * (token_len - *pos + 1));
+    cmd->argc = 0;
+    cmd->argv[cmd->argc++] = STRDUP(tok->text);
+    (*pos)++;
+
+    while (*pos < token_len) {
+        BATSH_TOKEN *t = peek_token(tokens, *pos, token_len);
+        if (!t) break;
+        if (t->type == TOK_WORD || t->type == TOK_VAR || t->type == TOK_STRING) {
+            cmd->argv[cmd->argc++] = STRDUP(t->text);
+            (*pos)++;
+        } else {
+            break;
+        }
+    }
+    cmd->argv[cmd->argc] = NULL;
+    return cmd;
+}
+
+BATSH_COMMAND *parse_if(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    if (!match_token(tokens, pos, token_len, TOK_IF)) return NULL;
+
+    BATSH_COMMAND *cmd = MAlloc(sizeof(BATSH_COMMAND));
+    MEMZERO(cmd, sizeof(BATSH_COMMAND));
+    cmd->type = TOK_IF;
+
+    // Condition expression until THEN
+    U32 cond_pos = *pos;
+    while (*pos < token_len && !match_token(tokens, pos, token_len, TOK_THEN)) {
+        (*pos)++;
+    }
+    cmd->left = parse_arith_expr(tokens, &cond_pos, *pos);
+
+    // Body until ELSE or FI
+    U32 body_pos = *pos;
+    while (*pos < token_len &&
+           peek_token(tokens, *pos, token_len)->type != TOK_ELSE &&
+           peek_token(tokens, *pos, token_len)->type != TOK_FI) {
+        (*pos)++;
+    }
+    cmd->right = parse_sequence(tokens, &body_pos, *pos);
+
+    // Optional ELSE
+    if (peek_token(tokens, *pos, token_len) &&
+        peek_token(tokens, *pos, token_len)->type == TOK_ELSE) {
+        (*pos)++;
+        U32 else_pos = *pos;
+        while (*pos < token_len && peek_token(tokens, *pos, token_len)->type != TOK_FI) {
+            (*pos)++;
+        }
+        cmd->next = parse_sequence(tokens, &else_pos, *pos);
+    }
+
+    // Consume FI
+    match_token(tokens, pos, token_len, TOK_FI);
+    return cmd;
+}
+
+BATSH_COMMAND *parse_loop(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    if (!match_token(tokens, pos, token_len, TOK_LOOP)) return NULL;
+
+    BATSH_COMMAND *cmd = MAlloc(sizeof(BATSH_COMMAND));
+    MEMZERO(cmd, sizeof(BATSH_COMMAND));
+    cmd->type = TOK_LOOP;
+
+    // Loop condition or count
+    U32 cond_pos = *pos;
+    while (*pos < token_len && peek_token(tokens, *pos, token_len)->type != TOK_END) {
+        (*pos)++;
+    }
+    cmd->left = parse_arith_expr(tokens, &cond_pos, *pos);
+
+    // Consume END
+    match_token(tokens, pos, token_len, TOK_END);
+    return cmd;
+}
+
+BATSH_COMMAND *parse_arith_expr(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    // For now, we collect TOK_WORD, TOK_VAR, TOK_PLUS, TOK_MINUS, TOK_MUL, TOK_DIV, TOK_LPAREN, TOK_RPAREN
+    BATSH_COMMAND *expr = MAlloc(sizeof(BATSH_COMMAND));
+    MEMZERO(expr, sizeof(BATSH_COMMAND));
+    expr->type = TOK_UNKNOWN;
+
+    expr->argv = MAlloc(sizeof(char*) * (token_len - *pos + 1));
+    expr->argc = 0;
+
+    while (*pos < token_len) {
+        BATSH_TOKEN *tok = peek_token(tokens, *pos, token_len);
+        if (!tok) break;
+
+        if (tok->type == TOK_WORD || tok->type == TOK_VAR ||
+            tok->type == TOK_PLUS || tok->type == TOK_MINUS ||
+            tok->type == TOK_MUL || tok->type == TOK_DIV ||
+            tok->type == TOK_LPAREN || tok->type == TOK_RPAREN) {
+            expr->argv[expr->argc++] = STRDUP(tok->text);
+            (*pos)++;
+        } else {
+            break;
+        }
+    }
+    expr->argv[expr->argc] = NULL;
+    return expr;
+}
+
+BATSH_COMMAND *parse_pipeline(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    // TODO: implement pipeline parsing
+    // Should detect TOK_PIPE and set left/right commands
+    return NULL;
+}
+
+BATSH_COMMAND *parse_redirection(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    // TODO: implement redirection parsing
+    // Should detect TOK_REDIR_OUT, TOK_REDIR_IN and set target file
+    return NULL;
+}
+
+// ==========================
+// Updated parse_command entry point
+// ==========================
+BATSH_COMMAND *parse_command(BATSH_TOKEN **tokens, U32 *pos, U32 token_len) {
+    BATSH_TOKEN *tok = peek_token(tokens, *pos, token_len);
+    if (!tok) return NULL;
+
+    switch(tok->type) {
+        case TOK_CMD:
+        case TOK_WORD:  // external command or unknown word
+        case TOK_VAR:   // variable expansion as command
+            return parse_simple(tokens, pos, token_len);
+        case TOK_IF:
+            return parse_if(tokens, pos, token_len);
+        case TOK_LOOP:
+            return parse_loop(tokens, pos, token_len);
+        case TOK_PIPE:
+            return parse_pipeline(tokens, pos, token_len);
+        case TOK_REDIR_OUT:
+        case TOK_REDIR_IN:
+            return parse_redirection(tokens, pos, token_len);
+        default:
+            return NULL;
+    }
+}
+
+
+BATSH_COMMAND *parse_tokens(BATSH_TOKEN **tokens, U32 token_len) {
+    U32 pos = 0;
+    return parse_sequence(tokens, &pos, token_len);
+}
+
+void free_batsh_command(BATSH_COMMAND *cmd) {
+    if (!cmd) return;
+
+    // Free argv strings
+    if (cmd->argv) {
+        for (int i = 0; i < cmd->argc; i++) {
+            if (cmd->argv[i]) MFree(cmd->argv[i]);
+        }
+        MFree(cmd->argv);
+    }
+
+    // Recursively free compound commands
+    free_batsh_command(cmd->left);
+    free_batsh_command(cmd->right);
+    free_batsh_command(cmd->next);
+
+    // Free the command struct itself
+    MFree(cmd);
+}
+
+void execute_command(BATSH_COMMAND *cmd) {
+    if (!cmd) return;
+
+    switch (cmd->type) {
+        case TOK_CMD: {
+            for (U32 i = 0; i < shell_command_count; i++) {
+                if (STRICMP(cmd->argv[0], shell_commands[i].name) == 0) {
+                    // Reconstruct the line from argv
+                    U32 line_len = 0;
+                    for (int j = 0; j < cmd->argc; j++)
+                        line_len += STRLEN(cmd->argv[j]) + 1;
+
+                    U8 *line_buf = MAlloc(line_len);
+                    if (!line_buf) return;
+
+                    line_buf[0] = '\0';
+                    for (int j = 0; j < cmd->argc; j++) {
+                        STRCAT(line_buf, cmd->argv[j]);
+                        if (j < cmd->argc - 1)
+                            STRCAT(line_buf, " ");
+                    }
+
+                    shell_commands[i].handler(line_buf);
+                    MFree(line_buf);
+                    break;
+                }
+            }
+            break;
+        }
+        case TOK_WORD:
+            // TODO: execute external command or script
+            break;
+        case TOK_VAR:
+            // TODO: resolve variable, then execute
+            break;
+        case TOK_IF:
+            // TODO: evaluate condition, execute cmd->right or cmd->next
+            break;
+        case TOK_LOOP:
+            // TODO: evaluate loop condition, execute cmd->right in loop
+            break;
+    }
+
+    // Execute sequential commands
+    if (cmd->next) execute_command(cmd->next);
+}
+
+
+
+BOOLEAN ADD_TOKEN(BATSH_TOKEN ***tokens, U32 *token_len, PU8 buf, KEYWORD *kw) {
+    if (!tokens || !token_len || !buf || !kw) return FALSE;
+
+    BATSH_TOKEN **tmp = ReAlloc(*tokens, sizeof(BATSH_TOKEN*) * (*token_len + 1));
+    if (!tmp) return FALSE;
+    *tokens = tmp;
+
+    BATSH_TOKEN *tok = MAlloc(sizeof(BATSH_TOKEN));
+    if (!tok) return FALSE;
+
+    STRNCPY(tok->text, buf, CUR_LINE_MAX_LENGTH);
+    tok->text[CUR_LINE_MAX_LENGTH - 1] = '\0';
+    tok->type = kw->type;
+
+    (*tokens)[*token_len] = tok;
+    (*token_len)++;
+    return TRUE;
+}
+
+
+VOID PRINT_TOKENIZER_ERR(PU8 buf, KEYWORD *kw, struct pos pos) {
+    PUTS("Tokenizer error at line ");
+    PUT_DEC(pos.row);
+    PUTS(", col ");
+    PUT_DEC(pos.line);
+    PUTS(": ");
+    PUTS(buf);
+    PRINTNEWLINE();
+}
+
+// ===================================================
+// BATSH Parser
+// Takes either full file or line from cmd line
+// Tokenizes, parses and runs the input
+// ===================================================
+BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
+    if (!input || !*input) return TRUE;
+    U32 len = STRLEN(input);
+    U8 buf[CUR_LINE_MAX_LENGTH] = {0};
+    U32 ptr = 0;
+    BATSH_TOKEN **tokens = NULL;
+    U32 token_len = 0;
+
+    struct pos pos = { .line = 0, .row = 0 };
+    KEYWORD *rem = GET_KEYWORD_S("rem");
+
+    for (U32 i = 0; i < len; i++) {
+        CHAR c = input[i];
+        if (c == '\n' || c == '\r') {
+            pos.row++;
+            pos.line = 0;
+        } else {
+            pos.line++;
+        }
+
+        // Keywords and full words
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (ptr > 0) {
+                buf[ptr] = '\0';
+                if(STRICMP(buf, rem->keyword) == 0) {
+                    // Loop until end of line
+                    for(;i < len; i++) {
+                        CHAR c2 = input[i];
+                        if(c2 == '\n' || c2 == '\r') {
+                            break;
+                        }
+                    }
+                    ptr = 0;
+                    continue;
+                }
+                BOOLEAN KEYWORD_ADDED = FALSE;
+                for (U32 j = 0; j < KEYWORDS_COUNT; j++) {
+                    if (STRICMP(buf, KEYWORDS[j].keyword) == 0) {
+                        if (!ADD_TOKEN(&tokens, &token_len, buf, &KEYWORDS[j])) {
+                            PRINT_TOKENIZER_ERR(buf, &KEYWORDS[j], pos);
+                            goto error;
+                        }
+                        KEYWORD_ADDED = TRUE;
+                        break;
+                    }
+                }
+
+                if(!KEYWORD_ADDED) {
+                    KEYWORD throwaway = { "", TOK_WORD };
+                    if(!ADD_TOKEN(&tokens, &token_len, buf, &throwaway)) {
+                        PRINT_TOKENIZER_ERR(buf, &throwaway, pos);
+                        goto error;
+                    }
+                }
+                ptr = 0;
+            }
+            continue;
+        } 
+        else if(c == '"') {
+            // parse quoted string
+            i++;
+            U32 start = i;
+            while (i < len) {
+                if (input[i] == '"' && input[i - 1] != '\\')
+                    break;
+                i++;
+            }
+            U32 str_len = i - start;
+            if (str_len >= CUR_LINE_MAX_LENGTH)
+                str_len = CUR_LINE_MAX_LENGTH - 1;
+            MEMCPY(buf, &input[start], str_len);
+            buf[str_len] = '\0';
+
+            KEYWORD str_kw = { "\"", TOK_STRING };
+            if (!ADD_TOKEN(&tokens, &token_len, buf, &str_kw)) goto error;
+            continue;
+        }
+        else if(c == '#') {
+            for(;i < len; i++) {
+                CHAR c2 = input[i];
+                if(c2 == '\n' || c2 == '\r') {
+                    break;
+                }
+            }
+            continue;
+        }
+        else if(c == '@') {
+            i++; // move past '@'
+            U32 start = i;
+            if(input[i] == '{') {
+                i++; // skip '{'
+                start = i;
+                while(i < len && input[i] != '}') i++;
+            } else {
+                while(i < len && ISALNUM(input[i])) i++;
+            }
+            U32 var_len = i - start;
+            if(var_len >= CUR_LINE_MAX_LENGTH) var_len = CUR_LINE_MAX_LENGTH - 1;
+            MEMCPY(buf, &input[start], var_len);
+            buf[var_len] = '\0';
+
+            KEYWORD var_kw = { buf, TOK_VAR };
+            if(!ADD_TOKEN(&tokens, &token_len, buf, &var_kw)) goto error;
+
+            if(input[i] == '}') i++; // skip closing brace
+            continue;
+        }
+        else if (
+            c == '|' ||
+            c == '+' ||
+            c == '-' ||
+            c == '*' ||
+            c == '/' ||
+            c == '(' ||
+            c == ')' ||
+            c == '}' ||
+            c == '{' ||
+            c == '=' ||
+            c == '@' ||
+            c == '>' ||
+            c == '<' ||
+            c == '{' ||
+            c == '}' ||
+            c == ';' ||
+            c == '\\' 
+        ) 
+        {
+            buf[ptr] = c;
+            buf[++ptr] = '\0';
+            KEYWORD *kw = GET_KEYWORD_C(c);
+            if(!kw) {
+                PRINT_TOKENIZER_ERR(buf, NULLPTR, pos);
+                goto error;
+            }
+            if(!ADD_TOKEN(&tokens, &token_len, buf, kw)) {
+                PRINT_TOKENIZER_ERR(buf, kw, pos);
+                goto error;
+            }
+            ptr = 0;
+            continue;
+        }
+
+        buf[ptr++] = c;
+        if (ptr >= CUR_LINE_MAX_LENGTH - 1)
+            break;
+    }
+
+    // Parse the tokens
+    BATSH_COMMAND *root_cmd = parse_tokens(tokens, token_len);
+    if (!root_cmd) {
+        PUTS("Parsing failed\n");
+        goto error;
+    }
+
+    BATSH_COMMAND *cmd = root_cmd;
+    DEBUG_NL();
+    execute_command(cmd);
+    while (cmd) {
+        DEBUG_PUTS("Command type: ");
+        DEBUG_HEX32(cmd->type);
+        DEBUG_NL();
+
+        for (int i = 0; i < cmd->argc; i++) {
+            DEBUG_PUTS("Arg: ");
+            DEBUG_PUTS_LN(cmd->argv[i]);
+        }
+        cmd = cmd->next;
+    }
+
+    U8 res = TRUE;
+    goto free;
+error:
+    res = FALSE;
+free:
+    for (U32 i = 0; i < token_len; i++) {
+        // DEBUG_HEX32(tokens[i]->type);
+        // DEBUG_PUTS(" ");
+        // DEBUG_PUTS_LN(tokens[i]->text);
+        if (tokens[i]) MFree(tokens[i]);
+    }
+    if (tokens) MFree(tokens);
+    if (root_cmd) free_batsh_command(root_cmd);
+    return res;
+}
+
 
 // ===================================================
 // Core Command Handler
@@ -263,30 +884,34 @@ VOID HANDLE_COMMAND(U8 *line) {
     cursor->CURSOR_VISIBLE = TRUE;
 }
 
+
 // ===================================================
 // BATSH File Runner
 // ===================================================
-BOOLEAN RUN_BATSH_FILE(FILE *file) {
-    if (!file) return FALSE;
-    SHELL_SET_ECHO(TRUE);
-    BATSH_SET_MODE(TRUE);
+BOOLEAN RUN_BATSH_FILE(BATSH_INSTANCE *inst) {
+    if (!inst) return FALSE;
     OutputHandle crs = GetOutputHandle();
     U32 prev = crs->CURSOR_VISIBLE;
     crs->CURSOR_VISIBLE = FALSE;
-    U8 line[SHELL_SCRIPT_LINE_MAX_LEN] = { 0 };
-    while (FILE_GET_LINE(file, line, SHELL_SCRIPT_LINE_MAX_LEN)) {
-        U32 len = STRLEN(line);
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
-            line[--len] = '\0';
 
-        if (SHELL_GET_ECHO()) {
-            PUTS(line);
+    inst->echo = TRUE;
+    inst->batsh_mode = TRUE;
+
+    while (1) {
+        U32 n = FREAD(inst->file, inst->line, inst->line_len - 1);
+        if(n == 0) break; // EOF
+        inst->line[n] = '\0'; // null-terminate exactly after read bytes
+
+        if(!PARSE_BATSH_INPUT(inst->line, inst)) {
+            PUTS("BATSH parse error\n");
         }
-        HANDLE_BATSH_LINE(line);
     }
+
     crs->CURSOR_VISIBLE = prev;
     return TRUE;
 }
+
+
 
 // ===================================================
 // BATSH Script Loader
@@ -294,18 +919,55 @@ BOOLEAN RUN_BATSH_FILE(FILE *file) {
 BOOLEAN RUN_BATSH_SCRIPT(PU8 path) {
     PU8 dot = STRRCHR(path, '.');
     if (!dot || STRNICMP(dot, ".SH", 3) != 0)
-        return FALSE;
-
-    FILE file;
-    if (!FOPEN(&file, path, MODE_R | MODE_FAT32)) {
-        PUTS((PU8)"Unable to open script file." LEND);
-        return FALSE;
-    }
-
-    BOOLEAN res = RUN_BATSH_FILE(&file);
-    FCLOSE(&file);
+    return FALSE;
+    BATSH_INSTANCE *inst = CREATE_BATSH_INSTANCE(path);
+    if(!inst) return FALSE;
+    BOOLEAN res = RUN_BATSH_FILE(inst);
+    DESTROY_BATSH_INSTANCE(inst);
     return res;
 }
+
+// ===================================================
+// BATSH Instance initializer
+// ===================================================
+BATSH_INSTANCE *CREATE_BATSH_INSTANCE(PU8 path) {
+    BATSH_INSTANCE *inst = MAlloc(sizeof(BATSH_INSTANCE));
+    if(!inst) return NULLPTR;
+
+    if(!FOPEN(inst->file, path, MODE_R | MODE_FAT32)) {
+        MFree(inst);
+        return NULLPTR;
+    }
+    inst->line_len = SHELL_SCRIPT_LINE_MAX_LEN;
+    MEMZERO(inst->line, inst->line_len);
+    inst->batsh_mode = 1;
+    inst->child_proc = NULLPTR;
+    inst->parent_proc = NULLPTR;
+    inst->echo = 1;
+    inst->shell_var_count = 0;
+    MEMZERO(inst->shell_vars, sizeof(inst->shell_vars));
+    inst->arg_count = 0;
+    MEMZERO(inst->args, sizeof(inst->args));
+    inst->shndl = GET_SHNDL();
+    inst->status_code = 0;
+    return inst;
+}
+
+// ===================================================
+// BATSH instance destroyer
+// ===================================================
+VOID DESTROY_BATSH_INSTANCE(BATSH_INSTANCE *inst) {
+    if(!inst) return;
+    FCLOSE(inst->file);
+    MFree(inst);
+}
+
+
+
+
+
+
+
 
 // ===================================================
 // Command Implementations

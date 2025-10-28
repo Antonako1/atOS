@@ -1,3 +1,6 @@
+#ifndef __SHELL__
+#define __SHELL__
+#endif 
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <STD/FS_DISK.h>
 #include <STD/PROC_COM.h>

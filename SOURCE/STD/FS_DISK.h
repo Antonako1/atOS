@@ -44,28 +44,93 @@ typedef struct {
     U8 iso_padding[ISO9660_MAX_FILENAME_LENGTH]; // Padding in-case of iso
 } ATTRIB_PACKED FILE;
 
+// ===================================================
+// File I/O Abstraction Functions
+// Supports FAT32 (read/write) and ISO9660 (read-only) modes
+// ===================================================
+
+// Open a file in the specified mode (FAT32 or ISO9660)
+// Returns TRUE if file opened successfully, FALSE otherwise
 BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode);
+
+// Close a file and free associated memory
 VOID FCLOSE(FILE *file);
+
+// Read up to `len` bytes from file into `buffer`
+// Returns number of bytes actually read (0 at EOF)
 U32 FREAD(FILE *file, VOIDPTR buffer, U32 len);
-U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len); // Returns byte written
+
+// Write up to `len` bytes from `buffer` into file
+// Returns number of bytes written; always 0 for read-only (ISO9660) files
+U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len);
+
+// Move the read pointer to `offset` bytes from the beginning
+// Returns TRUE if seek successful, FALSE if offset is out of bounds
 BOOLEAN FSEEK(FILE *file, U32 offset);
-U32 FTELL(FILE *file); // Returns current read pointer
-VOID FREWIND(FILE *file); // Reset read pointer to start
-U32 FSIZE(FILE *file); // Returns file size
-BOOLEAN FILE_EOF(FILE *file); // True if pointer is past or equal to sz
-BOOLEAN FILE_GET_LINE(FILE *file, PU8 line, U32 max_len); // Sets `line` to start of line. Returns TRUE if line is returned
 
-BOOLEAN FILE_DELETE(PU8 path); // Removes file
-BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force); // Removes dir, if force is false, only empty dir can be deleted
+// Return the current read pointer offset
+U32 FTELL(FILE *file);
+
+// Reset read pointer to the beginning of the file
+VOID FREWIND(FILE *file);
+
+// Return the total size of the file in bytes
+U32 FSIZE(FILE *file);
+
+// Check if the read pointer is at or past the end of the file
+BOOLEAN FILE_EOF(FILE *file);
+
+// Read a single line (up to `max_len - 1` bytes) from file into `line`
+// Line includes newline character if present
+// Returns TRUE if a line was read, FALSE if EOF or empty
+BOOLEAN FILE_GET_LINE(FILE *file, PU8 line, U32 max_len);
+
+// ===================================================
+// File / Directory Management
+// ===================================================
+
+// Delete a file from the filesystem
+// Returns TRUE on success, FALSE if file does not exist or cannot be deleted
+BOOLEAN FILE_DELETE(PU8 path);
+
+// Delete a directory
+// If `force` is TRUE, may remove non-empty directories
+// Returns TRUE on success
+BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force);
+
+// Check if a file exists
 BOOLEAN FILE_EXISTS(PU8 path);
-BOOLEAN DIR_EXISTS(PU8 path);
-BOOLEAN FILE_CREATE(PU8 path); // Creates new file
-BOOLEAN DIR_CREATE(PU8 path); // Creates new directory
-BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size); // Shrinks or expands size of a file
-BOOLEAN FILE_FLUSH(FILE *file); // Writes buffer to disk
 
+// Check if a directory exists
+BOOLEAN DIR_EXISTS(PU8 path);
+
+// Create a new empty file (FAT32 only)
+// Returns TRUE if file was created successfully
+BOOLEAN FILE_CREATE(PU8 path);
+
+// Create a new directory (FAT32 only)
+// Returns TRUE if directory was created successfully
+BOOLEAN DIR_CREATE(PU8 path);
+
+// Truncate or expand a file to `new_size` bytes (FAT32 only)
+// Returns TRUE if operation succeeded
+BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size);
+
+// Flush in-memory file data to disk (FAT32 only)
+// Returns TRUE on success
+BOOLEAN FILE_FLUSH(FILE *file);
+
+// ===================================================
+// Raw File Initialization
+// Used to create FILE structures from in-memory FAT32 or ISO9660 data
+// ===================================================
+
+// Initialize a FILE object from raw FAT32 data and directory entry
 BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, DIR_ENTRY *ent);
+
+// Initialize a FILE object from raw ISO9660 data and directory record
 BOOLEAN FILE_FROM_RAW_ISO_DATA(FILE *file, VOIDPTR data, U32 sz, IsoDirectoryRecord *ent);
+
 
 /**
  * ISO9660

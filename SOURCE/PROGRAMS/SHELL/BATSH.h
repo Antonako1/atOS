@@ -4,14 +4,50 @@
 #include <STD/FS_DISK.h>
 
 #ifdef __SHELL__
+
+
 #define SHELL_SCRIPT_LINE_MAX_LEN 512
+#define MAX_VARS 64
+#define MAX_VAR_NAME 32
+#define MAX_VAR_VALUE 128
+#define MAX_ARGS 10
+
+typedef struct {
+    U8 name[MAX_VAR_NAME];
+    U8 value[MAX_VAR_VALUE];
+} ShellVar;
+
+typedef struct {
+    FILE *file;
+    ShellVar shell_vars[MAX_VARS];
+    U32 shell_var_count;
+
+    PU8 args[MAX_ARGS];
+    U32 arg_count;
+
+    VOIDPTR *shndl; // VOIDPTR because SHELL.h can't be included here. Safe to cast
+
+    U32 status_code;
+    
+    struct BATSH_INSTANCE *child_proc;
+    struct BATSH_INSTANCE *parent_proc;
+    
+
+    U8 echo;
+    U8 batsh_mode;
+
+    U8 line[SHELL_SCRIPT_LINE_MAX_LEN];
+    U32 line_len;
+} BATSH_INSTANCE;
 
 U0 HANDLE_COMMAND(U8 *line);
 
-BOOLEAN RUN_BATSH_FILE(FILE *file);
+BOOLEAN RUN_BATSH_FILE(BATSH_INSTANCE *inst);
 BOOLEAN RUN_BATSH_SCRIPT(PU8 path);
+BATSH_INSTANCE *CREATE_BATSH_INSTANCE(PU8 path);
+VOID DESTROY_BATSH_INSTANCE(BATSH_INSTANCE *inst);
 
-BOOLEAN HANDLE_BATSH_LINE(PU8 line);
+BOOLEAN PARSE_BATSH_INPUT(PU8 line, BATSH_INSTANCE *inst);
 VOID SHELL_SET_ECHO(U8 on);
 U8 SHELL_GET_ECHO(void);
 
@@ -19,4 +55,5 @@ VOID BATSH_SET_MODE(U8 mode);
 U8 BATSH_GET_MODE(void);
 BOOLEAN RUN_PROCESS(PU8 line);
 #endif __SHELL__
+
 #endif // BATSH_H

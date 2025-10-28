@@ -1,7 +1,10 @@
+dir
 @echo=off
-echo atOShell v0.1 Type 'help' for a list of commands.
-/PROGRAMS/ASTRAC/ASTRAC.BIN --nothing
+# if 1 equ 1 then
+# fi
+# echo atOShell v0.1 Type 'help' for a list of commands.
+# /PROGRAMS/ASTRAC/ASTRAC.BIN --nothing
 
-cd /PROGRAMS/ASTRAC
+# cd /PROGRAMS/ASTRAC
 
-ASTRAC.BIN --nothing
+# ASTRAC.BIN --nothing

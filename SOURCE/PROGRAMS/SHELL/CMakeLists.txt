@@ -17,7 +17,6 @@ set(Sources
     ${CUR_DIR}/SHELL.c
     ${CUR_DIR}/VOUTPUT.c
     ${CUR_DIR}/LOOP.c
-    ${CUR_DIR}/SHELL_PROC.c
     ${CUR_DIR}/BATSH.c
     ${CUR_DIR}/DIR.c
     ${CUR_DIR}/INPUTS.c
