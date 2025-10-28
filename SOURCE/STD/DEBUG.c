@@ -27,7 +27,7 @@ void DEBUG_PUTC(U8 c) {
     com1_out(c);
 }
 
-void DEBUG_PUTS(const U8 *s) {
+void DEBUG_PUTS(U8 *s) {
     if (!s) return;
     while (*s) {
         if (*s == '\n') {
@@ -35,6 +35,17 @@ void DEBUG_PUTS(const U8 *s) {
         }
         DEBUG_PUTC(*s++);
     }
+}
+
+void DEBUG_PUTS_LN(PU8 s) {
+    if (!s) return;
+    while (*s) {
+        if (*s == '\n') {
+            DEBUG_PUTC('\r');
+        }
+        DEBUG_PUTC(*s++);
+    }
+    DEBUG_PUTC('\r');
 }
 
 static inline U8 hex_nibble(U8 v) {

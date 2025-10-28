@@ -6,6 +6,7 @@
 #include <STD/AUDIO.h>
 #include <STD/MEM.h>
 #include <STD/PROC_COM.h>
+#include <STD/DEBUG.h>
 
 #define LEND "\r\n"
 
@@ -414,19 +415,27 @@ VOID SETUP_BATSH_PROCESSER() {
 BOOLEAN RUN_PROCESS(PU8 line) {
     if (!line || !*line) return FALSE;
 
-    // Copy and trim input line
+    // --------------------------------------------------
+    // Prepare working buffers
+    // --------------------------------------------------
+    U8 tmp_line[256];
     STRNCPY(tmp_line, line, sizeof(tmp_line) - 1);
     str_trim(tmp_line);
 
+
+    // --------------------------------------------------
     // Extract first token (program path)
+    // --------------------------------------------------
     PU8 first_space = STRCHR(tmp_line, ' ');
     U32 prog_len = first_space ? (U32)(first_space - tmp_line) : STRLEN(tmp_line);
 
-    // argv[0] = program name only (last path component)
-    PU8 prog_name = MAlloc(prog_len + 1);
-    STRNCPY(prog_name, tmp_line, prog_len);
-    prog_name[prog_len] = 0;
+    // Copy the program portion (may be relative)
+    PU8 prog_copy = MAlloc(prog_len + 1);
+    STRNCPY(prog_copy, tmp_line, prog_len);
+    prog_copy[prog_len] = 0;
 
+    // Extract only the program name (last path component)
+    PU8 prog_name = STRDUP(prog_copy);
     PU8 last_slash = STRRCHR(prog_name, '/');
     if (last_slash) {
         PU8 tmp = STRDUP(last_slash + 1);
@@ -434,22 +443,25 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         prog_name = tmp;
     }
 
-    // Resolve full path (absolute)
-    PU8 full_path = MAlloc(prog_len + 1);
-    STRNCPY(full_path, tmp_line, prog_len);
-    full_path[prog_len] = 0;
 
-    if (!ResolvePath(full_path, tmp_line, sizeof(tmp_line))) {
+    // --------------------------------------------------
+    // Resolve path (use a separate buffer)
+    // --------------------------------------------------
+    U8 abs_path_buf[256];
+    if (!ResolvePath(prog_copy, abs_path_buf, sizeof(abs_path_buf))) {
         PUTS("\nError: Failed to resolve path.\n");
         MFree(prog_name);
-        MFree(full_path);
+        MFree(prog_copy);
         return FALSE;
     }
-    MFree(full_path);
 
-    PU8 abs_path = tmp_line;
+    PU8 abs_path = abs_path_buf;
+    MFree(prog_copy);
 
+
+    // --------------------------------------------------
     // Verify file exists
+    // --------------------------------------------------
     FAT_LFN_ENTRY ent;
     if (!FAT32_PATH_RESOLVE_ENTRY(abs_path, &ent)) {
         PUTS("\nError: File not found.\n");
@@ -457,7 +469,9 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         return FALSE;
     }
 
-    // Read file contents
+    // --------------------------------------------------
+    // Load file contents
+    // --------------------------------------------------
     U32 sz = 0;
     VOIDPTR data = FAT32_READ_FILE_CONTENTS(&sz, &ent.entry);
     if (!data) {
@@ -467,15 +481,23 @@ BOOLEAN RUN_PROCESS(PU8 line) {
 
     U32 pid = PROC_GETPID();
 
-    // -------------------------
-    // Argument parsing
-    // -------------------------
+    // --------------------------------------------------
+    // Parse arguments (from original input line)
+    // --------------------------------------------------
     #define MAX_ARGS 12
     PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
-    argv[argc++] = prog_name; // argv[0]
 
-    PU8 args_start = first_space ? first_space + 1 : NULL;
+    argv[argc++] = STRDUP(abs_path); // argv[0]
+
+    // Use a preserved copy of the original line
+    U8 arg_line[256];
+    STRNCPY(arg_line, line, sizeof(arg_line) - 1);
+    str_trim(arg_line);
+
+    PU8 first_space_copy = STRCHR(arg_line, ' ');
+    PU8 args_start = first_space_copy ? first_space_copy + 1 : NULL;
+
     if (args_start && *args_start) {
         PU8 p = args_start;
         while (*p && argc < MAX_ARGS) {
@@ -504,12 +526,11 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         }
     }
 
-    // -------------------------
+    // --------------------------------------------------
     // Determine file type and execute
-    // -------------------------
+    // --------------------------------------------------
     PU8 ext = STRRCHR(abs_path, '.');
-    if (ext) ext++; // skip dot
-    else ext = (PU8)"";
+    if (ext) ext++; else ext = (PU8)"";
 
     if (STRICMP(ext, "BIN") == 0) {
         // Execute binary
@@ -518,7 +539,10 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         return res != 0;
     } else if (STRICMP(ext, "SH") == 0) {
         // TODO: run as shell script
+        return FALSE;
     } else {
         return FALSE;
     }
 }
+
+

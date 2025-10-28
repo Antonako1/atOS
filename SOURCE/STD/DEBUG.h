@@ -19,7 +19,10 @@ void DEBUG_INIT(void);
 void DEBUG_PUTC(U8 c);
 
 // Write a string (null-terminated)
-void DEBUG_PUTS(const U8 *s);
+void DEBUG_PUTS(U8 *s);
+
+// Write a string. Line-end added automatically
+void DEBUG_PUTS_LN(PU8 s);
 
 // Print 32-bit hexadecimal
 void DEBUG_HEX32(U32 value);
