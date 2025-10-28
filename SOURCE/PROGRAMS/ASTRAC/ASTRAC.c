@@ -1,24 +1,21 @@
 #include <PROGRAMS/ASTRAC/ASTRAC.h>
-#include <STD/PROC_COM.h>
 #include <STD/GRAPHICS.h>
 #include <STD/IO.h>
+#include <STD/RUNTIME.h>
 
 static U32 MSG_COUNT ATTRIB_DATA = 0; 
 
 U0 INITIALIZE_ASTRAC();
 
-U0 _start(U32 argc, PPU8 argv) {
-    PROC_INIT_CONSOLE();
-    while(!IS_PROC_INITIALIZED());
-    if(argc < 1) EXIT(1);
+U32 main(U32 argc, PPU8 argv) {
+    if(argc < 1) return 1;
     puts("AstraC C compiler and Assembler!\n");
     for(U32 i = 0; i < argc;i++) {
         if(STRCMP(argv[i], "--nothing") == 0) EXIT(-1);
         puts(argv[i]);
         putc('\n');
     }
-    puts(line_end);
-    EXIT(0x12345678);
+    return 0x12345678; 
 }
 
 U0 INITIALIZE_ASTRAC() {
