@@ -30,6 +30,7 @@ U0 _start(U32 argc, PU8 argv[]) {
         for(;;);
     }
     INITIALIZE_DIR(&shndl);
+    SETUP_BATSH_PROCESSER();
     
     SHELL_LOOP();
 }

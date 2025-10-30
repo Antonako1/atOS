@@ -541,3 +541,133 @@ BOOLEAN ISALNUM(CHAR c) {
     }
     return FALSE;
 }
+PU8 STRDUPCAT(PU8 a, PU8 b) {
+    if (!a && !b) return NULLPTR;
+    if (!a) return STRDUP(b);
+    if (!b) return STRDUP(a);
+
+    U32 len_a = STRLEN(a);
+    U32 len_b = STRLEN(b);
+    PU8 result = MAlloc(len_a + len_b + 1);
+    if (!result) return NULLPTR;
+
+    MEMCPY(result, a, len_a);
+    MEMCPY(result + len_a, b, len_b);
+    result[len_a + len_b] = '\0';
+    return result;
+}
+PU8 STRAPPEND(PU8 dest, PU8 src) {
+    if (!src || !*src) return dest; // nothing to append
+
+    U32 src_len = STRLEN(src);
+    if (!dest) {
+        // if dest is null, just duplicate
+        PU8 new_str = MAlloc(src_len + 1);
+        if (!new_str) return NULLPTR;
+        MEMCPY(new_str, src, src_len);
+        new_str[src_len] = '\0';
+        return new_str;
+    }
+
+    U32 dest_len = STRLEN(dest);
+    PU8 new_str = ReAlloc(dest, dest_len + src_len + 1);
+    if (!new_str) return dest; // fallback, keep old one if realloc fails
+
+    MEMCPY(new_str + dest_len, src, src_len);
+    new_str[dest_len + src_len] = '\0';
+
+    return new_str;
+}
+
+PU8 STRAPPEND_SEPARATOR(PU8 dest, PU8 src, CHAR separator) {
+    if (!src || !*src) return dest; // nothing to append
+
+    U32 src_len = STRLEN(src);
+
+    if (!dest) {
+        // if dest is null, just duplicate
+        PU8 new_str = MAlloc(src_len + 1);
+        if (!new_str) return NULLPTR;
+        MEMCPY(new_str, src, src_len);
+        new_str[src_len] = '\0';
+        return new_str;
+    }
+
+    U32 dest_len = STRLEN(dest);
+    // +1 for separator, +1 for null terminator
+    PU8 new_str = ReAlloc(dest, dest_len + 1 + src_len + 1);
+    if (!new_str) return dest; // fallback, keep old one if realloc fails
+
+    new_str[dest_len] = separator;                  // add separator after dest
+    MEMCPY(new_str + dest_len + 1, src, src_len);  // copy src after separator
+    new_str[dest_len + 1 + src_len] = '\0';        // null terminate
+
+    return new_str;
+}
+
+VOID STRSHIFT(U8 *src, U32 index, I32 shiftcount) {
+    if (!src) return;
+    U32 len = STRLEN(src);
+
+    // clamp index
+    if (index > len) index = len;
+
+    // shifting right
+    if (shiftcount > 0) {
+        // move the tail to the right
+        for (I32 i = len; i >= (I32)index; i--) {
+            src[i + shiftcount] = src[i];
+        }
+    }
+    // shifting left
+    else if (shiftcount < 0) {
+        I32 shift = -shiftcount;
+        if (index + shift > len) shift = len - index;
+        for (U32 i = index; i <= len; i++) {
+            src[i] = src[i + shift];
+        }
+    }
+}
+VOID STRNSHIFT(U8 *src, U32 index, I32 shiftcount, U32 maxlen) {
+    if (!src) return;
+    U32 len = STRLEN(src);
+    if (index > len) index = len;
+
+    // shifting right
+    if (shiftcount > 0) {
+        if (len + shiftcount >= maxlen) shiftcount = maxlen - len - 1;
+        for (I32 i = len; i >= (I32)index; i--) {
+            if ((U32)(i + shiftcount) < maxlen)
+                src[i + shiftcount] = src[i];
+        }
+    }
+    // shifting left
+    else if (shiftcount < 0) {
+        I32 shift = -shiftcount;
+        if (index + shift > len) shift = len - index;
+        for (U32 i = index; i <= len; i++) {
+            src[i] = src[i + shift];
+        }
+    }
+}
+VOID STRSHIFTLEFTAT(PU8 src, U32 index) {
+    if (!src) return;
+
+    U32 len = STRLEN(src);
+    if (index >= len) return; // out of range
+
+    for (U32 i = index; i < len; i++) {
+        src[i] = src[i + 1];
+    }
+}
+VOID STRNSHIFTRIGHTAT(PU8 src, U32 index, CHAR ch, U32 maxlen) {
+    if (!src) return;
+    U32 len = STRLEN(src);
+    if (len + 1 >= maxlen) return; // no room
+    if (index > len) index = len;
+
+    for (I32 i = len; i >= (I32)index; i--) {
+        src[i + 1] = src[i];
+    }
+    src[index] = ch;
+}

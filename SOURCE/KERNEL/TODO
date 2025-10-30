@@ -3,17 +3,9 @@ PROC_COM RTC update ticks
 
 Panic TCB info
 
-Keyboard driver. 
-    Update keys and modifiers to HEAP, return pointer to proc
-
 Bitmap image support
-shell lang batsh
-
-Shell proc handler
-Args as RUN_BINARY arg. Allocate in HEAP and push argc, argv as first args in PIT handler
 
 Compiler
-
 
 Server?
 RTL8139 to syslist

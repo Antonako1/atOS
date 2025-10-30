@@ -77,10 +77,7 @@ cd TEST; dir
 ```bat
 @var=value
 echo @{var}
-echo @var
 ```
-
-* Variables support both `@var` and `@{var}` syntax.
 
 ### Arithmetic Expressions
 
@@ -113,7 +110,7 @@ END
 
 ## Future Improvements
 
-* Advanced variable substitution (`%USER%`, `%CD%`).
+* Advanced variable substitution (`@{CD}`, `@{PATH}`).
 * Full support for conditional statements and loops.
 * Enhanced error reporting.
 * Pipelines and redirection.

@@ -26,6 +26,14 @@ BOOLEAN ISALNUM(CHAR c);
 
 PU8 STRDUP(PU8 src);
 PU8 STRNDUP(PU8 src, U32 n);
+PU8 STRDUPCAT(PU8 a, PU8 b); // Duplicates a string into a and adds b
+PU8 STRAPPEND(PU8 dest, PU8 src); // HEAP. Appends src to dest
+PU8 STRAPPEND_SEPARATOR(PU8 dest, PU8 src, CHAR separator); // Append strings with separator
+
+VOID STRSHIFT(U8 *src, U32 index, I32 shiftcount);
+VOID STRNSHIFT(U8 *src, U32 index, I32 shiftcount, U32 maxlen);
+VOID STRSHIFTLEFTAT(PU8 src, U32 index);
+VOID STRNSHIFTRIGHTAT(PU8 src, U32 index, CHAR ch, U32 maxlen);
 
 U32 ATOI(CONST U8* str);
 U32 ATOI_HEX(CONST U8* str);

@@ -12,10 +12,6 @@ typedef enum {
     STATE_EDIT_LINE, // Editing current command line
 } SHELL_STATES;
 
-typedef struct {
-    U8 *PATH;
-} ENV_VARS;
-
 #define STDOUT_MAX_LENGTH 2048
 #define MAX_STDOUT_BUFFS (MAX_PROC_AMOUNT - 2) // -self, -kernel
 
@@ -46,7 +42,6 @@ typedef struct {
         U8 path[FAT_MAX_PATH];
         U8 prev_path[FAT_MAX_PATH];
     } fat_info;
-    ENV_VARS VARS;
     STDOUT *stdouts[MAX_STDOUT_BUFFS];
     U32 stdout_count;
 } SHELL_INSTANCE;
