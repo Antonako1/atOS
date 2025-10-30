@@ -705,7 +705,6 @@ BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
             if (!line_as_is) break;
 
             resolve_vars(&line_as_is, inst);
-            DEBUG_PUTS_LN(line_as_is);
             HANDLE_COMMAND(line_as_is);
             MFree(line_as_is);
         } break;
@@ -1012,8 +1011,6 @@ error:
     res = FALSE;
 free:
     for (U32 i = 0; i < token_len; i++) {
-        DEBUG_HEX32(tokens[i]->type);
-        DEBUG_PUTS_LN(tokens[i]->text);
         if (tokens[i]) MFree(tokens[i]);
     }
     if (tokens) MFree(tokens);
