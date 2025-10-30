@@ -134,7 +134,7 @@ VOID SET_VAR(PU8 name, PU8 value) {
 // Get variable value
 PU8 GET_VAR(PU8 name) {
     S32 idx = FIND_VAR(name);
-    return (idx >= 0 && idx != -1) ? shell_vars[idx].value : (PU8)"";
+    return (idx >= 0 && idx != -1) ? shell_vars[idx].value : (PU8)NULLPTR;
 }
 
 static S32 FIND_INST_VAR(PU8 name, BATSH_INSTANCE *inst) {
@@ -207,7 +207,7 @@ BOOLEAN SET_INST_VAR(PU8 name, PU8 value, BATSH_INSTANCE *inst) {
 PU8 GET_INST_VAR(PU8 name, BATSH_INSTANCE *inst) {
     if(!inst) return NULL;
     S32 idx = FIND_INST_VAR(name, inst);
-    return (idx >= 0 && idx != -1) ? inst->shell_vars[idx].value : (PU8)"";
+    return (idx >= 0 && idx != -1) ? inst->shell_vars[idx].value : NULLPTR;
 }
 
 
@@ -498,9 +498,9 @@ BATSH_COMMAND *parse_word_or_cmd(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_IN
     U32 escapes = 0;
 
     BOOL append_next = 0;
-
+    BATSH_TOKEN *tkn = NULLPTR;
     for (; *i < len; (*i)++) {
-        BATSH_TOKEN *tkn = tokens[*i];
+        tkn = tokens[*i];
         append_next--;
         switch (tkn->type) {
             case TOK_EOL:
@@ -538,6 +538,10 @@ BATSH_COMMAND *parse_word_or_cmd(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_IN
         }
 
         if (end_next) break;
+    }
+
+    if(tkn->type == TOK_DIV) {
+        cmd_tkn->argv[cmd_tkn->argc - 1] = STRAPPEND(cmd_tkn->argv[cmd_tkn->argc - 1], tkn->text);
     }
 
     return cmd_tkn;
@@ -701,7 +705,7 @@ BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
             if (!line_as_is) break;
 
             resolve_vars(&line_as_is, inst);
-
+            DEBUG_PUTS_LN(line_as_is);
             HANDLE_COMMAND(line_as_is);
             MFree(line_as_is);
         } break;
@@ -798,15 +802,19 @@ static BOOL finalize_token(U8 *buf, U32 *ptr, BATSH_TOKEN ***tokens, U32 *token_
 BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
     if (!input || !*input) return TRUE;
     U32 len = STRLEN(input);
+    if(len == 0) {
+        return TRUE;
+    }
     U8 buf[CUR_LINE_MAX_LENGTH] = {0};
     U32 ptr = 0;
     BATSH_TOKEN **tokens = NULL;
     U32 token_len = 0;
-
     // Lex input
     struct pos pos = { .line = 0, .row = 0 };
     KEYWORD *rem = GET_KEYWORD_S("rem");
     CHAR c = 0;
+
+    BOOL back_to_singles = FALSE;
 
     BOOL relexed = FALSE;
     for (U32 i = 0; i < len; i++) {
@@ -833,6 +841,7 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
                         }
                     }
                     ptr = 0;
+                    if(back_to_singles) goto back_to_single_parse;
                     continue;
                 }
                 BOOLEAN KEYWORD_ADDED = FALSE;
@@ -860,6 +869,7 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
                 KEYWORD kw = { "~", TOK_EOL };
                 if(!ADD_TOKEN(&tokens, &token_len, kw.keyword, &kw)) goto error;
             }
+            if(back_to_singles) goto back_to_single_parse;
             continue;
         } 
         else if(c == '"') {
@@ -945,6 +955,13 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
             c == '\\' 
         ) 
         {
+            if(ptr > 0) {
+                back_to_singles = TRUE;
+                goto cmp_words;
+            }
+            back_to_single_parse:
+            back_to_singles = FALSE;
+            ptr = 0;
             buf[ptr] = c;
             buf[++ptr] = '\0';
             KEYWORD *kw = GET_KEYWORD_C(c);
@@ -975,10 +992,7 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
         goto relex;
     }
 
-    if(len == 0) {
-        PUTS("Nothing to lex\n");
-        goto error;
-    }
+
 
     // Parse the tokens
     BATSH_COMMAND *root_cmd = parse_master(tokens, token_len, inst);
@@ -998,6 +1012,8 @@ error:
     res = FALSE;
 free:
     for (U32 i = 0; i < token_len; i++) {
+        DEBUG_HEX32(tokens[i]->type);
+        DEBUG_PUTS_LN(tokens[i]->text);
         if (tokens[i]) MFree(tokens[i]);
     }
     if (tokens) MFree(tokens);
@@ -1021,9 +1037,12 @@ VOID HANDLE_COMMAND(U8 *line) {
     // Extract command name
     U8 command[64];
     U32 i = 0;
-    while (line[i] && line[i] != ' ' && i < sizeof(command) - 1)
-        command[i++] = line[i];
-    command[i] = '\0';
+    U32 j = 0;
+
+    while (line[i] && line[i] != ' ' && j < sizeof(command) - 1)
+        command[j++] = line[i++];
+    command[j] = '\0';
+
 
     BOOLEAN found = FALSE;
     for (U32 j = 0; j < shell_command_count; j++) {
@@ -1227,7 +1246,7 @@ VOID CMD_RMDIR(PU8 raw_line) {
 
 VOID SETUP_BATSH_PROCESSER() {
     SET_VAR("PATH", 
-        "/ATOS/;"
+        ";/ATOS/;"
         "/PROGRAMS/ASTRAC/;"
         "/PROGRAMS/GLYPH/;"
         "/PROGRAMS/HEXNEST/;"
@@ -1240,7 +1259,6 @@ VOID SETUP_BATSH_PROCESSER() {
 
 BOOLEAN RUN_PROCESS(PU8 line) {
     if (!line || !*line) return FALSE;
-
     // --------------------------------------------------
     // Prepare working buffers
     // --------------------------------------------------
@@ -1248,19 +1266,17 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     STRNCPY(tmp_line, line, sizeof(tmp_line) - 1);
     str_trim(tmp_line);
 
-
     // --------------------------------------------------
     // Extract first token (program path)
     // --------------------------------------------------
     PU8 first_space = STRCHR(tmp_line, ' ');
     U32 prog_len = first_space ? (U32)(first_space - tmp_line) : STRLEN(tmp_line);
 
-    // Copy the program portion (may be relative)
     PU8 prog_copy = MAlloc(prog_len + 1);
     STRNCPY(prog_copy, tmp_line, prog_len);
     prog_copy[prog_len] = 0;
 
-    // Extract only the program name (last path component)
+    // Extract program name
     PU8 prog_name = STRDUP(prog_copy);
     PU8 last_slash = STRRCHR(prog_name, '/');
     if (last_slash) {
@@ -1269,12 +1285,59 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         prog_name = tmp;
     }
 
+    // --------------------------------------------------
+    // Resolve absolute path or search in PATH
+    // --------------------------------------------------
+    U8 abs_path_buf[512];
+    BOOLEAN found = FALSE;
+    FAT_LFN_ENTRY ent;
 
-    // --------------------------------------------------
-    // Resolve path (use a separate buffer)
-    // --------------------------------------------------
-    U8 abs_path_buf[256];
-    if (!ResolvePath(prog_copy, abs_path_buf, sizeof(abs_path_buf))) {
+    if (ResolvePath(prog_copy, abs_path_buf, sizeof(abs_path_buf))) {
+        if(FAT32_PATH_RESOLVE_ENTRY(prog_copy, &ent))
+            found = TRUE;
+        else 
+            goto no_luck_above;
+    } else {
+        no_luck_above:
+        PU8 path_val = GET_VAR((PU8)"PATH");
+
+        if (path_val && *path_val) {
+            PU8 path_dup = STRDUP(path_val);
+            PU8 saveptr = NULL;  // <-- state pointer for reentrant tokenization
+            PU8 tok = STRTOK_R(path_dup, ";", &saveptr);
+
+            while (tok != NULL) {
+                // Skip empty tokens
+                if(*tok == '\0') {
+                    tok = STRTOK_R(NULL, ";", &saveptr);
+                    continue;
+                }
+
+                U8 candidate[512] = {0};
+                STRNCPY(candidate, tok, sizeof(candidate) - 1);
+
+                // Append slash if missing
+                U32 len = STRLEN(candidate);
+                if(len > 0 && candidate[len - 1] != '/' && candidate[len - 1] != '\\') {
+                    STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
+                }
+
+                STRNCAT(candidate, prog_name, sizeof(candidate) - STRLEN(candidate) - 1);
+
+                if (ResolvePath(candidate, abs_path_buf, sizeof(abs_path_buf))) {
+                    if(FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
+                        found = TRUE;
+                        break;
+                    }
+                }
+
+                tok = STRTOK_R(NULL, ";", &saveptr);
+            }
+
+            MFree(path_dup);
+        }
+    }
+    if (!found) {
         PUTS("\nError: Failed to resolve path.\n");
         MFree(prog_name);
         MFree(prog_copy);
@@ -1284,11 +1347,9 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     PU8 abs_path = abs_path_buf;
     MFree(prog_copy);
 
-
     // --------------------------------------------------
     // Verify file exists
     // --------------------------------------------------
-    FAT_LFN_ENTRY ent;
     if (!FAT32_PATH_RESOLVE_ENTRY(abs_path, &ent)) {
         PUTS("\nError: File not found.\n");
         MFree(prog_name);
@@ -1308,22 +1369,18 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     U32 pid = PROC_GETPID();
 
     // --------------------------------------------------
-    // Parse arguments (from original input line)
+    // Parse arguments
     // --------------------------------------------------
     #define MAX_ARGS 12
     PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
-
     argv[argc++] = STRDUP(abs_path); // argv[0]
 
-    // Use a preserved copy of the original line
     U8 arg_line[256];
     STRNCPY(arg_line, line, sizeof(arg_line) - 1);
     str_trim(arg_line);
 
-    PU8 first_space_copy = STRCHR(arg_line, ' ');
-    PU8 args_start = first_space_copy ? first_space_copy + 1 : NULL;
-
+    PU8 args_start = first_space ? first_space + 1 : NULL;
     if (args_start && *args_start) {
         PU8 p = args_start;
         while (*p && argc < MAX_ARGS) {
@@ -1332,7 +1389,6 @@ BOOLEAN RUN_PROCESS(PU8 line) {
 
             PU8 arg_start = p;
             BOOL in_quotes = FALSE;
-
             if (*p == '"') {
                 in_quotes = TRUE;
                 arg_start = ++p;
@@ -1345,7 +1401,6 @@ BOOLEAN RUN_PROCESS(PU8 line) {
             PU8 arg = MAlloc(len + 1);
             STRNCPY(arg, arg_start, len);
             arg[len] = 0;
-
             argv[argc++] = arg;
 
             if (in_quotes && *p == '"') p++;
@@ -1353,22 +1408,21 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     }
 
     // --------------------------------------------------
-    // Determine file type and execute
+    // Execute based on file type
     // --------------------------------------------------
     PU8 ext = STRRCHR(abs_path, '.');
     if (ext) ext++; else ext = (PU8)"";
 
+    BOOLEAN result = FALSE;
     if (STRICMP(ext, "BIN") == 0) {
-        // Execute binary
         U32 res = START_PROCESS(abs_path, data, sz, TCB_STATE_ACTIVE, pid, argv, argc);
         if (res) PRINTNEWLINE();
-        return res != 0;
+        result = res != 0;
     } else if (STRICMP(ext, "SH") == 0) {
-        // TODO: run as shell script
-        return FALSE;
-    } else {
-        return FALSE;
+        // TODO: shell script
+        result = FALSE;
     }
+
+    MFree(prog_name);
+    return result;
 }
-
-

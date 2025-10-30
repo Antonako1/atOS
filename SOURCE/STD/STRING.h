@@ -70,6 +70,7 @@ PU8 STRPBRK(PU8 str, PU8 accept);
  * or NULLPTR if no more tokens are found.
  */
 PU8 STRTOK(PU8 str, PU8 delim);
+PU8 STRTOK_R(PU8 str, PU8 delim, PU8 *saveptr);
 
 /**
  * @brief Finds the length of the initial segment of 'str'

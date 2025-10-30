@@ -1265,36 +1265,36 @@ U32 FILE_GET_SIZE(DIR_ENTRY *entry) {
     return entry->FILE_SIZE;
 }
 
-CHAR *STRTOK_R(CHAR *str, const CHAR *delim, CHAR **saveptr) {
-    CHAR *start;
+// CHAR *STRTOK_R(CHAR *str, const CHAR *delim, CHAR **saveptr) {
+//     CHAR *start;
 
-    if (str)
-        start = str;
-    else if (*saveptr)
-        start = *saveptr;
-    else
-        return NULLPTR;
+//     if (str)
+//         start = str;
+//     else if (*saveptr)
+//         start = *saveptr;
+//     else
+//         return NULLPTR;
 
-    // Skip leading delimiters
-    while (*start && STRCHR(delim, *start)) start++;
+//     // Skip leading delimiters
+//     while (*start && STRCHR(delim, *start)) start++;
 
-    if (*start == '\0') {
-        *saveptr = NULLPTR;
-        return NULLPTR;
-    }
+//     if (*start == '\0') {
+//         *saveptr = NULLPTR;
+//         return NULLPTR;
+//     }
 
-    CHAR *token_end = start;
-    while (*token_end && !STRCHR(delim, *token_end)) token_end++;
+//     CHAR *token_end = start;
+//     while (*token_end && !STRCHR(delim, *token_end)) token_end++;
 
-    if (*token_end) {
-        *token_end = '\0';
-        *saveptr = token_end + 1;
-    } else {
-        *saveptr = NULLPTR;
-    }
+//     if (*token_end) {
+//         *token_end = '\0';
+//         *saveptr = token_end + 1;
+//     } else {
+//         *saveptr = NULLPTR;
+//     }
 
-    return start;
-}
+//     return start;
+// }
 
 BOOL DIR_ENTRY_IS_FREE(DIR_ENTRY *entry) {
     if (!entry) return TRUE;

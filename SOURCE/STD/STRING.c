@@ -671,3 +671,27 @@ VOID STRNSHIFTRIGHTAT(PU8 src, U32 index, CHAR ch, U32 maxlen) {
     }
     src[index] = ch;
 }
+PU8 STRTOK_R(PU8 str, PU8 delim, PU8 *saveptr) {
+    PU8 token_start;
+    if (str != NULL) token_start = str;
+    else if (*saveptr != NULL) token_start = *saveptr;
+    else return NULLPTR;
+
+    // Skip leading delimiters
+    token_start += STRSPN(token_start, delim);
+    if (*token_start == '\0') {
+        *saveptr = NULLPTR;
+        return NULLPTR;
+    }
+
+    // Find end of token
+    PU8 token_end = STRPBRK(token_start, delim);
+    if (!token_end) {
+        *saveptr = NULLPTR;
+        return token_start;
+    }
+
+    *token_end = '\0';
+    *saveptr = token_end + 1;
+    return token_start;
+}
