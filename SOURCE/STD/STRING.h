@@ -46,6 +46,9 @@ U0 STR_TOUPPER(U8* str);
 U0 STR_TOLOWER(U8* str);
 U32 FIRST_INDEX_OF(CONST U8* str, U8 c);
 
+BOOL IS_DIGIT_STR(PU8 str);
+BOOL IS_DIGIT(CHAR c);
+
 /**
  * @brief Finds the first character in 'str' that matches
  * *any* character specified in 'accept'.

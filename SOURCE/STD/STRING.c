@@ -695,3 +695,15 @@ PU8 STRTOK_R(PU8 str, PU8 delim, PU8 *saveptr) {
     *saveptr = token_end + 1;
     return token_start;
 }
+BOOL IS_DIGIT(CHAR c) {
+    return (c >= '0' && c <= '9');
+}
+
+BOOL IS_DIGIT_STR(PU8 str) {
+    if (!str || !*str) return FALSE; // empty string is not a number
+    for (; *str; str++) {
+        if (!IS_DIGIT(*str))
+            return FALSE;
+    }
+    return TRUE;
+}
