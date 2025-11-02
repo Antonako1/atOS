@@ -36,9 +36,21 @@ Function table:
 void putc(U8 c);
 void puts(U8 *str);
 
+/**
+ * Supports
+ * 
+ * %s
+ * %c
+ * %d
+ * %x
+ * %%
+ */
+void printf(PU8 fmt, ...);
+
 KP_DATA *get_kp_data();
 KEYPRESS *get_last_keypress();
 KEYPRESS *get_latest_keypress();
+KEYPRESS *get_latest_keypress_unconsumed();
 MODIFIERS *get_modifiers();
 U32 get_kp_seq();
 U8 keypress_to_char(U32 kcode);

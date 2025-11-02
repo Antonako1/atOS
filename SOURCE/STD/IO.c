@@ -7,6 +7,7 @@
 #include <DRIVERS/PS2/KEYBOARD.h> // For definitions
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <STD/DEBUG.h>
+#include <STD/ARG.h>
 
 void putc(U8 c) {
     STDOUT *stdout = GET_PROC_STDOUT();
@@ -36,6 +37,90 @@ void puts(U8 *str) {
     stdout->proc_seq++;
 }
 
+void printf(PU8 fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    while (*fmt) {
+        if (*fmt != '%') {
+            putc(*fmt++);
+            continue;
+        }
+
+        fmt++; // skip '%'
+        if (!*fmt) break;
+
+        I32 width = 0;
+        BOOL pad_zero = FALSE;
+
+        // Parse optional zero-padding and width (e.g. %02X, %08x)
+        if (*fmt == '0') {
+            pad_zero = TRUE;
+            fmt++;
+        }
+        while (*fmt >= '0' && *fmt <= '9') {
+            width = width * 10 + (*fmt - '0');
+            fmt++;
+        }
+
+        switch (*fmt) {
+            case 'c': {
+                CHAR c = (CHAR)va_arg(args, I32);
+                putc(c);
+                break;
+            }
+
+            case 's': {
+                CHAR *s = va_arg(args, CHAR*);
+                if (s)
+                    puts((PU8)s);
+                else
+                    puts((PU8)"(null)");
+                break;
+            }
+
+            case 'd': {
+                I32 val = va_arg(args, I32);
+                CHAR buf[32];
+                ITOA(val, buf, 10);
+
+                I32 len = STRLEN(buf);
+                for (I32 i = len; i < width; i++)
+                    putc(pad_zero ? '0' : ' ');
+                puts((PU8)buf);
+                break;
+            }
+
+            case 'x':
+            case 'X': {
+                U32 val = va_arg(args, U32);
+                CHAR buf[32];
+                ITOA_U(val, buf, 16);
+
+                I32 len = STRLEN(buf);
+                for (I32 i = len; i < width; i++)
+                    putc(pad_zero ? '0' : ' ');
+                puts((PU8)buf);
+                break;
+            }
+
+            case '%':
+                putc('%');
+                break;
+
+            default:
+                putc('%');
+                putc(*fmt);
+                break;
+        }
+
+        fmt++;
+    }
+
+    va_end(args);
+}
+
+
 
 static U32 prev_seq ATTRIB_DATA = 0;
 static KP_DATA *kp ATTRIB_DATA = NULLPTR;
@@ -59,6 +144,12 @@ KEYPRESS *get_latest_keypress() {
     }
     return NULLPTR;
 }
+KEYPRESS *get_latest_keypress_unconsumed() {
+    KP_DATA *kp = get_kp_data();
+    if (!kp) return NULLPTR;
+    return &kp->cur; // no seq check, always return latest
+}
+
 MODIFIERS *get_modifiers() {
     KP_DATA *kp = get_kp_data();
     if(!kp) return NULLPTR;
