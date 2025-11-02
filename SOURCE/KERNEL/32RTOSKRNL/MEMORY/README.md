@@ -13,5 +13,6 @@
 | `0x08570000`          | `0x08580000`            | Guard page above kernel stack  | 4 KiB                         |                           |
 | `0x08580000`          | `0x0B000000`            | Framebuffer (LFB)              | ~40 MiB max                   | If you map 1920×1080×4 B  |
 | `0x0B000000`          | `0x10000000`            | MMIO / Device-reserved         | ~80 MiB                       | PCI/graphics/apic areas   |
-| `0x10000000`          | `0x20000000`            | **User space start**           | ~256 MiB                      | For processes              |
-| `0x20000000` → beyond | Free / future expansion | (512 MiB +)                    | Only present if > 512 MiB RAM |                           |
+| `0x10000000`          | `0x20000000`            | **User space start**           | ~256 MiB                      | For processes             |
+| `0x20000000`          | `0x30000000`            | **Library space start**        | ~256 MiB                      | For libraries             |
+| `0x30000000` → beyond | Free / future expansion | (512 MiB +)                    | Only present if > 512 MiB RAM |                           |
