@@ -525,7 +525,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     if(!file) {
         panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
-    U8 *shell_argv[] = { SHELL_PATH , NULLPTR };
+    U8 *shell_argv[] = { SHELL_PATH , "-test", NULLPTR };
     panic_if(
         !RUN_BINARY(
             "atOShell", 
@@ -536,7 +536,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
             TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
             0,
             shell_argv,
-            1
+            2
         ), 
         "PANIC: Failed to run kernel shell!", 
         PANIC_KERNEL_SHELL_GENERAL_FAILURE
@@ -564,6 +564,8 @@ BOOL initialize_filestructure(VOID) {
     ISO9660_FREE_MEMORY(bin);
     U32 tmp;
     CREATE_CHILD_DIR(GET_ROOT_CLUSTER(), "HOME", 0, &tmp);
+    CREATE_CHILD_DIR(tmp, "DOCS", 0, &tmp);
+    CREATE_CHILD_DIR(GET_ROOT_CLUSTER(), "TMP", 0, &tmp);
     // HLT;
     return TRUE;
 }
