@@ -769,12 +769,15 @@ BOOLEAN copy_iso_to_fat32(IsoDirectoryRecord *iso_dir, U32 parent_cluster) {
             }
         } else {
             // Read file contents from ISO
-            U8 *file_data = ISO9660_READ_FILEDATA_TO_MEMORY(rec);
-            if (!file_data) {
-                rec->fileIdentifier[rec->fileNameLength] = '\0';
-                panic_debug(rec->fileIdentifier,0xAC);
-                ISO9660_FREE_LIST(dir_contents, count);
-                return FALSE;
+            U8 *file_data = NULLPTR;
+            if(rec->extentLengthLE != 0) {
+                file_data = ISO9660_READ_FILEDATA_TO_MEMORY(rec);
+                if (!file_data) {
+                    rec->fileIdentifier[rec->fileNameLength] = '\0';
+                    panic_debug(rec->fileIdentifier,0xAC);
+                    ISO9660_FREE_LIST(dir_contents, count);
+                    return FALSE;
+                }
             }
             U32 cluster_out = 0;
             // Create file in FAT32
