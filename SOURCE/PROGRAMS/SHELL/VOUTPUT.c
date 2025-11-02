@@ -747,14 +747,16 @@ VOID HANDLE_CTRL_C() {
     SHELL_INSTANCE *shdnl = GET_SHNDL();
     U32 pid = shdnl->focused_pid;
     U32 self_pid = PROC_GETPID();
-    PROC_MESSAGE msg;
-    shdnl->focused_pid = self_pid;
-    DELETE_STDOUT(pid);
-
-    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, 0, 0, self_pid);
-    SEND_MESSAGE(&msg);
-    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
-    SEND_MESSAGE(&msg);
+    if(pid != self_pid) {
+        PROC_MESSAGE msg;
+        shdnl->focused_pid = self_pid;
+        DELETE_STDOUT(pid);
+    
+        msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, 0, 0, self_pid);
+        SEND_MESSAGE(&msg);
+        msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
+        SEND_MESSAGE(&msg);
+    }
 
     // Draw `^C` at current position
     PUTC('^');
@@ -881,10 +883,6 @@ void HANDLE_LE_CTRL_C() {
 }
 
 void HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod) {
-    if(kp->keycode == KEY_C && mod->ctrl) {
-        HANDLE_LE_CTRL_C();
-        return;
-    }
 
     U8 c = keypress_to_char(kp->keycode);
     if(!c) return;

@@ -1267,9 +1267,13 @@ VOID CMD_CD(PU8 raw_line) {
     else if (STRCMP(path_arg, "~") == 0) CD_INTO((PU8)"/HOME");
     else if (!path_arg || *path_arg == '\0') CD_INTO((PU8)"/");
     else CD_INTO(path_arg);
+    SET_VAR("CD", GET_PATH());
 }
 
-VOID CMD_CD_BACKWARDS(PU8 line) { (void)line; CD_BACKWARDS_DIR(); PRINTNEWLINE(); }
+VOID CMD_CD_BACKWARDS(PU8 line) { 
+    (void)line; CD_BACKWARDS_DIR(); PRINTNEWLINE(); 
+    SET_VAR("CD", GET_PATH());
+}
 
 VOID CMD_DIR(PU8 raw_line) {
     MEMZERO(tmp_line, sizeof(tmp_line));
@@ -1411,6 +1415,7 @@ VOID SETUP_BATSH_PROCESSER() {
     );
     SET_VAR("HOME", "/HOME");
     SET_VAR("DOCS", "/HOME/DOCS");
+    SET_VAR("CD", "/HOME/DOCS");
 }
 
 

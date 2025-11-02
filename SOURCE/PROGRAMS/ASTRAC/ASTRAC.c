@@ -1,9 +1,12 @@
 #include <PROGRAMS/ASTRAC/ASTRAC.h>
+#include <PROGRAMS/ASTRAC/ASSEMBLER/ASSEMBLER.h>
 #include <STD/GRAPHICS.h>
 #include <STD/IO.h>
 #include <STD/RUNTIME.h>
 #include <STD/STRING.h>
 #include <STD/MEM.h>
+
+
 
 VOID PRINT_HELP() {
     printf("\n%s. \n", TRADEMARK);
@@ -34,7 +37,7 @@ VOID PRINT_VERSION() {
 }
 
 #define ARG_CMP1(x) STRCMP(arg, x) == 0
-#define ARG_CMP2(x, y) ARG_CMP1(#x) || ARG_CMP1(#y)
+#define ARG_CMP2(x, y) ARG_CMP1(x) || ARG_CMP1(y)
 
 static ASTRAC_ARGS args ATTRIB_DATA = { 0 };
 
@@ -45,19 +48,17 @@ U32 START_WORKLOAD() {
         return 0x1F; // Should not happen
     } 
     else if(args.build_type & DISSASEMBLE) {
-        return 0;
-    }
-    else if(args.build_type & PREPROCESS) {
-
+        return 0x2F;
     }
     else if(args.build_type & COMPILE) {
-
+        return 0x5F;
     }
     else if(args.build_type & ASSEMBLE) {
-        
+        return START_ASSEMBLING();
     } else { // args.built_type & BUILD
-
+        return 0x7F;
     }
+    return 0;
 }
 
 U32 main(U32 argc, PPU8 argv) {
@@ -71,14 +72,13 @@ U32 main(U32 argc, PPU8 argv) {
 
     for (U32 i = 1; i < argc; i++) {
         PU8 arg = argv[i];
-
+        printf("[%d] %s\n", i, arg);
         if (ARG_CMP2("-h", "--help")) { PRINT_HELP(); return 0; }
         else if (ARG_CMP2("-v", "--verbose")) { args.verbose = TRUE; }
         else if (ARG_CMP2("-q", "--quiet")) { args.quiet = TRUE; }
         else if (ARG_CMP2("-A", "--assemble")) { args.build_type |= ASSEMBLE; }
         else if (ARG_CMP2("-C", "--compile")) { args.build_type |= COMPILE; }
         else if (ARG_CMP2("-D", "--disassemble")) { args.build_type |= DISSASEMBLE; }
-        else if (ARG_CMP2("-E", "--preprocess")) { args.build_type |= PREPROCESS; }
         else if (ARG_CMP2("-B", "--build")) { args.build_type |= BUILD; }
         else if (ARG_CMP2("-o", "--out")) {
             if (++i < argc) {
@@ -93,7 +93,22 @@ U32 main(U32 argc, PPU8 argv) {
             if (++i < argc) args.includes[args.include_count++] = argv[i];
         }
         else if (ARG_CMP2("-M", "--macro")) {
-            if (++i < argc) args.macros[args.macro_count++] = argv[i];
+            if (++i < argc) {
+                PU8 equ = STRCHR(argv[i], '=');
+                PU8 val = NULLPTR;
+                if(equ) {
+                    *equ = '\0';    // terminate macro name
+                    val = equ + 1;  // value starts after '='
+                }
+                DEFINE_MACRO(
+                    argv[i], 
+                    val, 
+                    args.macros.macros[args.macros.len]
+                );
+            } else {
+                printf("Define macros as -M NAME=VALUE\n");
+                return 1;
+            }
         }
         else {
             args.input_files[args.input_file_count++] = arg;
@@ -113,9 +128,9 @@ U32 main(U32 argc, PPU8 argv) {
         PU8 dot = STRRCHR(args.outfile, '.');
         if (dot) *dot = '\0';
 
-        if (args.build_type & DISSASEMBLE) STRCAT(args.outfile, ".ASM");
-        else if (args.build_type & PREPROCESS) STRCAT(args.outfile, ".C");
-        else if (args.build_type & COMPILE) STRCAT(args.outfile, ".ASM");
+        if (args.build_type & DISSASEMBLE ||
+            args.build_type & COMPILE
+        ) STRCAT(args.outfile, ".ASM");
         else if (args.build_type & ASSEMBLE) STRCAT(args.outfile, ".BIN");
     }
 

@@ -10,17 +10,43 @@ typedef enum {
     COMPILE = 0x0001,
     ASSEMBLE =0x0002,
     DISSASEMBLE = 0x0004,
-    PREPROCESS = 0x0008,
-    BUILD = COMPILE | ASSEMBLE | PREPROCESS,
+    BUILD = COMPILE | ASSEMBLE,
 } BUILD_TYPE;
+
 
 #define MAX_MACROS 255
 #define MAX_INCLUDES 255
 #define MAX_INPUT_FILES 255
 
+#define MAX_MACRO_VALUE 255
+#define BUF_SZ 512
+
+#define ASM_PREPROCESSOR 1
+#define C_PREPROCESSOR 2
+
+#define MAX_FILES MAX_INPUT_FILES
+
+typedef struct {
+    U8 name[MAX_MACRO_VALUE];
+    U8 value[MAX_MACRO_VALUE];
+} MACRO, *PMACRO;
+
+typedef struct {
+    PMACRO macros[MAX_MACROS];
+    U32 len;
+} MACRO_ARR;
+
+
+
+BOOL DEFINE_MACRO(PU8 name, PU8 value, MACRO_ARR *arr);
+PMACRO GET_MACRO(PU8 name, MACRO_ARR *arr);
+VOID UNDEFINE_MACRO(PU8 name, MACRO_ARR *arr);
+VOID FREE_MACROS(MACRO_ARR *arr);
+
+
+
 typedef struct _ASTRAC_ARGS {
-    PU8 macros[MAX_MACROS];
-    U32 macro_count;
+    MACRO_ARR macros;
 
     PU8 includes[MAX_INCLUDES];
     U32 include_count;

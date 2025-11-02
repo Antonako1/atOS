@@ -1454,85 +1454,92 @@ BOOL FILE_WRITE(DIR_ENTRY *entry, const U8 *data, U32 size) {
 BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
     if (!entry || !data || size == 0) return FALSE;
 
-    U32 cluster_size = GET_CLUSTER_SIZE();
-    U8 *buf = KMALLOC(cluster_size);
-    if (!buf) return FALSE;
+    // Get current start cluster and file size
+    U32 start_cluster = (entry->HIGH_CLUSTER_BITS << 16) | entry->LOW_CLUSTER_BITS;
+    U32 file_size     = entry->FILE_SIZE;
 
-    U32 start_cluster = ((U32)entry->HIGH_CLUSTER_BITS << 16) | entry->LOW_CLUSTER_BITS;
-    if (start_cluster == 0) {
-        Free(buf);
-        return FILE_WRITE(entry, data, size); // empty file
+    // If the file is empty, just use FILE_WRITE
+    if (start_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) {
+        return FILE_WRITE(entry, data, size);
     }
 
-    U32 last_cluster = FAT32_GetLastCluster(start_cluster);
-    U32 used_bytes = entry->FILE_SIZE % cluster_size;
+    // Calculate last cluster of the current file
+    U32 last_cluster = start_cluster;
+    U32 clusters_to_traverse = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+    for (U32 i = 1; i < clusters_to_traverse; i++) {
+        last_cluster = fat32[last_cluster];
+        if (last_cluster >= FAT32_END_OF_CHAIN) break;
+    }
 
-    const U8 *src = data;
+    // Write new data into new clusters
     U32 remaining = size;
+    PU8 src = (PU8)data;
 
-    // Fill last partially used cluster if needed
-    if (used_bytes > 0 && used_bytes < cluster_size) {
-        if (!FAT_READ_CLUSTER(last_cluster, buf)) {
-            Free(buf);
-            return FALSE;
-        }
+    U32 clusters_needed = (size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+    U32 *allocated_clusters = KMALLOC(clusters_needed * sizeof(U32));
+    if (!allocated_clusters) return FALSE;
 
-        U32 to_copy = MIN(cluster_size - used_bytes, remaining);
-        MEMCPY(buf + used_bytes, src, to_copy);
+    U32 allocated_count = 0;
+    U32 prev_cluster = last_cluster;
 
-        if (!FAT_WRITE_CLUSTER(last_cluster, buf)) {
-            Free(buf);
-            return FALSE;
-        }
-
-        src += to_copy;
-        remaining -= to_copy;
+    U8 *buf = KMALLOC(CLUSTER_SIZE);
+    if (!buf) {
+        Free(allocated_clusters);
+        return FALSE;
     }
 
-    // Allocate and write new clusters
-    while (remaining > 0) {
-        U32 new_cluster = FIND_NEXT_FREE_CLUSTER();
-        if (new_cluster == 0) {
+    for (U32 i = 0; i < clusters_needed; i++) {
+        U32 c = FIND_NEXT_FREE_CLUSTER();
+        if (c == 0) {
+            // Rollback allocated clusters
+            for (U32 j = 0; j < allocated_count; j++)
+                fat32[allocated_clusters[j]] = FAT32_FREE_CLUSTER;
+            FAT_FLUSH();
             Free(buf);
-            return FALSE; // out of space
-        }
-
-        MEMZERO(buf, cluster_size);
-        U32 to_copy = MIN(cluster_size, remaining);
-        MEMCPY(buf, src, to_copy);
-
-        if (!FAT_WRITE_CLUSTER(new_cluster, buf)) {
-            Free(buf);
+            Free(allocated_clusters);
             return FALSE;
         }
 
-        // Link into FAT chain after successful write
-        fat32[last_cluster] = new_cluster;
-        fat32[new_cluster] = FAT32_END_OF_CHAIN;
+        allocated_clusters[allocated_count++] = c;
 
-        src += to_copy;
-        remaining -= to_copy;
-        last_cluster = new_cluster;
+        if (prev_cluster != 0 && i == 0) {
+            // Link last existing cluster to first new cluster
+            fat32[prev_cluster] = c;
+        }
+
+        prev_cluster = c;
+
+        U32 tocopy = (remaining > CLUSTER_SIZE) ? CLUSTER_SIZE : remaining;
+        if (tocopy < CLUSTER_SIZE) MEMZERO(buf, CLUSTER_SIZE);
+        MEMCPY(buf, src, tocopy);
+
+        if (!FAT_WRITE_CLUSTER(c, buf)) {
+            for (U32 j = 0; j < allocated_count; j++)
+                fat32[allocated_clusters[j]] = FAT32_FREE_CLUSTER;
+            FAT_FLUSH();
+            Free(buf);
+            Free(allocated_clusters);
+            return FALSE;
+        }
+
+        src       += tocopy;
+        remaining -= tocopy;
     }
+
+    // Mark end-of-chain
+    fat32[prev_cluster] = FAT32_END_OF_CHAIN;
 
     // Flush FAT to disk
     if (!FAT_FLUSH()) {
         Free(buf);
+        Free(allocated_clusters);
         return FALSE;
     }
 
-    // Update entry size and time
+    // Update file size
     entry->FILE_SIZE += size;
-    FAT_UPDATETIMEDATE(entry);
-
-    // Persist updated directory entry to disk
-    // todo:
-    // if (!UPDATE_DIR_ENTRY(entry)) {
-    //     Free(buf);
-    //     return FALSE;
-    // }
-
     Free(buf);
+    Free(allocated_clusters);
     return TRUE;
 }
 

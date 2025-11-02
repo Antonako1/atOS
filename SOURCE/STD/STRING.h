@@ -30,6 +30,14 @@ PU8 STRDUPCAT(PU8 a, PU8 b); // Duplicates a string into a and adds b
 PU8 STRAPPEND(PU8 dest, PU8 src); // HEAP. Appends src to dest
 PU8 STRAPPEND_SEPARATOR(PU8 dest, PU8 src, CHAR separator); // Append strings with separator
 
+PU8 STRSTR(PU8 a, PU8 b);
+
+PU8 STR_REPLACE_FIRST(PU8 src, PU8 repl, PU8 with); // returns allocated string
+PU8 STR_REPLACE(PU8 src, PU8 repl, PU8 with);
+
+// same support as printf
+void SPRINTF(CHAR *buffer, CHAR *fmt, ...);
+
 VOID STRSHIFT(U8 *src, U32 index, I32 shiftcount);
 VOID STRNSHIFT(U8 *src, U32 index, I32 shiftcount, U32 maxlen);
 VOID STRSHIFTLEFTAT(PU8 src, U32 index);

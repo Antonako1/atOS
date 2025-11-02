@@ -64,16 +64,39 @@ void DEBUG_HEX32(U32 value) {
 // Simple memory dump: 16 bytes per line
 void MEMORY_DUMP(const void *addr, U32 length) {
     const U8 *p = (const U8 *)addr;
+    U8 line[17] = {0}; // 16 chars + null terminator for ASCII
+
     for (U32 i = 0; i < length; i++) {
-        if (i % 16 == 0) {
-            DEBUG_PUTC('\n');
-            DEBUG_HEX32((U32)(p + i));
-            DEBUG_PUTS(": ");
-        }
         U8 b = p[i];
-        DEBUG_PUTC(hex_nibble(b >> 4));
-        DEBUG_PUTC(hex_nibble(b & 0xF));
-        DEBUG_PUTC(' ');
+        line[i % 16] = (b >= 32 && b <= 126) ? b : '.'; // printable ASCII
+
+        if (i % 16 == 15 || i == length - 1) {
+            U32 bytes_in_line = (i % 16) + 1;
+
+            // Print address
+            DEBUG_HEX32((U32)(p + i - (bytes_in_line - 1)));
+            DEBUG_PUTS(" | ");
+
+            // Print hex bytes
+            for (U32 j = i - (bytes_in_line - 1); j <= i; j++) {
+                U8 byte = p[j];
+                DEBUG_PUTC(hex_nibble(byte >> 4));
+                DEBUG_PUTC(hex_nibble(byte & 0xF));
+                DEBUG_PUTC(' ');
+            }
+
+            // Pad hex column if line < 16 bytes
+            for (U32 j = bytes_in_line; j < 16; j++) {
+                DEBUG_PUTS("   "); // 3 spaces per missing byte
+            }
+
+            // Print ASCII
+            line[bytes_in_line] = '\0';
+            DEBUG_PUTS(" | ");
+            DEBUG_PUTS(line);
+            DEBUG_NL();
+        }
     }
-    DEBUG_PUTC('\n');
+    DEBUG_NL();
 }
+

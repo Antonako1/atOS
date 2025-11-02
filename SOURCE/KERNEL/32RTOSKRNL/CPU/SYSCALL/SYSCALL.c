@@ -376,7 +376,8 @@ U32 SYS_FILE_WRITE(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unuse
 
 U32 SYS_FILE_APPEND(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unused5) {
     (void)unused4; (void)unused5;
-    return FILE_APPEND((DIR_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
+    U32 res = FILE_APPEND((DIR_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
+    return res;
 }
 
 U32 SYS_PATH_RESOLVE_ENTRY(U32 path_ptr, U32 out_entry_ptr, U32 unused3, U32 unused4, U32 unused5) {

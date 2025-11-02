@@ -27,7 +27,7 @@ typedef enum {
     MODE_R        = 0x0001,  // Read
     MODE_W        = 0x0002,  // Write
     MODE_RW       = MODE_R | MODE_W,   // Read & Write
-    MODE_A        = 0x0004,  // Append
+    MODE_A        = 0x0008,  // Append
     MODE_FAT32    = 0x0100,  // FAT32 backend
     MODE_ISO9660  = 0x0200,  // ISO9660 backend
 } FILEMODES;

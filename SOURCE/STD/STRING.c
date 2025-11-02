@@ -1,5 +1,6 @@
 #include "./STRING.h"
 #include "./MEM.h"
+#include <STD/ARG.h>
 U32 STRLEN(CONST U8* str) {
     U32 res = 0;
     while (*str++) res++;
@@ -706,4 +707,156 @@ BOOL IS_DIGIT_STR(PU8 str) {
             return FALSE;
     }
     return TRUE;
+}
+PU8 STRSTR(PU8 a, PU8 b) {
+    if(!a || !b) return NULLPTR;
+
+    U32 len = STRLEN(b);
+    if(len == 0) return a;
+
+    PU8 tmp = a;
+    while(*tmp) {
+        if(STRNCMP(tmp, b, len) == 0) return tmp;
+        tmp++;
+    }
+
+    return NULLPTR;
+}
+void SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    CHAR *out = buffer;
+
+    while (*fmt) {
+        if (*fmt != '%') {
+            *out++ = *fmt++;
+            continue;
+        }
+
+        fmt++; // skip '%'
+        if (!*fmt) break;
+
+        I32 width = 0;
+        BOOL pad_zero = FALSE;
+
+        // Parse optional zero-padding and width (e.g. %02X, %08x)
+        if (*fmt == '0') {
+            pad_zero = TRUE;
+            fmt++;
+        }
+        while (*fmt >= '0' && *fmt <= '9') {
+            width = width * 10 + (*fmt - '0');
+            fmt++;
+        }
+
+        switch (*fmt) {
+            case 'c': {
+                CHAR c = (CHAR)va_arg(args, I32);
+                *out++ = c;
+                break;
+            }
+
+            case 's': {
+                CHAR *s = va_arg(args, CHAR*);
+                if (!s) s = "(null)";
+                while (*s) *out++ = *s++;
+                break;
+            }
+
+            case 'd': {
+                I32 val = va_arg(args, I32);
+                CHAR buf[32];
+                ITOA(val, buf, 10);
+
+                I32 len = STRLEN(buf);
+                for (I32 i = len; i < width; i++)
+                    *out++ = pad_zero ? '0' : ' ';
+                CHAR *p = buf;
+                while (*p) *out++ = *p++;
+                break;
+            }
+
+            case 'x':
+            case 'X': {
+                U32 val = va_arg(args, U32);
+                CHAR buf[32];
+                ITOA_U(val, buf, 16);
+
+                I32 len = STRLEN(buf);
+                for (I32 i = len; i < width; i++)
+                    *out++ = pad_zero ? '0' : ' ';
+                CHAR *p = buf;
+                while (*p) *out++ = *p++;
+                break;
+            }
+
+            case '%':
+                *out++ = '%';
+                break;
+
+            default:
+                *out++ = '%';
+                *out++ = *fmt;
+                break;
+        }
+
+        fmt++;
+    }
+
+    *out = '\0'; // Null-terminate the string
+    va_end(args);
+}
+
+PU8 STR_REPLACE_FIRST(PU8 src, PU8 repl, PU8 with) {
+    if (!src || !repl) return NULLPTR;
+    if (!with) with = "";
+
+    U32 src_len  = STRLEN(src);
+    U32 repl_len = STRLEN(repl);
+    U32 with_len = STRLEN(with);
+
+    if (src_len == 0 || repl_len == 0) return NULLPTR;
+
+    PU8 pos = STRSTR(src, repl);
+    if (!pos) return STRDUP(src); // nothing to replace, return copy
+
+    U32 new_len = src_len - repl_len + with_len;
+    PU8 res = MAlloc(new_len + 1); // +1 for null terminator
+    if (!res) return NULLPTR;
+
+    U32 index = 0;
+
+    // Copy characters before match
+    for (PU8 p = src; p != pos; p++)
+        res[index++] = *p;
+
+    // Copy replacement string
+    for (U32 i = 0; i < with_len; i++)
+        res[index++] = with[i];
+
+    // Copy characters after match
+    for (PU8 p = pos + repl_len; *p; p++)
+        res[index++] = *p;
+
+    res[index] = '\0';
+    return res;
+}
+
+PU8 STR_REPLACE(PU8 src, PU8 repl, PU8 with) {
+    if (!src || !repl) return NULLPTR;
+    if (!with) with = "";
+
+    PU8 result = STRDUP(src); // start with a copy
+    if (!result) return NULLPTR;
+
+    PU8 pos;
+    while ((pos = STRSTR(result, repl)) != NULLPTR) {
+        PU8 tmp = STR_REPLACE_FIRST(result, repl, with);
+        MFree(result);
+        result = tmp;
+        if (!result) return NULLPTR;
+    }
+
+    return result;
 }

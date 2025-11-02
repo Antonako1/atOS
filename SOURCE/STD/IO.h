@@ -42,7 +42,7 @@ void puts(U8 *str);
  * %s
  * %c
  * %d
- * %x
+ * %[00-0x8]x
  * %%
  */
 void printf(PU8 fmt, ...);

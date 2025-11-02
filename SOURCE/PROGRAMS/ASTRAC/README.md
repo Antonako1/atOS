@@ -16,7 +16,6 @@ OPTIONS:
     -A, --assemble                  Assemble input ASM files into object binaries
     -C, --compile                   Compile C source files into object binaries
     -D, --disassemble               Disassemble a binary back into readable ASM
-    -E, --preprocess                Run preprocessor only (for C files)
     -B, --build                     Perform full build pipeline (compile + assemble)
     
     -I, --include <dir>             Add an include directory for headers

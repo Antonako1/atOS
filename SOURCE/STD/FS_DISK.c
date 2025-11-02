@@ -282,8 +282,10 @@ BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
 
         MEMCPY(&file->ent.fat_ent, &ent.entry, sizeof(DIR_ENTRY));
         file->sz = ent.entry.FILE_SIZE;
-        file->data = FAT32_READ_FILE_CONTENTS(&file->sz, &ent.entry);
-        if (!file->data) goto failure;
+        if(file->sz > 0) {
+            file->data = FAT32_READ_FILE_CONTENTS(&file->sz, &ent.entry);
+            if (!file->data) goto failure;
+        }
 
         return TRUE;
     }
@@ -307,6 +309,10 @@ BOOLEAN FILE_FROM_RAW_ISO_DATA(FILE *file, VOIDPTR data, U32 sz, IsoDirectoryRec
     MEMCPY_OPT(&file->ent.iso_ent, ent, sizeof(IsoDirectoryRecord));
     file->mode |= MODE_ISO9660 | MODE_RW;
 
+}
+
+U32 GET_FULL_CLUSTER(U32 high, U32 low) {
+    return (high << 16) | (low & 0xFFFF);
 }
 
 
@@ -334,25 +340,47 @@ U32 FREAD(FILE *file, VOIDPTR buffer, U32 len) {
 }
 
 U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len) {
-    if (!file || !buffer) return 0;
+    if (!file || !buffer || len == 0) return 0;
 
     // ISO9660 is read-only
     if (file->mode & MODE_ISO9660) return 0;
 
+    // Only FAT32 supported
     if (!(file->mode & MODE_FAT32)) return 0;
 
-    // Append mode
-    if (file->mode & MODE_A) {
+    VOIDPTR tmp;
+
+    if (file->mode & MODE_A) { // Append
+        // Write to FAT32 first (file->sz is the current size)
         if (!FAT32_FILE_APPEND(&file->ent.fat_ent, (PU8)buffer, len))
             return 0;
+
+        // Now extend in-memory buffer
+        tmp = ReAlloc(file->data, file->sz + len);
+        if (!tmp) return 0;
+
+        file->data = tmp;
+        MEMCPY_OPT((PU8)file->data + file->sz, buffer, len);
+        file->sz += len;
     }
-    // Overwrite
-    else if (file->mode & MODE_W) {
-        if (!FAT32_FILE_WRITE(&file->ent.fat_ent, buffer, len))
+    else if (file->mode & MODE_W) { // Overwrite mode
+        // Write to FAT32
+        if (!FAT32_FILE_WRITE(&file->ent.fat_ent, (PU8)buffer, len))
             return 0;
+
+        // Reallocate buffer to new size
+        tmp = ReAlloc(file->data, len);
+        if (!tmp) return 0;
+
+        file->data = tmp;
+        MEMCPY_OPT(file->data, buffer, len); // overwrite existing content
+        file->sz = len;
     }
+
     return len;
 }
+
+
 
 BOOLEAN FSEEK(FILE *file, U32 offset) {
     if (!file) return FALSE;
@@ -532,13 +560,18 @@ BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force) {
 }
 
 BOOLEAN FILE_CREATE(PU8 path) {
-    if (!path) return FALSE;
+    if (!path) {
+        DEBUG_PUTS_LN("FILE_CREATE: path is NULL");
+        return FALSE;
+    }
 
-    // do not create in ISO9660 (read-only)
     // Split path into parent and name
     const U8 *name = GET_BASENAME(path);
     U8 *parent = GET_PARENT_PATH(path);
-    if (!parent) return FALSE;
+    if (!parent) {
+        DEBUG_PUTS_LN("FILE_CREATE: failed to get parent path");
+        return FALSE;
+    }
 
     // resolve parent - if parent path is root ("/") we use root cluster; otherwise try to resolve
     U32 parent_cluster = FAT32_GET_ROOT_CLUSTER();
@@ -548,19 +581,18 @@ BOOLEAN FILE_CREATE(PU8 path) {
             MFree(parent);
             return FALSE;
         }
-        // We don't know the exact field for starting cluster in DIR_ENTRY here,
-        // but a safe fallback is to use root cluster. This is a skeleton; real
-        // implementation must extract cluster from parent_ent.entry.
-        // For now, attempt to use root cluster.
-        parent_cluster = FAT32_GET_ROOT_CLUSTER();
+        parent_cluster = GET_FULL_CLUSTER(parent_ent.entry.HIGH_CLUSTER_BITS, parent_ent.entry.LOW_CLUSTER_BITS);
     }
 
     // create empty file (attrib = archive)
     U32 out_cluster = 0;
-    BOOLEAN res = FAT32_CREATE_CHILD_FILE(parent_cluster, (U8*)name, 0x20 /* archive attrib */, NULL, 0, &out_cluster);
+    BOOLEAN res = FAT32_CREATE_CHILD_FILE(parent_cluster, (U8*)name, FAT_ATTRIB_ARCHIVE, NULL, 0, &out_cluster);
+
+
     MFree(parent);
     return res;
 }
+
 
 BOOLEAN DIR_CREATE(PU8 path) {
     if (!path) return FALSE;
