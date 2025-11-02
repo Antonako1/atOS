@@ -74,7 +74,7 @@ U0 EDIT_LINE_MSG_LOOP() {
                 }
                 SEND_MESSAGE(&res);
             } break;
-
+            
 
             case SHELL_CMD_ENDED_MYSELF: {
                 STDOUT *proc_out = GET_STDOUT(msg->sender_pid);
@@ -104,6 +104,10 @@ U0 EDIT_LINE_MSG_LOOP() {
                 SEND_MESSAGE(&res);
             } break;
 
+            case SHELL_CMD_SHELL_FOCUS: {
+                SHELL_INSTANCE *shndl = GET_SHNDL();
+                shndl->focused_pid = msg->sender_pid;
+            } break;
         }
 
         FREE_MESSAGE(msg);

@@ -1,5 +1,9 @@
 echo atOShell v0.1 Type 'help' for a list of commands.
-ASTRAC.BIN 1 2 3
+IRONCLAD.BIN # Start dynamic library loader
+
+ASTRAC.BIN -h
+
+HEXNEST.BIN -A @{DOCS}/ASM/TEST.ASM -o TEST.BIN
 # @var=ATOS
 # dir @{q}
 # dir @{var}

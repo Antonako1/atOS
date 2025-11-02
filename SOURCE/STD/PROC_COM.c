@@ -180,6 +180,9 @@ void PROC_INIT_CONSOLE() {
 
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_CREATE_STDOUT, NULL, 0, 0);
     SEND_MESSAGE(&msg);
+
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_SHELL_FOCUS, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
     ___keyboard_access_granted = FALSE;
     ___draw_access_granted = FALSE;
     ___STDOUT_CREATED = FALSE;

@@ -477,6 +477,7 @@ BOOLEAN REMOVE_DIR(PU8 path) {
         if (STRNCMP(name, ".          ", 11) == 0 || STRNCMP(name, "..         ", 11) == 0) continue;
 
         PUTS("\nrmdir: Directory is not empty.\n");
+        PUTS(name);
         return FALSE;
     }
 

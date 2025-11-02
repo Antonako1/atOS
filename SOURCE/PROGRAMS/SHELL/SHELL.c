@@ -94,7 +94,7 @@ U0 SHELL_LOOP(U0) {
     U32 pass = 0;
     
 
-    RUN_BATSH_SCRIPT("/ATOS/ATOSHELL.SH");
+    RUN_BATSH_SCRIPT("/ATOS/ATOSHELL.SH", 0, NULLPTR);
     PUT_SHELL_START();
 
     while(1) {

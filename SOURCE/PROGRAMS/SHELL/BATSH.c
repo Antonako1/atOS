@@ -53,6 +53,8 @@ CMD_FUNC(CD);
 CMD_FUNC(CD_BACKWARDS);
 CMD_FUNC(DIR);
 CMD_FUNC(MKDIR);
+CMD_FUNC(TYPE);
+CMD_FUNC(TAIL);
 CMD_FUNC(RMDIR);
 
 
@@ -208,6 +210,11 @@ PU8 GET_INST_VAR(PU8 name, BATSH_INSTANCE *inst) {
     if(!inst) return NULL;
     S32 idx = FIND_INST_VAR(name, inst);
     return (idx >= 0 && idx != -1) ? inst->shell_vars[idx].value : NULLPTR;
+}
+
+PU8 GET_INST_ARG(U32 index, BATSH_INSTANCE *inst) {
+    if(index > inst->arg_count) return NULLPTR;
+    return inst->args[index];
 }
 
 
@@ -372,6 +379,8 @@ static const ShellCommand shell_commands[] ATTRIB_RODATA = {
     { "dir",      CMD_DIR,      "List directory contents" },
     { "mkdir",    CMD_MKDIR,    "Create a directory" },
     { "rmdir",    CMD_RMDIR,    "Remove a directory" },
+    { "type",     CMD_TYPE,    "Print file contents" },
+    { "tail",     CMD_TAIL,    "Print tail of file contents" },
 
     // Any commands added here must be added 
     //   into the KEYWORDS array above as TOK_CMD in built-ins section!
@@ -502,6 +511,7 @@ BATSH_COMMAND *parse_word_or_cmd(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_IN
     for (; *i < len; (*i)++) {
         tkn = tokens[*i];
         append_next--;
+        DEBUG_PUTS_LN(tkn->text);
         switch (tkn->type) {
             case TOK_EOL:
                 if (escapes > 0) { escapes--; continue; }
@@ -517,6 +527,17 @@ BATSH_COMMAND *parse_word_or_cmd(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_IN
                 continue;
             case TOK_DIV: // For paths and such.
                 append_next = 2;
+            case TOK_PIPE:
+            case TOK_PLUS:
+            case TOK_MINUS:
+            case TOK_MUL:
+            case TOK_LPAREN:
+            case TOK_RPAREN:
+            case TOK_LBRACE:
+            case TOK_RBRACE:
+            case TOK_ASSIGN:
+            case TOK_REDIR_OUT:
+            case TOK_REDIR_IN:
             case TOK_CMD:
             case TOK_WORD:
             case TOK_STRING:
@@ -553,7 +574,6 @@ BATSH_COMMAND *parse_master(BATSH_TOKEN **tokens, U32 len, BATSH_INSTANCE *inst)
     for (U32 i = 0; i < len;) {
         BATSH_TOKEN *tkn = tokens[i];
         BATSH_COMMAND *cmd = NULL;
-
         switch (tkn->type) {
             case TOK_WORD:
             case TOK_CMD:
@@ -654,21 +674,23 @@ BOOL resolve_vars(PU8 *line, BATSH_INSTANCE *inst) {
 
                 PU8 value = NULL;
 
-                if (inst) {
-                    S32 idx = FIND_VAR(var_name);
+
+                if (IS_DIGIT_STR(value) && inst) {
+                    U32 arg_index = ATOI(var_name);
+                    value = GET_INST_ARG(arg_index, inst);
+                }
+
+                S32 idx = 0; 
+                if (!value || !*value) {
+                    idx = FIND_VAR(var_name);
                     if (idx >= 0)
                         value = GET_VAR(var_name);
-                    else {
-                        idx = FIND_INST_VAR(var_name, inst);
-                        if (idx >= 0)
-                            value = GET_INST_VAR(var_name, inst);
-                    }
                 }
 
                 if (!value || !*value) {
-                    S32 idx = FIND_VAR(var_name);
+                    idx = FIND_INST_VAR(var_name, inst);
                     if (idx >= 0)
-                        value = GET_VAR(var_name);
+                        value = GET_INST_VAR(var_name, inst);
                 }
 
                 if (!value) value = (PU8)"";
@@ -699,7 +721,8 @@ BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
         case CMD_SIMPLE: {
             PU8 line_as_is = NULLPTR;
             for (U32 i = 0; i < cmd->argc; i++) {
-                line_as_is = STRAPPEND_SEPARATOR(line_as_is, cmd->argv[i], ' ');
+                // line_as_is = STRAPPEND_SEPARATOR(line_as_is, cmd->argv[i], ' ');
+                line_as_is = STRAPPEND(line_as_is, cmd->argv[i]);
             }
 
             if (!line_as_is) break;
@@ -830,6 +853,9 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
         if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
             cmp_words:
             if (ptr > 0) {
+                if(!back_to_singles) {
+                    buf[ptr++] = c;
+                }
                 buf[ptr] = '\0';
                 if(STRICMP(buf, rem->keyword) == 0) {
                     // Loop until end of line
@@ -840,7 +866,9 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
                         }
                     }
                     ptr = 0;
-                    if(back_to_singles) goto back_to_single_parse;
+                    if(back_to_singles) {
+                        goto back_to_single_parse;
+                    }
                     continue;
                 }
                 BOOLEAN KEYWORD_ADDED = FALSE;
@@ -868,7 +896,9 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
                 KEYWORD kw = { "~", TOK_EOL };
                 if(!ADD_TOKEN(&tokens, &token_len, kw.keyword, &kw)) goto error;
             }
-            if(back_to_singles) goto back_to_single_parse;
+            if(back_to_singles) {
+                goto back_to_single_parse;
+            }
             continue;
         } 
         else if(c == '"') {
@@ -888,6 +918,7 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
 
             KEYWORD str_kw = { "\"", TOK_STRING };
             if (!ADD_TOKEN(&tokens, &token_len, buf, &str_kw)) goto error;
+            ptr = 0;
             continue;
         }
         else if(c == '#') {
@@ -897,6 +928,9 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
                     break;
                 }
             }
+            KEYWORD str_kw = { "~", TOK_EOL };
+            if (!ADD_TOKEN(&tokens, &token_len, buf, &str_kw)) goto error;
+            ptr = 0;
             continue;
         }
         else if(c == '@') {
@@ -921,6 +955,22 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
 
             if(input[i] == '}') i++; // skip closing brace
             if(input[i] == '=' ||
+                input[i] == '|' ||
+                input[i] == '+' ||
+                input[i] == '-' ||
+                input[i] == '*' ||
+                input[i] == '(' ||
+                input[i] == ')' ||
+                input[i] == '}' ||
+                input[i] == '/' ||
+                input[i] == '{' ||
+                input[i] == '=' ||
+                input[i] == '@' ||
+                input[i] == '>' ||
+                input[i] == '<' ||
+                input[i] == '{' ||
+                input[i] == '}' ||
+                input[i] == '\\' ||
                 input[i] == '\n' ||
                 input[i] == '\t' ||
                 input[i] == '\r' ||
@@ -940,10 +990,10 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
             c == '+' ||
             c == '-' ||
             c == '*' ||
-            c == '/' ||
             c == '(' ||
             c == ')' ||
             c == '}' ||
+            c == '/' ||
             c == '{' ||
             c == '=' ||
             c == '@' ||
@@ -951,30 +1001,32 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
             c == '<' ||
             c == '{' ||
             c == '}' ||
-            c == '\\' 
-        ) 
+            c == '\\'
+        )
         {
-            if(ptr > 0) {
+            if (ptr > 0) {
                 back_to_singles = TRUE;
                 goto cmp_words;
             }
+
             back_to_single_parse:
             back_to_singles = FALSE;
             ptr = 0;
             buf[ptr] = c;
             buf[++ptr] = '\0';
             KEYWORD *kw = GET_KEYWORD_C(c);
-            if(!kw) {
+            if (!kw) {
                 PRINT_TOKENIZER_ERR(buf, NULLPTR, pos);
                 goto error;
             }
-            if(!ADD_TOKEN(&tokens, &token_len, buf, kw)) {
+            if (!ADD_TOKEN(&tokens, &token_len, buf, kw)) {
                 PRINT_TOKENIZER_ERR(buf, kw, pos);
                 goto error;
             }
             ptr = 0;
             continue;
         }
+
 
         buf[ptr++] = c;
         if (ptr >= CUR_LINE_MAX_LENGTH - 1)
@@ -990,7 +1042,6 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
         relexed = TRUE;
         goto relex;
     }
-
 
 
     // Parse the tokens
@@ -1088,11 +1139,11 @@ BOOLEAN RUN_BATSH_FILE(BATSH_INSTANCE *inst) {
 // ===================================================
 // BATSH Script Loader
 // ===================================================
-BOOLEAN RUN_BATSH_SCRIPT(PU8 path) {
+BOOLEAN RUN_BATSH_SCRIPT(PU8 path, U32 argc, PPU8 argv) {
     PU8 dot = STRRCHR(path, '.');
     if (!dot || STRNICMP(dot, ".SH", 3) != 0)
     return FALSE;
-    BATSH_INSTANCE *inst = CREATE_BATSH_INSTANCE(path);
+    BATSH_INSTANCE *inst = CREATE_BATSH_INSTANCE(path, argc, argv);
     if(!inst) return FALSE;
     BOOLEAN res = RUN_BATSH_FILE(inst);
     DESTROY_BATSH_INSTANCE(inst);
@@ -1102,7 +1153,7 @@ BOOLEAN RUN_BATSH_SCRIPT(PU8 path) {
 // ===================================================
 // BATSH Instance initializer
 // ===================================================
-BATSH_INSTANCE *CREATE_BATSH_INSTANCE(PU8 path) {
+BATSH_INSTANCE *CREATE_BATSH_INSTANCE(PU8 path, U32 argc, PPU8 argv) {
     BATSH_INSTANCE *inst = MAlloc(sizeof(BATSH_INSTANCE));
     if(!inst) return NULLPTR;
 
@@ -1118,7 +1169,11 @@ BATSH_INSTANCE *CREATE_BATSH_INSTANCE(PU8 path) {
     inst->echo = 1;
     inst->shell_var_count = 0;
     MEMZERO(inst->shell_vars, sizeof(inst->shell_vars));
-    inst->arg_count = 0;
+    inst->arg_count = argc;
+    if(inst->arg_count > MAX_ARGS) inst->arg_count = MAX_ARGS;
+    for(U32 i = 0; i < inst->arg_count; i++) {
+        STRCPY(inst->args[i], argv[i]);
+    }
     MEMZERO(inst->args, sizeof(inst->args));
     inst->shndl = GET_SHNDL();
     inst->status_code = 0;
@@ -1225,6 +1280,7 @@ VOID CMD_DIR(PU8 raw_line) {
     else if (STRCMP(path_arg, "~") == 0) path_arg = (PU8)"/HOME";
     else if (!path_arg || *path_arg == '\0') path_arg = (PU8)".";
     PRINT_CONTENTS_PATH(path_arg);
+    PRINTNEWLINE();
 }
 
 VOID CMD_MKDIR(PU8 raw_line) {
@@ -1241,6 +1297,108 @@ VOID CMD_RMDIR(PU8 raw_line) {
     if (!REMOVE_DIR(path_arg)) return;
 }
 
+#define TAIL_LINE_COUNT 10
+
+VOID CMD_TYPE(PU8 raw_line) {
+    MEMZERO(tmp_line, sizeof(tmp_line));
+    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
+    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 4);
+    if (!path_arg || !*path_arg) {
+        PUTS("\ntype: missing file path.\n");
+        return;
+    }
+
+    FAT_LFN_ENTRY entry;
+    if (!FAT32_PATH_RESOLVE_ENTRY(path_arg, &entry)) {
+        PUTS("\ntype: file not found.\n");
+        return;
+    }
+
+    if (entry.entry.ATTRIB & FAT_ATTRB_DIR) {
+        PUTS("\ntype: cannot display a directory.\n");
+        return;
+    }
+
+    U32 file_size = entry.entry.FILE_SIZE;
+    if (file_size == 0) {
+        PUTS("\n(empty file)\n");
+        return;
+    }
+
+    U8 *buffer = FAT32_READ_FILE_CONTENTS(&file_size, &entry.entry);
+    if (!buffer) {
+        PUTS("\ntype: failed to read file.\n");
+        MFree(buffer);
+        return;
+    }
+
+    buffer[file_size] = '\0';
+    PUTS("\n");
+    PUTS(buffer);
+    PUTS("\n");
+
+    MFree(buffer);
+}
+
+VOID CMD_TAIL(PU8 raw_line) {
+    MEMZERO(tmp_line, sizeof(tmp_line));
+    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
+    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 4);
+    if (!path_arg || !*path_arg) {
+        PUTS("\ntail: missing file path.\n");
+        return;
+    }
+
+    FAT_LFN_ENTRY entry;
+    if (!FAT32_PATH_RESOLVE_ENTRY(path_arg, &entry)) {
+        PUTS("\ntail: file not found.\n");
+        return;
+    }
+
+    if (entry.entry.ATTRIB & FAT_ATTRB_DIR) {
+        PUTS("\ntail: cannot read a directory.\n");
+        return;
+    }
+
+    U32 file_size = entry.entry.FILE_SIZE;
+    if (file_size == 0) {
+        PUTS("\n(empty file)\n");
+        return;
+    }
+    U8 *buffer = FAT32_READ_FILE_CONTENTS(&file_size, &entry.entry);
+    if (!buffer) {
+        PUTS("\ntype: failed to read file.\n");
+        MFree(buffer);
+        return;
+    }
+
+    buffer[file_size] = '\0';
+
+    // Find start of last N lines
+    U32 line_count = 0;
+    for (U32 i = file_size; i > 0; i--) {
+        if (buffer[i - 1] == '\n') {
+            line_count++;
+            if (line_count > TAIL_LINE_COUNT) {
+                buffer[i] = '\0';
+                PUTS("\n");
+                PUTS(&buffer[i]);
+                PUTS("\n");
+                MFree(buffer);
+                return;
+            }
+        }
+    }
+
+    // If fewer than N lines, print all
+    PUTS("\n");
+    PUTS(buffer);
+    PUTS("\n");
+
+    MFree(buffer);
+}
+
+
 VOID SETUP_BATSH_PROCESSER() {
     SET_VAR("PATH", 
         ";/ATOS/;"
@@ -1251,6 +1409,8 @@ VOID SETUP_BATSH_PROCESSER() {
         "/PROGRAMS/SATP/;"
         "/PROGRAMS/SHELL/;"
     );
+    SET_VAR("HOME", "/HOME");
+    SET_VAR("DOCS", "/HOME/DOCS");
 }
 
 
@@ -1416,8 +1576,14 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         if (res) PRINTNEWLINE();
         result = res != 0;
     } else if (STRICMP(ext, "SH") == 0) {
-        // TODO: shell script
-        result = FALSE;
+        // TODO: Crashes!
+        // result = RUN_BATSH_SCRIPT(abs_path, argc, argv);
+        // for(U32 i = 0; i < argc; i++) {
+        //     if(argv[i]) MFree(argv[i]);
+        // }   
+        // if(argv) MFree(argv);
+        PUTS("\nThis would crash, not going to do that though!\n");
+        result = TRUE;
     }
 
     MFree(prog_name);

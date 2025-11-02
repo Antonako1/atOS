@@ -48,7 +48,7 @@ static inline VOID DRAW_CELL_BG_RUN(U32 col, U32 row, U32 len, VBE_PIXEL_COLOUR 
 }
 
 
-#define GLYPH_COUNT (sizeof(WIN1KXHR__8x16) / CHAR_HEIGHT)
+#define GLYPH_COUNT (sizeof(toshiba_t5200c_bios_vers_3__2__8x16) / CHAR_HEIGHT)
 
 // Efficiently draw a string of length len at cell (col,row)
 // Background is cleared with a single filled-rectangle per run, then
@@ -79,10 +79,10 @@ static VOID DRAW_STRING_AT(U32 col, U32 row, const U8 *s, U32 len,
 
             // ✅ Also check that the index is safe before dereferencing
             U32 glyph_index = ch * CHAR_HEIGHT;
-            if (glyph_index + i >= sizeof(WIN1KXHR__8x16))
+            if (glyph_index + i >= sizeof(toshiba_t5200c_bios_vers_3__2__8x16))
                 continue; // skip invalid glyph line
 
-            const U8 *glyph = &WIN1KXHR__8x16[glyph_index];
+            const U8 *glyph = &toshiba_t5200c_bios_vers_3__2__8x16[glyph_index];
             U8 bits = glyph[i];
 
             for (U32 bj = 0; bj < CHAR_WIDTH; bj++) {
@@ -743,6 +743,19 @@ VOID HANDLE_KEY_DELETE() {
 }
 
 VOID HANDLE_CTRL_C() {
+    HANDLE_LE_CURSOR();
+    SHELL_INSTANCE *shdnl = GET_SHNDL();
+    U32 pid = shdnl->focused_pid;
+    U32 self_pid = PROC_GETPID();
+    PROC_MESSAGE msg;
+    shdnl->focused_pid = self_pid;
+    DELETE_STDOUT(pid);
+
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, 0, 0, self_pid);
+    SEND_MESSAGE(&msg);
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
+    SEND_MESSAGE(&msg);
+
     // Draw `^C` at current position
     PUTC('^');
     PUTC('C');
@@ -906,6 +919,7 @@ void HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod) {
 }
 
 void HANDLE_LE_CURSOR() {
+    if(STRLEN(current_line) == 0) PUT_SHELL_START();
     cursor.Row = prompt_row;
     // clamp column to valid range
     U32 desired = prompt_length + edit_pos;
