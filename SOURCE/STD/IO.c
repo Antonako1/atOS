@@ -36,91 +36,17 @@ void puts(U8 *str) {
     
     stdout->proc_seq++;
 }
-
-void printf(PU8 fmt, ...) {
+// For printf (direct console)
+VOID console_putch(CHAR c, VOID *ctx) {
+    (VOID)ctx;
+    putc(c);
+}
+VOID printf(CHAR *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-
-    while (*fmt) {
-        if (*fmt != '%') {
-            putc(*fmt++);
-            continue;
-        }
-
-        fmt++; // skip '%'
-        if (!*fmt) break;
-
-        I32 width = 0;
-        BOOL pad_zero = FALSE;
-
-        // Parse optional zero-padding and width (e.g. %02X, %08x)
-        if (*fmt == '0') {
-            pad_zero = TRUE;
-            fmt++;
-        }
-        while (*fmt >= '0' && *fmt <= '9') {
-            width = width * 10 + (*fmt - '0');
-            fmt++;
-        }
-
-        switch (*fmt) {
-            case 'c': {
-                CHAR c = (CHAR)va_arg(args, I32);
-                putc(c);
-                break;
-            }
-
-            case 's': {
-                CHAR *s = va_arg(args, CHAR*);
-                if (s)
-                    puts((PU8)s);
-                else
-                    puts((PU8)"(null)");
-                break;
-            }
-
-            case 'd': {
-                I32 val = va_arg(args, I32);
-                CHAR buf[32];
-                ITOA(val, buf, 10);
-
-                I32 len = STRLEN(buf);
-                for (I32 i = len; i < width; i++)
-                    putc(pad_zero ? '0' : ' ');
-                puts((PU8)buf);
-                break;
-            }
-
-            case 'x':
-            case 'X': {
-                U32 val = va_arg(args, U32);
-                CHAR buf[32];
-                ITOA_U(val, buf, 16);
-
-                I32 len = STRLEN(buf);
-                for (I32 i = len; i < width; i++)
-                    putc(pad_zero ? '0' : ' ');
-                puts((PU8)buf);
-                break;
-            }
-
-            case '%':
-                putc('%');
-                break;
-
-            default:
-                putc('%');
-                putc(*fmt);
-                break;
-        }
-
-        fmt++;
-    }
-
+    VFORMAT(console_putch, NULL, fmt, args);
     va_end(args);
 }
-
-
 
 static U32 prev_seq ATTRIB_DATA = 0;
 static KP_DATA *kp ATTRIB_DATA = NULLPTR;

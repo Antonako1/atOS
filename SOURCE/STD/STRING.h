@@ -31,6 +31,7 @@ PU8 STRAPPEND(PU8 dest, PU8 src); // HEAP. Appends src to dest
 PU8 STRAPPEND_SEPARATOR(PU8 dest, PU8 src, CHAR separator); // Append strings with separator
 
 PU8 STRSTR(PU8 a, PU8 b);
+PU8 STRISTR(PU8 a, PU8 b);
 
 PU8 STR_REPLACE_FIRST(PU8 src, PU8 repl, PU8 with); // returns allocated string
 PU8 STR_REPLACE(PU8 src, PU8 repl, PU8 with);
@@ -96,4 +97,8 @@ size_t STRSPN(PU8 str, PU8 accept);
 U8* str_ltrim(U8 *s);
 U8* str_rtrim(U8 *s);
 U8* str_trim(U8 *s);
+
+#include <STD/ARG.h>
+VOID buffer_putch(CHAR c, VOID *ctx);
+VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args);
 #endif // STRING_H

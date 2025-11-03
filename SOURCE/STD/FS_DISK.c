@@ -185,7 +185,7 @@ BOOL FAT32_DIR_ENUMERATE(U32 dir_cluster, DIR_ENTRY *out_entries, U32 *max_count
     return res;
 }
 
-BOOL FAT32_DIR_REMOVE_ENTRY(DIR_ENTRY *entry, const char *name) {
+BOOL FAT32_DIR_REMOVE_ENTRY(FAT_LFN_ENTRY *entry, const char *name) {
     if (!entry || !name) return FALSE;
     return SYSCALL2(SYSCALL_DIR_REMOVE_ENTRY, entry, name);
 }
@@ -203,12 +203,12 @@ VOIDPTR FAT32_READ_FILE_CONTENTS(U32 *size_out, DIR_ENTRY *entry) {
     return buffer;
 }
 
-BOOL FAT32_FILE_WRITE(DIR_ENTRY *entry, const U8 *data, U32 size) {
+BOOL FAT32_FILE_WRITE(FAT_LFN_ENTRY *entry, const U8 *data, U32 size) {
     if (!entry || !data) return FALSE;
     return SYSCALL3(SYSCALL_FILE_WRITE, entry, data, size);
 }
 
-BOOL FAT32_FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
+BOOL FAT32_FILE_APPEND(FAT_LFN_ENTRY *entry, const U8 *data, U32 size) {
     if (!entry || !data) return FALSE;
     return SYSCALL3(SYSCALL_FILE_APPEND, entry, data, size);
 }
@@ -265,24 +265,23 @@ BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
         }
 
         MEMCPY(&file->ent.iso_ent, ent, sizeof(IsoDirectoryRecord));
-
         file->sz = ent->extentLengthLE;
         file->data = READ_ISO9660_FILECONTENTS(ent);
 
         MFree(ent);
-
         if (!file->data) goto failure;
         return TRUE;
     }
 
     if (fat) {
-        FAT_LFN_ENTRY ent = { 0 };
+        FAT_LFN_ENTRY ent = {0};
         if (!FAT32_PATH_RESOLVE_ENTRY(path, &ent)) goto failure;
         if (ent.entry.ATTRIB & FAT_ATTRB_DIR) goto failure;
 
-        MEMCPY(&file->ent.fat_ent, &ent.entry, sizeof(DIR_ENTRY));
+        MEMCPY(&file->ent.fat_ent, &ent, sizeof(FAT_LFN_ENTRY));
         file->sz = ent.entry.FILE_SIZE;
-        if(file->sz > 0) {
+
+        if (file->sz > 0) {
             file->data = FAT32_READ_FILE_CONTENTS(&file->sz, &ent.entry);
             if (!file->data) goto failure;
         }
@@ -295,13 +294,16 @@ failure:
     return FALSE;
 }
 
-BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, DIR_ENTRY *ent) {
+BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, FAT_LFN_ENTRY *ent) {
+    if (!file || !ent) return FALSE;
     file->data = data;
     file->sz = sz;
     file->read_ptr = 0;
-    MEMCPY_OPT(&file->ent.fat_ent, ent, sizeof(DIR_ENTRY));
+    MEMCPY_OPT(&file->ent.fat_ent, ent, sizeof(FAT_LFN_ENTRY));
     file->mode |= MODE_FAT32 | MODE_RW;
+    return TRUE;
 }
+
 BOOLEAN FILE_FROM_RAW_ISO_DATA(FILE *file, VOIDPTR data, U32 sz, IsoDirectoryRecord *ent) {
     file->data = data;
     file->sz = sz;
@@ -340,45 +342,55 @@ U32 FREAD(FILE *file, VOIDPTR buffer, U32 len) {
 }
 
 U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len) {
-    if (!file || !buffer || len == 0) return 0;
+    if (!file || !buffer || len == 0)
+        return 0;
 
     // ISO9660 is read-only
-    if (file->mode & MODE_ISO9660) return 0;
+    if (file->mode & MODE_ISO9660)
+        return 0;
 
-    // Only FAT32 supported
-    if (!(file->mode & MODE_FAT32)) return 0;
+    // Must be FAT32 backend
+    if (!(file->mode & MODE_FAT32))
+        return 0;
 
-    VOIDPTR tmp;
+    U8 *tmp;
+    U32 new_size = file->sz;
 
-    if (file->mode & MODE_A) { // Append
-        // Write to FAT32 first (file->sz is the current size)
-        if (!FAT32_FILE_APPEND(&file->ent.fat_ent, (PU8)buffer, len))
+    if (file->mode & MODE_A) { // Append mode
+        new_size += len;
+
+        // Grow in-memory buffer
+        tmp = ReAlloc(file->data, new_size);
+        if (!tmp)
             return 0;
 
-        // Now extend in-memory buffer
-        tmp = ReAlloc(file->data, file->sz + len);
-        if (!tmp) return 0;
-
+        // Copy new data at the end
+        MEMCPY_OPT(tmp + file->sz, buffer, len);
         file->data = tmp;
-        MEMCPY_OPT((PU8)file->data + file->sz, buffer, len);
-        file->sz += len;
+        file->sz = new_size;
+
+        // Write combined buffer (existing + new) fully
+        if (!FAT32_FILE_WRITE(&file->ent.fat_ent, (PU8)file->data, file->sz))
+            return 0;
     }
     else if (file->mode & MODE_W) { // Overwrite mode
-        // Write to FAT32
-        if (!FAT32_FILE_WRITE(&file->ent.fat_ent, (PU8)buffer, len))
+        // Replace buffer entirely
+        tmp = ReAlloc(file->data, len);
+        if (!tmp)
             return 0;
 
-        // Reallocate buffer to new size
-        tmp = ReAlloc(file->data, len);
-        if (!tmp) return 0;
-
+        MEMCPY_OPT(tmp, buffer, len);
         file->data = tmp;
-        MEMCPY_OPT(file->data, buffer, len); // overwrite existing content
         file->sz = len;
+
+        // Write new data
+        if (!FAT32_FILE_WRITE(&file->ent.fat_ent, (PU8)file->data, file->sz))
+            return 0;
     }
 
     return len;
 }
+
 
 
 
@@ -529,34 +541,29 @@ BOOLEAN DIR_EXISTS(PU8 path) {
 BOOLEAN FILE_DELETE(PU8 path) {
     if (!path) return FALSE;
 
-    // ISO9660 is read-only -> cannot delete
-    // Try FAT32 removal: resolve entry, then call FAT32_DIR_REMOVE_ENTRY
     FAT_LFN_ENTRY ent = {0};
     if (!FAT32_PATH_RESOLVE_ENTRY(path, &ent)) return FALSE;
 
-    // basename to pass as name (some syscalls expect a name)
     const U8 *basename = GET_BASENAME(path);
-    // call removal syscall wrapper
-    if (FAT32_DIR_REMOVE_ENTRY(&ent.entry, (const char*)basename)) return TRUE;
+    if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
+
     return FALSE;
 }
 
 BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force) {
     if (!path) return FALSE;
 
-    // ISO9660 read-only -> cannot delete
-    // FAT32: resolve entry and remove. 'force' isn't explicitly used here;
-    // assume the syscall enforces non-empty checks if needed.
     FAT_LFN_ENTRY ent = {0};
     if (!FAT32_PATH_RESOLVE_ENTRY(path, &ent)) return FALSE;
 
-    if (!IS_FLAG_SET(ent.entry.ATTRIB, FAT_ATTRB_DIR)) {
-        // not a directory
+    if (!IS_FLAG_SET(ent.entry.ATTRIB, FAT_ATTRB_DIR))
         return FALSE;
-    }
-
     const U8 *basename = GET_BASENAME(path);
-    return FAT32_DIR_REMOVE_ENTRY(&ent.entry, (const char*)basename);
+    if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
+
+    if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
+
+    return FALSE;
 }
 
 BOOLEAN FILE_CREATE(PU8 path) {
@@ -621,40 +628,34 @@ BOOLEAN DIR_CREATE(PU8 path) {
 
 BOOLEAN FILE_TRUNCATE(FILE *file, U32 new_size) {
     if (!file) return FALSE;
-    if (!(file->mode & MODE_FAT32)) return FALSE; // only support FAT32 truncation here
+    if (!(file->mode & MODE_FAT32)) return FALSE;
 
-    // allocate temp buffer with new_size, copy the min(file->sz, new_size)
     U8 *temp = NULL;
     if (new_size > 0) {
         temp = MAlloc(new_size);
         if (!temp) return FALSE;
         MEMZERO(temp, new_size);
         U32 to_copy = (file->sz < new_size) ? file->sz : new_size;
-        if (to_copy && file->data) MEMCPY(temp, file->data, to_copy);
-    } else {
-        // new_size == 0: create empty buffer (NULL allowed for write)
-        temp = NULL;
+        if (to_copy && file->data)
+            MEMCPY(temp, file->data, to_copy);
     }
 
-    // write to disk (overwrite)
     if (!FAT32_FILE_WRITE(&file->ent.fat_ent, temp, new_size)) {
         if (temp) MFree(temp);
         return FALSE;
     }
 
-    // update in-memory representation: free old data and set new
     if (file->data) {
         MFree(file->data);
         file->data = NULL;
     }
     if (new_size > 0) {
         file->data = (VOIDPTR)MAlloc(new_size);
-        if (file->data) MEMCPY(file->data, temp, new_size);
-    } else {
-        file->data = NULL;
+        if (file->data)
+            MEMCPY(file->data, temp, new_size);
     }
-    file->sz = new_size;
 
+    file->sz = new_size;
     if (temp) MFree(temp);
     return TRUE;
 }
@@ -663,11 +664,17 @@ BOOLEAN FILE_FLUSH(FILE *file) {
     if (!file) return FALSE;
     if (!(file->mode & MODE_FAT32)) return FALSE;
 
-    // If there's data in memory, write it to disk (overwrite)
-    if (file->data && file->sz > 0) {
+    if (file->data && file->sz > 0)
         return FAT32_FILE_WRITE(&file->ent.fat_ent, (const U8*)file->data, file->sz);
-    }
 
-    // nothing to flush, succeed
     return TRUE;
+}
+
+VOID FAT_DECODE_TIME(U16 time, U16 date, U32 *year, U32 *month, U32 *day, U32 *hour, U32 *minute, U32 *second) {
+    *hour   = (time >> 11) & 0x1F;
+    *minute = (time >> 5)  & 0x3F;
+    *second = (time & 0x1F) * 2;
+    *year   = 1980 + ((date >> 9) & 0x7F);
+    *month  = (date >> 5) & 0x0F;
+    *day    = (date & 0x1F);
 }

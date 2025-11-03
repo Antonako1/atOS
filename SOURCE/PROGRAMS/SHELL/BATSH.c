@@ -262,6 +262,7 @@ typedef enum {
     TOK_RBRACE, // }
     TOK_ASSIGN, // =
     TOK_VAR, // @
+    TOK_VAR_GLOBAL, // @@
     TOK_REDIR_OUT,   // >
     TOK_REDIR_IN,    // <
 
@@ -342,6 +343,7 @@ static const KEYWORD KEYWORDS[] ATTRIB_RODATA = {
     { "}", TOK_RBRACE },
     { "=", TOK_ASSIGN },
     { "@", TOK_VAR },
+    { "@@", TOK_VAR_GLOBAL },
     { ">", TOK_REDIR_OUT },
     { "<", TOK_REDIR_IN },
     { ";", TOK_SEMI },
@@ -402,6 +404,7 @@ typedef struct {
 typedef enum {
     CMD_SIMPLE,
     CMD_ASSIGN,
+    CMD_GLOB_ASSIGN,
     CMD_IF,
     CMD_LOOP,
     CMD_VAR,
@@ -442,9 +445,12 @@ BATSH_COMMAND *parse_var_assignment(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH
     U32 escapes = 0;
     BOOL has_assign = FALSE;
     U32 assign_track = 0;
-    if (*i >= len || tokens[*i]->type != TOK_VAR)
+    if (*i >= len ||
+    !(tokens[*i]->type == TOK_VAR || tokens[*i]->type == TOK_VAR_GLOBAL))
         return var_tkn;
 
+    
+    U32 original_type = tokens[*i]->type;
     // Move to next token
     for (; *i < len; (*i)++) {
         BATSH_TOKEN *tkn = tokens[*i];
@@ -469,6 +475,7 @@ BATSH_COMMAND *parse_var_assignment(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH
             case TOK_STRING:
             case TOK_WORD:
             case TOK_VAR:
+            case TOK_VAR_GLOBAL:
                 if(assign_track == 1) has_assign = TRUE;
                 var_tkn->argv = ReAlloc(var_tkn->argv, sizeof(char*) * (var_tkn->argc + 1));
                 var_tkn->argv[var_tkn->argc++] = STRDUP(tkn->text);
@@ -487,7 +494,8 @@ BATSH_COMMAND *parse_var_assignment(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH
     }
 
     if (has_assign) {
-        var_tkn->type = CMD_ASSIGN;
+        if(original_type == TOK_VAR_GLOBAL) var_tkn->type = CMD_GLOB_ASSIGN;
+        else var_tkn->type = CMD_ASSIGN;
     } else {
         var_tkn->type = CMD_SIMPLE;
     }
@@ -511,7 +519,6 @@ BATSH_COMMAND *parse_word_or_cmd(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_IN
     for (; *i < len; (*i)++) {
         tkn = tokens[*i];
         append_next--;
-        DEBUG_PUTS_LN(tkn->text);
         switch (tkn->type) {
             case TOK_EOL:
                 if (escapes > 0) { escapes--; continue; }
@@ -542,6 +549,7 @@ BATSH_COMMAND *parse_word_or_cmd(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_IN
             case TOK_WORD:
             case TOK_STRING:
             case TOK_VAR:
+            case TOK_VAR_GLOBAL:
                 if(append_next == 1) {
                     cmd_tkn->argv[cmd_tkn->argc - 1] = STRAPPEND(cmd_tkn->argv[cmd_tkn->argc - 1], tkn->text);
                 } else {
@@ -574,6 +582,8 @@ BATSH_COMMAND *parse_master(BATSH_TOKEN **tokens, U32 len, BATSH_INSTANCE *inst)
     for (U32 i = 0; i < len;) {
         BATSH_TOKEN *tkn = tokens[i];
         BATSH_COMMAND *cmd = NULL;
+        DEBUG_PUTS_LN(tkn->text);
+
         switch (tkn->type) {
             case TOK_WORD:
             case TOK_CMD:
@@ -587,7 +597,7 @@ BATSH_COMMAND *parse_master(BATSH_TOKEN **tokens, U32 len, BATSH_INSTANCE *inst)
             case TOK_LOOP:
                 cmd = parse_loop(tokens, len, &i, inst);
                 break;
-
+            case TOK_VAR_GLOBAL:
             case TOK_VAR:
                 cmd = parse_var_assignment(tokens, len, &i, inst);
                 break;
@@ -731,7 +741,19 @@ BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
             HANDLE_COMMAND(line_as_is);
             MFree(line_as_is);
         } break;
+        case CMD_GLOB_ASSIGN: {
+            if (cmd->argc < 2) break;
+            PU8 name = cmd->argv[0];
+            PU8 value = NULL;
 
+            for (U32 i = 1; i < cmd->argc; i++) {
+                value = STRAPPEND(value, cmd->argv[i]);
+            }
+            resolve_vars(&value, inst);
+            S32 idx = FIND_VAR(name);
+            if (idx >= 0) SET_VAR(name, value);
+            MFree(value);
+        } break;
         case CMD_ASSIGN: {
             if (cmd->argc < 2) break;
             PU8 name = cmd->argv[0];
@@ -748,7 +770,8 @@ BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
                 else
                     SET_INST_VAR(name, value, inst);
             } else {
-                SET_VAR(name, value);
+                S32 idx = FIND_VAR(name);
+                if (idx >= 0) SET_VAR(name, value);
             }
 
             MFree(value);
@@ -933,49 +956,42 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
             ptr = 0;
             continue;
         }
-        else if(c == '@') {
-            i++; // move past '@'
+        else if (c == '@') {
+            // Check if it's @@ (global variable)
+            BOOL is_global = FALSE;
+            if (i + 1 < len && input[i + 1] == '@') {
+                is_global = TRUE;
+                i++; // skip second '@'
+            }
+
+            i++; // move past '@' or '@@'
             U32 start = i;
             BOOL was_bracket = FALSE;
-            if(input[i] == '{') {
+
+            if (input[i] == '{') {
                 i++; // skip '{'
                 start = i;
                 was_bracket = TRUE;
-                while(i < len && input[i] != '}') i++;
+                while (i < len && input[i] != '}') i++;
             } else {
-                while(i < len && ISALNUM(input[i])) i++;
+                while (i < len && ISALNUM(input[i])) i++;
             }
+
             U32 var_len = i - start + (was_bracket ? 3 : 1);
-            if(var_len >= CUR_LINE_MAX_LENGTH) var_len = CUR_LINE_MAX_LENGTH - 1;
-            MEMCPY(buf, &input[start - (was_bracket ? 2 : 1)], var_len);
+            if (var_len >= CUR_LINE_MAX_LENGTH)
+                var_len = CUR_LINE_MAX_LENGTH - 1;
+
+            MEMCPY(buf, &input[start - (was_bracket ? 2 : (is_global ? 3 : 1))], var_len);
             buf[var_len] = '\0';
+            KEYWORD var_kw = { buf, is_global ? TOK_VAR_GLOBAL : TOK_VAR };
 
-            KEYWORD var_kw = { buf, TOK_VAR };
-            if(!ADD_TOKEN(&tokens, &token_len, buf, &var_kw)) goto error;
+            if (!ADD_TOKEN(&tokens, &token_len, buf, &var_kw))
+                goto error;
 
-            if(input[i] == '}') i++; // skip closing brace
-            if(input[i] == '=' ||
-                input[i] == '|' ||
-                input[i] == '+' ||
-                input[i] == '-' ||
-                input[i] == '*' ||
-                input[i] == '(' ||
-                input[i] == ')' ||
-                input[i] == '}' ||
-                input[i] == '/' ||
-                input[i] == '{' ||
-                input[i] == '=' ||
-                input[i] == '@' ||
-                input[i] == '>' ||
-                input[i] == '<' ||
-                input[i] == '{' ||
-                input[i] == '}' ||
-                input[i] == '\\' ||
-                input[i] == '\n' ||
-                input[i] == '\t' ||
-                input[i] == '\r' ||
-                input[i] == ' '
-            ) i--; // reparse 
+            if (input[i] == '}') i++; // skip closing brace
+            // Allow re-parsing next operator
+            if (STRCHR("|+-*/(){}=@><\\\n\t\r ", input[i])) i--;
+
             continue;
         }
         else if(c == ';') {

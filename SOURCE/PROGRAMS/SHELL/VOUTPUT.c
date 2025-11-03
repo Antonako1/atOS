@@ -975,11 +975,13 @@ void LE_CLS(void) {
 }
 
 void HANDLE_LE_HOME() {
+    RESTORE_CURSOR_BEFORE_MOVE();
     edit_pos = 0;
     HANDLE_LE_CURSOR();
 }
 
 void HANDLE_LE_END() {
+    RESTORE_CURSOR_BEFORE_MOVE();
     edit_pos = STRLEN(current_line);
     HANDLE_LE_CURSOR();
 }
@@ -987,11 +989,11 @@ void HANDLE_LE_END() {
 void HANDLE_LE_CTRL_LEFT() {
     if (edit_pos == 0) return;
 
-    // Skip spaces
+    // Skip spaces left of cursor
     while (edit_pos > 0 && current_line[edit_pos - 1] == ' ')
         edit_pos--;
 
-    // Skip word
+    // Skip the word left of cursor
     while (edit_pos > 0 && current_line[edit_pos - 1] != ' ')
         edit_pos--;
 
@@ -1002,16 +1004,17 @@ void HANDLE_LE_CTRL_RIGHT() {
     U32 len = STRLEN(current_line);
     if (edit_pos >= len) return;
 
-    // Skip spaces
-    while (edit_pos < len && current_line[edit_pos] == ' ')
+    // Skip non-space (current word)
+    while (edit_pos < len && current_line[edit_pos] != ' ')
         edit_pos++;
 
-    // Skip word
-    while (edit_pos < len && current_line[edit_pos] != ' ')
+    // Skip spaces after the word
+    while (edit_pos < len && current_line[edit_pos] == ' ')
         edit_pos++;
 
     HANDLE_LE_CURSOR();
 }
+
 
 static char yank_buffer[CUR_LINE_MAX_LENGTH];
 

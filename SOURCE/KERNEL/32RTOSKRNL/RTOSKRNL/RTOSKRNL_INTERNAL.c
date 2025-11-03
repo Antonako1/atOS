@@ -237,25 +237,48 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     VBE_COLOUR bg = VBE_BLUE;
     VBE_CLEAR_SCREEN(bg);
     U8 buf[16];
+
+    // --- Print to debug port ---
+    KDEBUG_PUTS("\n=== PANIC REG ===\n");
+    KDEBUG_PUTS("Message: ");
+    KDEBUG_PUTS(msg);
+    KDEBUG_PUTS("\nError Code: 0x");
+    KDEBUG_HEX32(errmsg);
+    KDEBUG_PUTS("\n");
+
+    // --- Draw to VRAM ---
     ITOA(errmsg, buf, 16);
     VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
-    // VBE_UPDATE_VRAM();
-    // HLT;
     VBE_DRAW_STRING(VBE_CHAR_WIDTH*13, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
+
     VBE_DRAW_STRING(0, rki_row, msg, fg, bg);
     INC_rki_row(rki_row);
     VBE_DRAW_STRING(0, rki_row, "System halted, Dump as of exception raise.", fg, bg);
     INC_rki_row(rki_row);
+
+    // --- Register dump ---
     U32 esp = r->esp;
     U32 ebp = r->ebp;
-    
     INC_rki_row(rki_row);    
     VBE_DRAW_STRING(0, rki_row, "Registers:", fg, bg);
     INC_rki_row(rki_row);
     DUMP_REGS(r);
     INC_rki_row(rki_row);
-    
+
+    // Debug output for registers
+    KDEBUG_PUTS("Register dump:\n");
+    KDEBUG_PUTS("EAX="); KDEBUG_HEX32(r->eax); KDEBUG_PUTS(" ");
+    KDEBUG_PUTS("EBX="); KDEBUG_HEX32(r->ebx); KDEBUG_PUTS(" ");
+    KDEBUG_PUTS("ECX="); KDEBUG_HEX32(r->ecx); KDEBUG_PUTS(" ");
+    KDEBUG_PUTS("EDX="); KDEBUG_HEX32(r->edx); KDEBUG_PUTS("\n");
+    KDEBUG_PUTS("ESI="); KDEBUG_HEX32(r->esi); KDEBUG_PUTS(" ");
+    KDEBUG_PUTS("EDI="); KDEBUG_HEX32(r->edi); KDEBUG_PUTS("\n");
+    KDEBUG_PUTS("EBP="); KDEBUG_HEX32(ebp); KDEBUG_PUTS(" ");
+    KDEBUG_PUTS("ESP="); KDEBUG_HEX32(esp); KDEBUG_PUTS("\n");
+    KDEBUG_PUTS("EIP="); KDEBUG_HEX32(r->eip); KDEBUG_PUTS("\n");
+    KDEBUG_PUTS("EFLAGS="); KDEBUG_HEX32(r->eflags); KDEBUG_PUTS("\n");
+
     INC_rki_row(rki_row);
     DUMP_CALLER_STACK(10);
     INC_rki_row(rki_row);
@@ -265,7 +288,7 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     DUMP_STACK(esp - 60, 80);
     INC_rki_row(rki_row);
 
-        // 🔍 Kernel Heap Info
+    // --- Heap info ---
     INC_rki_row(rki_row);
     VBE_DRAW_STRING(0, rki_row, "Kernel Heap Info:", fg, bg);
     INC_rki_row(rki_row);
@@ -285,9 +308,15 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
         VBE_DRAW_STRING(0, rki_row, "Free Size: 0x", fg, bg);
         VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
         INC_rki_row(rki_row);
+
+        // Debug output
+        KDEBUG_PUTS("Heap: total=0x"); KDEBUG_HEX32(heap->totalSize);
+        KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(heap->usedSize);
+        KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(heap->freeSize);
+        KDEBUG_PUTS("\n");
     }
 
-    // 🔍 Pageframe Info
+    // --- Pageframe info ---
     INC_rki_row(rki_row);
     VBE_DRAW_STRING(0, rki_row, "Pageframe Info:", fg, bg);
     INC_rki_row(rki_row);
@@ -312,11 +341,20 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
         VBE_DRAW_STRING(0, rki_row, "Reserved Memory: 0x", fg, bg);
         VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
         INC_rki_row(rki_row);
+
+        // Debug output
+        KDEBUG_PUTS("PF: total=0x"); KDEBUG_HEX32(pf->size);
+        KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(pf->usedMemory);
+        KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(pf->freeMemory);
+        KDEBUG_PUTS(" reserved=0x"); KDEBUG_HEX32(pf->reservedMemory);
+        KDEBUG_PUTS("\n");
     }
 
+    KDEBUG_PUTS("System halted.\n");
     VBE_UPDATE_VRAM();
     ASM_VOLATILE("cli; hlt");
 }
+
 void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     CLI;
     debug_vram_start();
@@ -335,7 +373,13 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
     VBE_DRAW_STRING(VBE_CHAR_WIDTH*13, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
-
+    // --- Print to debug port ---
+    KDEBUG_PUTS("\n=== PANIC ===\n");
+    KDEBUG_PUTS("Message: ");
+    KDEBUG_PUTS(msg);
+    KDEBUG_PUTS("\nError Code: 0x");
+    KDEBUG_HEX32(errmsg);
+    KDEBUG_PUTS("\n");
     // Last error
     VBE_DRAW_STRING(0, rki_row, "Last error: 0x", fg, bg);
     ITOA_U(GET_LAST_ERROR(), buf, 16);
@@ -404,6 +448,11 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
         VBE_DRAW_STRING(0, rki_row, "Free Size: 0x", fg, bg);
         VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
         INC_rki_row(rki_row);
+
+        KDEBUG_PUTS("Heap: total=0x"); KDEBUG_HEX32(heap->totalSize);
+        KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(heap->usedSize);
+        KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(heap->freeSize);
+        KDEBUG_PUTS("\n");
     }
 
     // 🔍 Pageframe Info
@@ -431,6 +480,12 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
         VBE_DRAW_STRING(0, rki_row, "Reserved Memory: 0x", fg, bg);
         VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
         INC_rki_row(rki_row);
+
+            KDEBUG_PUTS("PF: total=0x"); KDEBUG_HEX32(pf->size);
+        KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(pf->usedMemory);
+        KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(pf->freeMemory);
+        KDEBUG_PUTS(" reserved=0x"); KDEBUG_HEX32(pf->reservedMemory);
+        KDEBUG_PUTS("\n");
     }
 
     VBE_UPDATE_VRAM();

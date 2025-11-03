@@ -9,8 +9,7 @@ It is **batch-like, but not batch**—designed for both interactive command exec
 
 * **Interactive commands**: Execute built-in commands directly in the shell.
 * **Script execution**: Run `.SH` scripts line by line.
-* **Command echo control**: Turn line output on or off using `@ECHO=ON` or `@ECHO=OFF`.
-* **Comments**: Lines starting with `#`, `;`, or `rem` are ignored.
+* **Comments**: Lines starting with `#` or `rem` are ignored.
 * **Command stacking**: Separate multiple commands on a line with `;`.
 * **Variables**: Define and use variables with `@var=value` or `@{var}`.
 * **Arithmetic**: Supported only inside `IF` statements, `LOOP` statements, or variable assignments.
@@ -36,6 +35,7 @@ It is **batch-like, but not batch**—designed for both interactive command exec
 | dir         | List directory contents                         |
 | mkdir       | Create a directory                              |
 | rmdir       | Remove a directory                              |
+| ...         | ...                                             |
 
 ---
 
@@ -45,19 +45,8 @@ It is **batch-like, but not batch**—designed for both interactive command exec
 
 ```bat
 # This is a comment
-; Another comment
 rem This is also a comment
 ```
-
-### ECHO Control
-
-```bat
-@ECHO=ON
-@ECHO=OFF
-```
-
-* Use `@` to suppress echo for that line.
-* `@ECHO=OFF` disables all line output for the script.
 
 ### Commands
 
@@ -69,7 +58,7 @@ echo Hello World
 * Commands can be stacked using `;`:
 
 ```bat
-cd TEST; dir
+cd TEST; dir;
 ```
 
 ### Variables
@@ -78,6 +67,8 @@ cd TEST; dir
 @var=value
 echo @{var}
 ```
+
+* Advanced variable substitution (`@{CD}`, `@{PATH}`, `@{HOME}`, `@{DOCS}`).
 
 ### Arithmetic Expressions
 
@@ -102,7 +93,6 @@ END
 ## Notes
 
 * Scripts must have a `.SH` extension.
-* `@ECHO=OFF` disables line output.
 * Command stacking with `;` is supported.
 * Reserved tokens for future: `|`, `>`, `<`.
 
@@ -110,7 +100,6 @@ END
 
 ## Future Improvements
 
-* Advanced variable substitution (`@{CD}`, `@{PATH}`).
 * Full support for conditional statements and loops.
 * Enhanced error reporting.
 * Pipelines and redirection.

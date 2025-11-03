@@ -292,8 +292,8 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
     if (!res) return;
 
     PUTS("\n");
-    PUTS("Type  Size       Name\n");
-    PUTS("----  ----------  ------------------------------\n");
+    PUTS("Type  Size       Date       Time     Name\n");
+    PUTS("----  ----------  ----------  -------  ------------------------------\n");
 
     for (U32 i = 0; i < count; i++) {
         DIR_ENTRY *f = &dirs[i];
@@ -307,16 +307,30 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
         else
             PUTS("file  ");
 
-        // Size (fixed width, right-aligned)
+        // Size (fixed width)
         U8 size_buf[12];
         MEMZERO(size_buf, sizeof(size_buf));
         ITOA_U(f->FILE_SIZE, size_buf, 10);
-
         U32 len = STRLEN(size_buf);
         for (U32 s = 0; s < 10 - len; s++)
             PUTS(" ");
-
         PUTS(size_buf);
+        PUTS("  ");
+
+        // Decode modification date/time
+        U32 year, month, day, hour, minute, second;
+        FAT_DECODE_TIME(f->LAST_MOD_TIME, f->LAST_MOD_DATE, &year, &month, &day, &hour, &minute, &second);
+
+        // Date
+        U8 date_buf[16];
+        SPRINTF(date_buf, "%04u-%02u-%02u", year, month, day);
+        PUTS(date_buf);
+        PUTS("  ");
+
+        // Time
+        U8 time_buf[12];
+        SPRINTF(time_buf, "%02u:%02u", hour, minute);
+        PUTS(time_buf);
         PUTS("  ");
 
         // Name
@@ -350,8 +364,8 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
         PRINT_CONTENTS(&ent);
     } else {
         // It's a file: print just the file info
-        PUTS("\nType  Size       Name\n");
-        PUTS("----  ----------  ------------------------------\n");
+        PUTS("\nType  Size       Date       Time     Name\n");
+        PUTS("----  ----------  ----------  -------  ------------------------------\n");
 
         PUTS("file  ");
 
@@ -359,12 +373,26 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
         U8 size_buf[12];
         MEMZERO(size_buf, sizeof(size_buf));
         ITOA_U(ent.entry.FILE_SIZE, size_buf, 10);
-
         U32 len = STRLEN(size_buf);
         for (U32 s = 0; s < 10 - len; s++)
             PUTS(" ");
-
         PUTS(size_buf);
+        PUTS("  ");
+
+        // Decode modification date/time
+        U32 year, month, day, hour, minute, second;
+        FAT_DECODE_TIME(ent.entry.LAST_MOD_TIME, ent.entry.LAST_MOD_DATE, &year, &month, &day, &hour, &minute, &second);
+
+        // Date
+        U8 date_buf[16];
+        SPRINTF(date_buf, "%04u-%02u-%02u", year, month, day);
+        PUTS(date_buf);
+        PUTS("  ");
+
+        // Time
+        U8 time_buf[12];
+        SPRINTF(time_buf, "%02u:%02u", hour, minute);
+        PUTS(time_buf);
         PUTS("  ");
 
         // Name
@@ -378,7 +406,6 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
         PUTS("\n");
     }
 }
-
 
 //==================== MKDIR ====================
 

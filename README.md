@@ -159,16 +159,20 @@ Please see `DOCS/DEBUGGING.md` for options and tips. When using `make run`/`make
 
 Planned and in-progress features for atOS:
 
-* [x] Bootloader and raw binary kernel loading
-* [x] Basic memory management (paging, allocator, frame BYTEMAP)
-* [X] ISO9660 support
 * [X] Basic drivers (keyboard, screen, disk I/O, audio)
 * [X] Ethernet driver
 * [X] FAT32 filesystem support
-* [X] System call interface
 * [X] Multitasking and scheduling
 * [X] Shell environment for interacting with the system
-* [ ] Running custom processes via shell
+* [X] Running custom processes via shell
+* [ ] Dynamic libraries
+* [ ] Text editor
+* [ ] Hex editor
+* [ ] Compiler
+* [ ] Assembler
+* [ ] Dissasembler
+
+
 
 *This roadmap is tentative and may evolve as the project grows.*
 

@@ -116,6 +116,8 @@ typedef struct ATTRIB_PACKED  {
 typedef struct {
     DIR_ENTRY entry;             ///< Standard directory entry
     CHAR lfn[FAT_MAX_FILENAME];  ///< Full long file name (ASCII, null-terminated)
+    U32 parent_cluster;  // not stored on disk — runtime info
+    U32 dir_offset;      // offset within the parent directory cluster
 } FAT_LFN_ENTRY;
 
 
@@ -214,7 +216,7 @@ BOOL DIR_ENUMERATE(U32 dir_cluster, DIR_ENTRY *out_entries, U32 *max_count);
 // Fills up to 'max_count' entries in 'out_entries'. Returns TRUE if successful.
 // Count returned in max_count
 
-BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *entry, const char *name);
+BOOL DIR_REMOVE_ENTRY(FAT_LFN_ENTRY *entry, const char *name);
 // Deletes a file or directory entry from 'entry'.
 // Marks the entry as deleted (0xE5) and frees associated clusters if needed.
 
@@ -232,10 +234,10 @@ VOIDPTR READ_FILE_CONTENTS(U32 *size_out, DIR_ENTRY *entry);
 // Reads the entire contents of a file into a newly allocated buffer.
 // Returns pointer to buffer and sets *size_out to file size in bytes.
 
-BOOL FILE_WRITE(DIR_ENTRY *entry, const U8 *data, U32 size);
+BOOL FILE_WRITE(FAT_LFN_ENTRY *entry, const U8 *data, U32 size);
 // Writes 'size' bytes to a file’s cluster chain, allocating new clusters if necessary.
 
-BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size);
+BOOL FILE_APPEND(FAT_LFN_ENTRY *entry, const U8 *data, U32 size);
 // Appends data to the end of a file’s cluster chain, extending it if needed.
 
 U32 FILE_GET_SIZE(DIR_ENTRY *entry);

@@ -28,6 +28,7 @@ typedef enum {
     MODE_W        = 0x0002,  // Write
     MODE_RW       = MODE_R | MODE_W,   // Read & Write
     MODE_A        = 0x0008,  // Append
+    MODE_RA       = MODE_R | MODE_A,
     MODE_FAT32    = 0x0100,  // FAT32 backend
     MODE_ISO9660  = 0x0200,  // ISO9660 backend
 } FILEMODES;
@@ -38,10 +39,9 @@ typedef struct {
     U32 read_ptr;        // Current read position
     FILEMODES mode;
     union {
-        DIR_ENTRY fat_ent;
+        FAT_LFN_ENTRY fat_ent;
         IsoDirectoryRecord iso_ent;
     } ent;
-    U8 iso_padding[ISO9660_MAX_FILENAME_LENGTH]; // Padding in-case of iso
 } ATTRIB_PACKED FILE;
 
 // ===================================================
@@ -126,7 +126,7 @@ BOOLEAN FILE_FLUSH(FILE *file);
 // ===================================================
 
 // Initialize a FILE object from raw FAT32 data and directory entry
-BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, DIR_ENTRY *ent);
+BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, FAT_LFN_ENTRY *ent);
 
 // Initialize a FILE object from raw ISO9660 data and directory record
 BOOLEAN FILE_FROM_RAW_ISO_DATA(FILE *file, VOIDPTR data, U32 sz, IsoDirectoryRecord *ent);
@@ -197,17 +197,17 @@ BOOL FAT32_DIR_ENUMERATE(U32 dir_cluster, DIR_ENTRY *out_entries, U32 *max_count
 
 // Deletes a file or directory entry from 'entry'.
 // Marks the entry as deleted (0xE5) and frees associated clusters if needed.
-BOOL FAT32_DIR_REMOVE_ENTRY(DIR_ENTRY *entry, const char *name);
+BOOL FAT32_DIR_REMOVE_ENTRY(FAT_LFN_ENTRY *entry, const char *name);
 
 // Reads the entire contents of a file into a newly allocated buffer.
 // Returns pointer to buffer and sets *size_out to file size in bytes.
 VOIDPTR FAT32_READ_FILE_CONTENTS(U32 *size_out, DIR_ENTRY *entry);
 
 // Writes 'size' bytes to a file’s cluster chain, allocating new clusters if necessary.
-BOOL FAT32_FILE_WRITE(DIR_ENTRY *entry, const U8 *data, U32 size);
+BOOL FAT32_FILE_WRITE(FAT_LFN_ENTRY *entry, const U8 *data, U32 size);
 
 // Appends data to the end of a file’s cluster chain, extending it if needed.
-BOOL FAT32_FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size);
+BOOL FAT32_FILE_APPEND(FAT_LFN_ENTRY *entry, const U8 *data, U32 size);
 
 // Returns the file size in bytes from a directory entry.
 U32 FAT32_FILE_GET_SIZE(DIR_ENTRY *entry);
@@ -227,6 +227,7 @@ BOOL FAT32_DIR_ENTRY_IS_DIR(DIR_ENTRY *entry);
 // On error, empty struct is returned
 DIR_ENTRY FAT32_GET_ROOT_DIR_ENTRY(void);
 
+VOID FAT_DECODE_TIME(U16 time, U16 date, U32 *year, U32 *month, U32 *day, U32 *hour, U32 *minute, U32 *second);
 
 /**
  * Raw Disk IO functions

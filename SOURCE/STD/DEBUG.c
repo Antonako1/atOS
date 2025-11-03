@@ -19,7 +19,7 @@ void DEBUG_INIT(void) {
     _outb(COM1_BASE + 4, 0x0B);    // IRQs enabled, RTS/DSR set
 }
 void DEBUG_NL() {
-    DEBUG_PUTC("\r");
+    DEBUG_PUTS("\r");
 }
 void DEBUG_PUTC(U8 c) {
     _outb(DEBUG_PORT, c);
@@ -97,6 +97,7 @@ void MEMORY_DUMP(const void *addr, U32 length) {
             DEBUG_NL();
         }
     }
+    DEBUG_NL();
     DEBUG_NL();
 }
 

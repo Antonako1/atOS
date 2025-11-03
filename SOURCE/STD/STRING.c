@@ -710,10 +710,8 @@ BOOL IS_DIGIT_STR(PU8 str) {
 }
 PU8 STRSTR(PU8 a, PU8 b) {
     if(!a || !b) return NULLPTR;
-
     U32 len = STRLEN(b);
     if(len == 0) return a;
-
     PU8 tmp = a;
     while(*tmp) {
         if(STRNCMP(tmp, b, len) == 0) return tmp;
@@ -722,15 +720,24 @@ PU8 STRSTR(PU8 a, PU8 b) {
 
     return NULLPTR;
 }
-void SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
 
-    CHAR *out = buffer;
+PU8 STRISTR(PU8 a, PU8 b) {
+    if(!a || !b) return NULLPTR;
+    U32 len = STRLEN(b);
+    if(len == 0) return a;
+    PU8 tmp = a;
+    while(*tmp) {
+        if(STRNICMP(tmp, b, len) == 0) return tmp;
+        tmp++;
+    }
+    return NULLPTR;
+}
 
+
+VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
     while (*fmt) {
         if (*fmt != '%') {
-            *out++ = *fmt++;
+            putch(*fmt++, ctx);
             continue;
         }
 
@@ -740,7 +747,7 @@ void SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
         I32 width = 0;
         BOOL pad_zero = FALSE;
 
-        // Parse optional zero-padding and width (e.g. %02X, %08x)
+        // Parse optional zero-padding and width
         if (*fmt == '0') {
             pad_zero = TRUE;
             fmt++;
@@ -753,14 +760,14 @@ void SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
         switch (*fmt) {
             case 'c': {
                 CHAR c = (CHAR)va_arg(args, I32);
-                *out++ = c;
+                putch(c, ctx);
                 break;
             }
 
             case 's': {
                 CHAR *s = va_arg(args, CHAR*);
                 if (!s) s = "(null)";
-                while (*s) *out++ = *s++;
+                while (*s) putch(*s++, ctx);
                 break;
             }
 
@@ -771,9 +778,22 @@ void SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
 
                 I32 len = STRLEN(buf);
                 for (I32 i = len; i < width; i++)
-                    *out++ = pad_zero ? '0' : ' ';
-                CHAR *p = buf;
-                while (*p) *out++ = *p++;
+                    putch(pad_zero ? '0' : ' ', ctx);
+                for (CHAR *p = buf; *p; p++)
+                    putch(*p, ctx);
+                break;
+            }
+
+            case 'u': {
+                U32 val = va_arg(args, U32);
+                CHAR buf[32];
+                ITOA_U(val, buf, 10);
+
+                I32 len = STRLEN(buf);
+                for (I32 i = len; i < width; i++)
+                    putch(pad_zero ? '0' : ' ', ctx);
+                for (CHAR *p = buf; *p; p++)
+                    putch(*p, ctx);
                 break;
             }
 
@@ -785,26 +805,45 @@ void SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
 
                 I32 len = STRLEN(buf);
                 for (I32 i = len; i < width; i++)
-                    *out++ = pad_zero ? '0' : ' ';
-                CHAR *p = buf;
-                while (*p) *out++ = *p++;
+                    putch(pad_zero ? '0' : ' ', ctx);
+                for (CHAR *p = buf; *p; p++)
+                    putch(*p, ctx);
                 break;
             }
 
             case '%':
-                *out++ = '%';
+                putch('%', ctx);
                 break;
 
             default:
-                *out++ = '%';
-                *out++ = *fmt;
+                putch('%', ctx);
+                putch(*fmt, ctx);
                 break;
         }
 
         fmt++;
     }
+}
 
-    *out = '\0'; // Null-terminate the string
+/* ---------------------------------- */
+/* Internal putch handlers for output */
+/* ---------------------------------- */
+
+// For SPRINTF
+VOID buffer_putch(CHAR c, VOID *ctx) {
+    CHAR **buf = (CHAR **)ctx;
+    *(*buf)++ = c;
+}
+
+
+
+
+VOID SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    CHAR *out = buffer;
+    VFORMAT(buffer_putch, &out, fmt, args);
+    *out = '\0'; // null-terminate
     va_end(args);
 }
 

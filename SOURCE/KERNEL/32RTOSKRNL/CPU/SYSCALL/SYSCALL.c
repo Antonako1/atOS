@@ -361,7 +361,7 @@ U32 SYS_DIR_ENUMERATE(U32 dir_cluster, U32 out_entries, U32 max_count_ptr, U32 u
 
 U32 SYS_DIR_REMOVE_ENTRY(U32 entry_ptr, U32 name_ptr, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused3; (void)unused4; (void)unused5;
-    return DIR_REMOVE_ENTRY((DIR_ENTRY*)entry_ptr, (const char*)name_ptr);
+    return DIR_REMOVE_ENTRY((FAT_LFN_ENTRY*)entry_ptr, (const char*)name_ptr);
 }
 
 U32 SYS_READ_FILE_CONTENTS(U32 entry_ptr, U32 size_out_ptr, U32 unused3, U32 unused4, U32 unused5) {
@@ -371,12 +371,12 @@ U32 SYS_READ_FILE_CONTENTS(U32 entry_ptr, U32 size_out_ptr, U32 unused3, U32 unu
 
 U32 SYS_FILE_WRITE(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unused5) {
     (void)unused4; (void)unused5;
-    return FILE_WRITE((DIR_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
+    return FILE_WRITE((FAT_LFN_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
 }
 
 U32 SYS_FILE_APPEND(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unused5) {
     (void)unused4; (void)unused5;
-    U32 res = FILE_APPEND((DIR_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
+    U32 res = FILE_APPEND((FAT_LFN_ENTRY*)entry_ptr, (const U8*)data_ptr, size);
     return res;
 }
 

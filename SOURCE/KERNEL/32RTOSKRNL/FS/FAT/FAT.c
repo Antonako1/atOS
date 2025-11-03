@@ -1268,37 +1268,6 @@ U32 FILE_GET_SIZE(DIR_ENTRY *entry) {
     return entry->FILE_SIZE;
 }
 
-// CHAR *STRTOK_R(CHAR *str, const CHAR *delim, CHAR **saveptr) {
-//     CHAR *start;
-
-//     if (str)
-//         start = str;
-//     else if (*saveptr)
-//         start = *saveptr;
-//     else
-//         return NULLPTR;
-
-//     // Skip leading delimiters
-//     while (*start && STRCHR(delim, *start)) start++;
-
-//     if (*start == '\0') {
-//         *saveptr = NULLPTR;
-//         return NULLPTR;
-//     }
-
-//     CHAR *token_end = start;
-//     while (*token_end && !STRCHR(delim, *token_end)) token_end++;
-
-//     if (*token_end) {
-//         *token_end = '\0';
-//         *saveptr = token_end + 1;
-//     } else {
-//         *saveptr = NULLPTR;
-//     }
-
-//     return start;
-// }
-
 BOOL DIR_ENTRY_IS_FREE(DIR_ENTRY *entry) {
     if (!entry) return TRUE;
     // Free if first byte is 0x00 (never used) or FAT32_DELETED_ENTRY (deleted)
@@ -1362,6 +1331,8 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
                 MEMCPY(&out_entry->entry, e, sizeof(DIR_ENTRY));
                 STRNCPY(out_entry->lfn, entry_name, FAT_MAX_FILENAME - 1);
                 out_entry->lfn[FAT_MAX_FILENAME - 1] = '\0';
+                out_entry->parent_cluster = current_cluster;    // the directory cluster we enumerated
+                out_entry->dir_offset     = i * sizeof(DIR_ENTRY); // offset within the cluster
 
                 current_cluster = (e->HIGH_CLUSTER_BITS << 16) | e->LOW_CLUSTER_BITS;
                 found = TRUE;
@@ -1429,10 +1400,27 @@ BOOL FAT_TRUNCATE_CHAIN(U32 start_cluster, U32 new_size_clusters) {
     return FAT_FLUSH();
 }
 
+BOOLEAN FAT_WRITE_DIR_ENTRY(const FAT_LFN_ENTRY *lfn_entry) {
+    if (!lfn_entry) return FALSE;
+    if (lfn_entry->parent_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) return FALSE;
+    if (lfn_entry->dir_offset + sizeof(DIR_ENTRY) > CLUSTER_SIZE) return FALSE;
+
+    U8 buf[CLUSTER_SIZE];
+    if (!FAT_READ_CLUSTER(lfn_entry->parent_cluster, buf))
+        return FALSE;
+
+    MEMCPY(buf + lfn_entry->dir_offset, &lfn_entry->entry, sizeof(DIR_ENTRY));
+
+    return FAT_WRITE_CLUSTER(lfn_entry->parent_cluster, buf);
+}
+
+
 
 // Overwrite a file completely with new data
-BOOL FILE_WRITE(DIR_ENTRY *entry, const U8 *data, U32 size) {
-    if (!entry || !data) return FALSE;
+BOOL FILE_WRITE(FAT_LFN_ENTRY *lfn_entry, const U8 *data, U32 size) {
+    if (!lfn_entry || !data) return FALSE;
+
+    DIR_ENTRY *entry = &lfn_entry->entry;
 
     // Free existing cluster chain if any
     U32 start_cluster = (entry->HIGH_CLUSTER_BITS << 16) | entry->LOW_CLUSTER_BITS;
@@ -1441,43 +1429,52 @@ BOOL FILE_WRITE(DIR_ENTRY *entry, const U8 *data, U32 size) {
     }
 
     // Write new data into clusters
-    if (!WRITE_FILEDATA(entry, data, size)) return FALSE;
+    if (!WRITE_FILEDATA(entry, data, size))
+        return FALSE;
 
-    // Update file size
+    // Update file size and timestamps
     entry->FILE_SIZE = size;
     FAT_UPDATETIMEDATE(entry);
+
+    // Write updated directory entry back to disk
+    if (!FAT_WRITE_DIR_ENTRY(lfn_entry))
+        return FALSE;
 
     return TRUE;
 }
 
-// Append data to existing file
-BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
-    if (!entry || !data || size == 0) return FALSE;
+BOOL FILE_APPEND(FAT_LFN_ENTRY *lfn_entry, const U8 *data, U32 size) {
+    if (!lfn_entry || !data || size == 0)
+        return FALSE;
+
+    DIR_ENTRY *entry = &lfn_entry->entry;
 
     // Get current start cluster and file size
     U32 start_cluster = (entry->HIGH_CLUSTER_BITS << 16) | entry->LOW_CLUSTER_BITS;
     U32 file_size     = entry->FILE_SIZE;
 
-    // If the file is empty, just use FILE_WRITE
-    if (start_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) {
-        return FILE_WRITE(entry, data, size);
-    }
+    // If the file is empty, just write fresh
+    if (start_cluster < FIRST_ALLOWED_CLUSTER_NUMBER)
+        return FILE_WRITE(lfn_entry, data, size);
 
     // Calculate last cluster of the current file
     U32 last_cluster = start_cluster;
     U32 clusters_to_traverse = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+
     for (U32 i = 1; i < clusters_to_traverse; i++) {
         last_cluster = fat32[last_cluster];
-        if (last_cluster >= FAT32_END_OF_CHAIN) break;
+        if (last_cluster >= FAT32_END_OF_CHAIN)
+            break;
     }
 
-    // Write new data into new clusters
+    // Prepare to allocate new clusters
     U32 remaining = size;
     PU8 src = (PU8)data;
-
     U32 clusters_needed = (size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+
     U32 *allocated_clusters = KMALLOC(clusters_needed * sizeof(U32));
-    if (!allocated_clusters) return FALSE;
+    if (!allocated_clusters)
+        return FALSE;
 
     U32 allocated_count = 0;
     U32 prev_cluster = last_cluster;
@@ -1488,6 +1485,7 @@ BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
         return FALSE;
     }
 
+    // Allocate and write new clusters
     for (U32 i = 0; i < clusters_needed; i++) {
         U32 c = FIND_NEXT_FREE_CLUSTER();
         if (c == 0) {
@@ -1510,7 +1508,8 @@ BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
         prev_cluster = c;
 
         U32 tocopy = (remaining > CLUSTER_SIZE) ? CLUSTER_SIZE : remaining;
-        if (tocopy < CLUSTER_SIZE) MEMZERO(buf, CLUSTER_SIZE);
+        if (tocopy < CLUSTER_SIZE)
+            MEMZERO(buf, CLUSTER_SIZE);
         MEMCPY(buf, src, tocopy);
 
         if (!FAT_WRITE_CLUSTER(c, buf)) {
@@ -1536,8 +1535,14 @@ BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
         return FALSE;
     }
 
-    // Update file size
+    // Update file size and timestamps
     entry->FILE_SIZE += size;
+    FAT_UPDATETIMEDATE(entry);
+
+    // Write updated directory entry back to disk (uses parent_cluster & offset)
+    if (!FAT_WRITE_DIR_ENTRY(lfn_entry))
+        return FALSE;
+
     Free(buf);
     Free(allocated_clusters);
     return TRUE;
@@ -1545,11 +1550,15 @@ BOOL FILE_APPEND(DIR_ENTRY *entry, const U8 *data, U32 size) {
 
 // Removes a directory entry named `name` in the directory pointed by `entry`.
 // Marks the entry as deleted and frees its clusters.
-BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *dir_entry, const char *name) {
+BOOL DIR_REMOVE_ENTRY(FAT_LFN_ENTRY *dir_entry, const char *name) {
     if (!dir_entry || !name) return FALSE;
 
-    U32 dir_cluster = (dir_entry->HIGH_CLUSTER_BITS << 16) | dir_entry->LOW_CLUSTER_BITS;
-    if (dir_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) return FALSE;
+    U32 dir_cluster = (dir_entry->entry.HIGH_CLUSTER_BITS << 16) |
+                      dir_entry->entry.LOW_CLUSTER_BITS;
+
+    // If this directory has no valid data cluster, it’s invalid
+    if (dir_cluster < FIRST_ALLOWED_CLUSTER_NUMBER)
+        return FALSE;
 
     U8 *cluster_buf = KMALLOC(CLUSTER_SIZE);
     if (!cluster_buf) return FALSE;
@@ -1557,26 +1566,33 @@ BOOL DIR_REMOVE_ENTRY(DIR_ENTRY *dir_entry, const char *name) {
 
     BOOL result = FALSE;
 
+    // Iterate over clusters in this directory
     while (dir_cluster >= FIRST_ALLOWED_CLUSTER_NUMBER && dir_cluster < FAT32_END_OF_CHAIN) {
-        if (!FAT_READ_CLUSTER(dir_cluster, cluster_buf)) break;
+        if (!FAT_READ_CLUSTER(dir_cluster, cluster_buf))
+            break;
 
         for (U32 offset = 0; offset < CLUSTER_SIZE; offset += sizeof(DIR_ENTRY)) {
             DIR_ENTRY *ent = (DIR_ENTRY *)(cluster_buf + offset);
 
-            if (ent->FILENAME[0] == 0x00) goto cleanup; // end of entries
+            // End of directory marker
+            if (ent->FILENAME[0] == 0x00)
+                goto cleanup;
+
+            // Skip deleted and LFN continuation entries
             if (ent->FILENAME[0] == FAT32_DELETED_ENTRY || ent->ATTRIB == FAT_ATTRIB_LFN)
                 continue;
 
-            if (STRCMP(ent->FILENAME, name) == 0) {
-                // Free clusters if it’s a file or directory
+            // Compare 8.3 short name (case-insensitive)
+            if (DIR_NAME_COMP_CASE(ent->FILENAME, name)) {
+                // Free file or directory cluster chain
                 U32 start_cluster = (ent->HIGH_CLUSTER_BITS << 16) | ent->LOW_CLUSTER_BITS;
-                if (start_cluster >= FIRST_ALLOWED_CLUSTER_NUMBER) {
+                if (start_cluster >= FIRST_ALLOWED_CLUSTER_NUMBER)
                     FAT_FREE_CHAIN(start_cluster);
-                }
 
-                // Mark directory entry as deleted
+                // Mark entry deleted
                 ent->FILENAME[0] = FAT32_DELETED_ENTRY;
 
+                // Write cluster back
                 if (FAT_WRITE_CLUSTER(dir_cluster, cluster_buf) && FAT_FLUSH())
                     result = TRUE;
 
@@ -1591,6 +1607,7 @@ cleanup:
     Free(cluster_buf);
     return result;
 }
+
 
 // -----------------------------------------------------------------------------
 // Returns the DIR_ENTRY representing the FAT32 root directory.
