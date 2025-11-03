@@ -382,12 +382,10 @@ BOOL PREPROCESS_FILE(FILE* file, FILE* tmp_file, MACRO_ARR* mcr, PREPROCESSING_U
         if(buf[0] == '#') {
             U32 matched_kw = U32_MAX;
             for (U32 i = 0; i < ident_max; i++) {
-                DEBUG_PUTS(buf); DEBUG_PUTC('|');
                 if (STRISTR(buf, macros_kw[i].str)) { // must be at start of line
                     matched_kw = i; 
                     break;
                 }
-                DEBUG_PUTS_LN(macros_kw[i].str);
             }
             // Check if this section of code should be active
             if (matched_kw != U32_MAX) {
@@ -552,7 +550,6 @@ PASM_INFO PREPROCESS_ASM() {
             return info;
         }
 
-        printf("%s\n", tmp.data);
         FCLOSE(&tmp);
         unit_cnt++;
     }

@@ -43,7 +43,11 @@ PMACRO GET_MACRO(PU8 name, MACRO_ARR *arr);
 VOID UNDEFINE_MACRO(PU8 name, MACRO_ARR *arr);
 VOID FREE_MACROS(MACRO_ARR *arr);
 
-
+// returns TRUE if a logical (possibly multi-physical) line was read into `out`
+// out_size is the byte size of out buffer. Uses FILE_GET_LINE(file, tmp, sizeof(tmp))
+// as your physical line reader. Returns FALSE on EOF/no-line or on error.
+BOOL READ_LOGICAL_LINE(FILE *file, U8 *out, U32 out_size);
+BOOL IS_EMPTY(PU8 line);
 
 typedef struct _ASTRAC_ARGS {
     MACRO_ARR macros;
