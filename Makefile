@@ -234,6 +234,7 @@ iso: bootloader kernel programs diskvbr
 	@echo "Creating ISO directory structure..."
 	mkdir -p $(INPUT_ISO_DIR)/INNER/INNER2
 	mkdir -p $(INPUT_ISO_DIR)/HOME/DOCS
+	mkdir -p $(INPUT_ISO_DIR)/SYS_SRC
 	mkdir -p $(INPUT_ISO_DIR_SYSTEM)
 	mkdir -p $(INPUT_ISO_DIR_USER)
 	mkdir -p $(INPUT_ISO_DIR_PROGRAMS)
@@ -244,6 +245,7 @@ iso: bootloader kernel programs diskvbr
 	mkdir -p $(INPUT_ISO_DIR)/INNER/INNER2
 	cp -f $(SOURCE_DIR)/INSIDE_1.txt $(INPUT_ISO_DIR)/INNER/INNER2/INSIDE_1.txt
 	cp -rf $(SOURCE_DIR)/FILES/* $(INPUT_ISO_DIR)/HOME/DOCS
+	cp -rf $(SOURCE_DIR)/SYS_SRC/* $(INPUT_ISO_DIR)/SYS_SRC
 	cp -f $(OUTPUT_KERNEL_DIR)/KERNEL.BIN $(INPUT_ISO_DIR)/KERNEL.BIN
 	cp -f $(OUTPUT_KERNEL_DIR)/32RTOSKRNL.BIN $(INPUT_ISO_DIR_SYSTEM)/32RTOSKRNL.BIN
 	cp -f $(SOURCE_DIR)/ATOSHELL.SH $(INPUT_ISO_DIR_SYSTEM)/ATOSHELL.SH

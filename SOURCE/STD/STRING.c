@@ -118,7 +118,7 @@ INT STRNICMP(U8 *a, U8 *b, U32 n) {
     if (!a || !b) return -1;
     if (n == 0) return 0;
 
-    while (n-- && *a && *b) {
+    while (n && *a && *b) {
         CHAR ca = *a;
         CHAR cb = *b;
 
@@ -130,14 +130,15 @@ INT STRNICMP(U8 *a, U8 *b, U32 n) {
 
         a++;
         b++;
-
-        // if we consumed n characters, stop (avoid reading past)
-        if (n == 0)
-            break;
+        n--;  // decrement after comparison
     }
+
+    if (n == 0)
+        return 0;
 
     return (INT)(*a - *b);
 }
+
 
 
 U32 ATOI(CONST U8* str) {

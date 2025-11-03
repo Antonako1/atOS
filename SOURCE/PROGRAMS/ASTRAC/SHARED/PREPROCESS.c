@@ -3,6 +3,7 @@
 #define MAX_PREPROCESSING_UNITS MAX_FILES
 
 typedef enum {
+    // keep in order
     ident_include,
 
     ident_ifdef,
@@ -24,6 +25,7 @@ typedef struct {
     MACRO_IDENT ident;
 } MACRO_KW;
 static const MACRO_KW macros_kw[] ATTRIB_RODATA = {
+    // keep in order
     {"#include", ident_include},
 
     {"#ifdef", ident_ifdef},
@@ -157,25 +159,70 @@ VOID FREE_MACROS(MACRO_ARR *arr) {
 
 
 VOID REMOVE_COMMENTS(PU8 line, U32 cmnt_type) {
+    static BOOL in_block_comment = FALSE;
+    BOOL in_string = FALSE;
+    BOOL in_char = FALSE;
+
     U32 len = STRLEN(line);
-    BOOL in_str = FALSE;
-    if(cmnt_type == ASM_PREPROCESSOR) {
-        for(U32 i = 0; i < len; i++) {
-            U8 c = line[i];
-            if(c == '\\' && in_str) continue;
-            if(c == '"') in_str = !in_str;
-            if(c == ';') {
-                line[i] = '\0';
-                break;
+    U32 write_pos = 0;
+
+    for (U32 i = 0; i < len; i++) {
+        U8 c = line[i];
+
+        // --- ASM MODE ---
+        if (cmnt_type == ASM_PREPROCESSOR) {
+            // ';' starts a comment until end of line
+            if (c == ';') break;
+
+            // Copy everything else normally
+            line[write_pos++] = c;
+            continue;
+        }
+        U8 next = (i + 1 < len) ? line[i + 1] : '\0';
+
+        // --- C MODE ---
+        if (cmnt_type == C_PREPROCESSOR) {
+            // Already inside block comment?
+            if (in_block_comment) {
+                if (c == '*' && next == '/') {
+                    in_block_comment = FALSE;
+                    i++; // skip '/'
+                }
+                continue;
             }
+
+            // Handle string and char literals
+            if (!in_char && c == '"' && (i == 0 || line[i - 1] != '\\')) {
+                in_string = !in_string;
+            } else if (!in_string && c == '\'' && (i == 0 || line[i - 1] != '\\')) {
+                in_char = !in_char;
+            }
+
+            if (!in_string && !in_char) {
+                // Start of block comment
+                if (c == '/' && next == '*') {
+                    in_block_comment = TRUE;
+                    i++; // skip '*'
+                    continue;
+                }
+                // Start of line comment
+                if (c == '/' && next == '/') {
+                    break; // rest of line is comment
+                }
+            }
+
+            // Normal character
+            line[write_pos++] = c;
         }
     }
+
+    line[write_pos] = '\0';
 }
 
+
 BOOL IS_EMPTY(PU8 line) {
-    STRNCPY(tmp_str, line, BUF_SZ);
-    str_trim(tmp_str);
-    if(STRLEN(tmp_str) == 0) return TRUE;
+    str_trim(line);
+    if(STRLEN(line) == 0) return TRUE;
     return FALSE;
 }
 
@@ -214,125 +261,254 @@ PU8 EXTRACT_VALUE(PU8 line, MACRO_IDENT type) {
     return value;
 }
 
-VOID REPLACE_MACROS_IN_LINE(PU8 line) {
-    STRNCPY(tmp_str, line, BUF_SZ);
-    U8 solved = FALSE;
-    ASTRAC_ARGS *args = GET_ARGS();
-    for(U32 i = 0; i < args->macros.len; i++) {
-        PMACRO mcr = args->macros.macros[i];
-        PU8 res = STRSTR(tmp_str, mcr->name);
-        if(res) {
-            solved = TRUE;
-            PU8 str = STR_REPLACE(tmp_str, mcr->name, mcr->value);
-            STRNCPY(tmp_str, str, BUF_SZ);
-            MFree(str);
-        }
-    }
-    if(!solved) {
-        for(U32 i = 0; i < units[unit_cnt].macros.len; i++) {
-            PMACRO mcr = units[unit_cnt].macros.macros[i];
-            PU8 res = STRSTR(tmp_str, mcr->name);
-            if(res) {
-                solved = TRUE;
-                PU8 str = STR_REPLACE(tmp_str, mcr->name, mcr->value);
-                STRNCPY(tmp_str, str, BUF_SZ);
-                MFree(str);
-            }
-        }
-    }
-    STRNCPY(line, tmp_str, BUF_SZ);
+PU8 EXTRACT_SINGLE_VALUE(PU8 line, MACRO_IDENT type) {
+    U32 add = STRLEN(macros_kw[type].str);
+    PU8 p = line + add;
+
+    while (*p == ' ' || *p == '\t') p++; // skip spaces
+
+    U32 len = STRLEN(p);
+    PU8 value = MAlloc(len + 1);
+    if (!value) return NULLPTR;
+
+    STRNCPY(value, p, len);
+    value[len] = '\0';
+    str_trim(value);
+    return value;
 }
 
-BOOL PREPROCESS_FILE(FILE* file, FILE* tmp_file) {
+
+VOID REPLACE_MACROS_IN_LINE(PU8 line, MACRO_ARR *mcr) {
+    for (U32 i = 0; i < glb_macros.len; i++) {
+        PMACRO m = glb_macros.macros[i];
+        PU8 res = STRSTR(line, m->name);
+        if(res) {
+            PU8 new_line = STR_REPLACE(line, m->name, m->value);
+            STRNCPY(line, new_line, BUF_SZ);
+            MFree(new_line);
+            return;
+        }
+    }
+    for (U32 i = 0; i < mcr->len; i++) {
+        PMACRO m = mcr->macros[i];
+        PU8 res = STRSTR(line, m->name);
+        if (res) {
+            PU8 new_line = STR_REPLACE(line, m->name, m->value);
+            STRNCPY(line, new_line, BUF_SZ);
+            MFree(new_line);
+        }
+    }
+}
+
+// returns TRUE if a logical (possibly multi-physical) line was read into `out`
+// out_size is the byte size of out buffer. Uses FILE_GET_LINE(file, tmp, sizeof(tmp))
+// as your physical line reader. Returns FALSE on EOF/no-line or on error.
+BOOL READ_LOGICAL_LINE(FILE *file, U8 *out, U32 out_size) {
+    if (!file || !out || out_size == 0) return FALSE;
+
+    U8 phys[BUF_SZ];
+    out[0] = '\0';
+    U32 out_len = 0;
+
+    while (TRUE) {
+        if (!FILE_GET_LINE(file, phys, sizeof(phys))) {
+            // If we've accumulated something, treat it as a line; otherwise EOF
+            return (out_len > 0);
+        }
+
+        // trim trailing CR/LF and then trailing spaces/tabs
+        U32 p = STRLEN(phys);
+        while (p > 0 && (phys[p-1] == '\n' || phys[p-1] == '\r')) p--;
+        phys[p] = '\0';
+        // trim trailing whitespace
+        while (p > 0 && (phys[p-1] == ' ' || phys[p-1] == '\t')) { p--; phys[p] = '\0'; }
+
+        // if last char is backslash -> continuation
+        if (p > 0 && phys[p-1] == '\\') {
+            // remove the backslash
+            phys[p-1] = '\0';
+            p--;
+
+            // append phys to out (with a single space to avoid accidental token merging)
+            U32 need = out_len + p + 1; // +1 for optional ' ' or '\0'
+            if (need + 1 >= out_size) { // +1 final null
+                // overflow
+                return FALSE;
+            }
+
+            if (out_len == 0) {
+                STRNCPY(out, phys, out_size - 1);
+                out_len = STRLEN(out);
+            } else {
+                // append a single space then phys to avoid token glue
+                out[out_len] = ' ';
+                out[out_len + 1] = '\0';
+                out_len++;
+                STRNCAT(out, phys, out_size - out_len - 1);
+                out_len = STRLEN(out);
+            }
+
+            // continue to next physical line
+            continue;
+        } else {
+            // no continuation — final physical line to append and return
+            U32 need = out_len + p + 1; // +1 for final null
+            if (need + 1 >= out_size) {
+                // overflow
+                return FALSE;
+            }
+            if (out_len == 0) {
+                STRNCPY(out, phys, out_size - 1);
+            } else {
+                out[out_len] = ' ';
+                out[out_len + 1] = '\0';
+                out_len++;
+                STRNCAT(out, phys, out_size - out_len - 1);
+            }
+            return TRUE;
+        }
+    }
+}
+
+BOOL PREPROCESS_FILE(FILE* file, FILE* tmp_file, MACRO_ARR* mcr, PREPROCESSING_UNIT *unit) {
     U8 buf[BUF_SZ] = {0};
-    while (FILE_GET_LINE(file, buf, sizeof(buf))) {
-        REMOVE_COMMENTS(buf, ASM_PREPROCESSOR);
+    while (READ_LOGICAL_LINE(file, buf, sizeof(buf))) {
+        REMOVE_COMMENTS(buf, unit->type);
         if(IS_EMPTY(buf)) continue;
         U32 len = STRLEN(buf);
-
+        
         // Detect preprocessor directive
-        U32 matched_kw = (U32)-1;
-        for (U32 i = 0; i < ident_max; i++) {
-            DEBUG_PUTS(buf); DEBUG_PUTC(' ');
-            if (STRISTR(buf, macros_kw[i].str)) { // must be at start of line
-                matched_kw = i; 
-                DEBUG_PUTS_LN("Matched");
-                break;
-            }
-            DEBUG_PUTS_LN(macros_kw[i].str);
-        }
-
-        // Check if this section of code should be active
         BOOL active = IF_STACK_IS_ACTIVE();
-        if (matched_kw != (U32)-1) {
-            const MACRO_KW kw = macros_kw[matched_kw];
-            PU8 name = EXTRACT_NAME(buf, kw.ident);
-            PU8 value = EXTRACT_VALUE(buf, kw.ident);
-            MACRO_ARR *mcr = &units[unit_cnt].macros;
+        if(buf[0] == '#') {
+            U32 matched_kw = U32_MAX;
+            for (U32 i = 0; i < ident_max; i++) {
+                DEBUG_PUTS(buf); DEBUG_PUTC('|');
+                if (STRISTR(buf, macros_kw[i].str)) { // must be at start of line
+                    matched_kw = i; 
+                    break;
+                }
+                DEBUG_PUTS_LN(macros_kw[i].str);
+            }
+            // Check if this section of code should be active
+            if (matched_kw != U32_MAX) {
+                const MACRO_KW kw = macros_kw[matched_kw];
+                PU8 name = EXTRACT_NAME(buf, kw.ident);
+                PU8 value = EXTRACT_VALUE(buf, kw.ident);
+                
+                switch (kw.ident) {
+                    case ident_ifdef:  IF_STACK_PUSH_IF(name, mcr, FALSE); break;
+                    case ident_ifndef: IF_STACK_PUSH_IF(name, mcr, TRUE);  break;
+                    case ident_elif:   IF_STACK_ELIF(name, mcr);           break;
+                    case ident_else:   IF_STACK_ELSE();                    break;
+                    case ident_endif:  IF_STACK_POP();                     break;
 
-            
-            switch (kw.ident) {
-                case ident_ifdef:  IF_STACK_PUSH_IF(name, mcr, FALSE); break;
-                case ident_ifndef: IF_STACK_PUSH_IF(name, mcr, TRUE);  break;
-                case ident_elif:   IF_STACK_ELIF(name, mcr);           break;
-                case ident_else:   IF_STACK_ELSE();                    break;
-                case ident_endif:  IF_STACK_POP();                     break;
+                    default: {
+                        // Skip all other directives if inactive
+                        if (!active) break;
 
-                default: {
-                    // Skip all other directives if inactive
-                    if (!active) break;
+                        switch (kw.ident) {
+                            case ident_define: {
+                                if (!DEFINE_MACRO(name, value, mcr)) {
+                                    printf("Failed to define macro #%s=%s\n", name, value);
+                                    MFree(name);
+                                    MFree(value);
+                                    return FALSE;
+                                }
+                            } break;
+                            case ident_undef: {
+                                UNDEFINE_MACRO(name, mcr);
+                            } break;
+                            case ident_include: {
+                                MFree(value);
+                                value = EXTRACT_SINGLE_VALUE(buf, kw.ident);
+                                if (!value || !*value) {
+                                    printf("[PP] Invalid include path: %s\n", buf);
+                                    return FALSE;
+                                }
 
-                    switch (kw.ident) {
-                        case ident_define: {
-                            if (!DEFINE_MACRO(name, value, mcr)) {
-                                printf("Failed to define macro #%s=%s\n", name, value);
+                                // Determine path type ("<...>" or "..." supported)
+                                CHAR *path = value;
+                                BOOL is_system = FALSE;
+                                if (*path == '<') {
+                                    is_system = TRUE;
+                                    path++;
+                                    CHAR *end = STRCHR(path, '>');
+                                    if (end) *end = '\0';
+                                } else if (*path == '"') {
+                                    path++;
+                                    CHAR *end = STRCHR(path, '"');
+                                    if (end) *end = '\0';
+                                }
+                                
+                                if(is_system) {
+                                    STRCPY(tmp_str, "/SYS_SRC");
+                                    if(path[0] != '/') STRCAT(tmp_str, "/");
+                                    STRCAT(tmp_str, path);
+                                } else {
+                                    STRCPY(tmp_str, path);
+                                }
+
+                                FILE inc;
+                                if (!FOPEN(&inc, tmp_str, MODE_R | MODE_FAT32)) {
+                                    printf("[PP] Could not open include file: %s\n", tmp_str);
+                                    MFree(value);
+                                    return FALSE;
+                                }
+
+                                if(GET_ARGS()->verbose) printf("[PP] Including: %s\n", path);
+
+                                // Recursively preprocess include with SAME macro context
+                                if (!PREPROCESS_FILE(&inc, tmp_file, mcr, unit)) {
+                                    FCLOSE(&inc);
+                                    MFree(value);
+                                    return FALSE;
+                                }
+                                for(U32 i = 0; i < mcr->len; i++) {
+                                    printf("[MC_%d]: %s\n", i, mcr->macros[i]);
+                                }
+                                FCLOSE(&inc);
+                            } break;
+                            case ident_error: {
+                                MFree(value);
+                                value = EXTRACT_SINGLE_VALUE(buf, kw.ident);
+                                printf("[PP] ERROR: [%s]\n", value);
                                 MFree(name);
                                 MFree(value);
-                                FCLOSE(tmp_file);
                                 return FALSE;
-                            }
-                        } break;
-                        case ident_undef: {
-                            UNDEFINE_MACRO(name, mcr);
-                        } break;
-                        case ident_include:
-                            // (future implementation)
-                            break;
-                        case ident_error: {
-                            printf("ASM PREPROCESSOR ERROR: %s\n", value);
-                            MFree(name);
-                            MFree(value);
-                            FCLOSE(tmp_file);
-                            return FALSE;
-                        } break;
-                        case ident_warning: {
-                            printf("ASM PREPROCESSOR WARNING: %s\n", value);
-                        } break;
-                    }
-                } break;
+                            } break;
+                            case ident_warning: {
+                                MFree(value);
+                                value = EXTRACT_SINGLE_VALUE(buf, kw.ident);
+                                printf("[PP] WARNING: [%s]\n", value);
+                            } break;
+                        }
+                    } break;
+                }
+
+                MFree(name);
+                MFree(value);
+                continue; // never write directive lines
             }
-
-            MFree(name);
-            MFree(value);
-            continue; // never write directive lines
+            else {
+                printf("Empty/false preprocessor directive, %s\n", buf);
+                return FALSE;
+            }
         }
-
+        
         // If not a preprocessor line, skip writing if inactive
         if (!active)
             continue;
 
         // Process and write active code line
-        REPLACE_MACROS_IN_LINE(buf);
+        REPLACE_MACROS_IN_LINE(buf, mcr);
         if (len + 1 < BUF_SZ) {
             buf[len] = '\n';
             if (!FWRITE(tmp_file, buf, len + 1)) {
-                FCLOSE(tmp_file);
                 return FALSE;
             }
         }
     }
 
-    FCLOSE(tmp_file);
     return TRUE;
 }
 
@@ -343,6 +519,11 @@ PASM_INFO PREPROCESS_ASM() {
     PASM_INFO info = MAlloc(sizeof(ASM_INFO));
     if(!info) return NULLPTR;
     if_stack_top = 0;
+
+    for(U32 i = 0; i < args->macros.len; i++) {
+        PMACRO mcr = &args->macros.macros[i];
+        DEFINE_MACRO(mcr->name, mcr->value, &glb_macros);
+    }
 
     for(U32 i = 0; i < args->input_file_count; i++) {
         U8 buf[32] = "/TMP/";
@@ -365,13 +546,13 @@ PASM_INFO PREPROCESS_ASM() {
             FREE_PREPROCESSING_UNITS();
             return NULLPTR;
         }
-
-        if(!PREPROCESS_FILE(&units[unit_cnt].file, &tmp)) {
+        MACRO_ARR *root_macros = &units[unit_cnt].macros;
+        if(!PREPROCESS_FILE(&units[unit_cnt].file, &tmp, root_macros, &units[unit_cnt])) {
             FREE_PREPROCESSING_UNITS();
             return info;
         }
 
-
+        printf("%s\n", tmp.data);
         FCLOSE(&tmp);
         unit_cnt++;
     }
