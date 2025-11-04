@@ -374,12 +374,12 @@ ASM_TOK_ARRAY *LEX(PASM_INFO info) {
         ADD_TOKEN(res, TOK_EOF, "EOF", 0, lineno + 1, 0);
         FCLOSE(&file);
     }
-    for (U32 i = 0; i < res->len; i++) {
-        PASM_TOK t = res->toks[i]; // note: toks[i] is a pointer in your ADD_TOKEN
-        printf("[TOKEN %03u] %s '%s' Enum=0x%X (Line %u, Col %u)\n",
-            i, TOKEN_TYPE_STR(t->type), t->txt, t->num, t->line, t->col);
+    // for (U32 i = 0; i < res->len; i++) {
+    //     PASM_TOK t = res->toks[i]; // note: toks[i] is a pointer in your ADD_TOKEN
+    //     printf("[TOKEN %03u] %s '%s' Enum=0x%X (Line %u, Col %u)\n",
+    //         i, TOKEN_TYPE_STR(t->type), t->txt, t->num, t->line, t->col);
 
-    }
+    // }
 
     return res;
 }

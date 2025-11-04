@@ -34,7 +34,7 @@ BOOLEAN START_ASSEMBLING() {
         printf("[ASM LEX] Nothing lexed\n");
         goto err;
     }
-
+    
     BOOL res = 0;
     goto cleanup;
     err:

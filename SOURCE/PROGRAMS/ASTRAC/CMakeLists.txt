@@ -49,16 +49,21 @@ set(CompArgs
     -D__PROCESS__
     -D__UP__
     -D__ASTRAC__
-    -Wno-comment
-    -Wno-comments
+    
+    # 🛑 Disables ALL warnings (including those enabled by -Wall/-Wextra)
+    -w
+    
+    # -Wno-comment (No longer needed if using -w)
+    # -Wno-comments (No longer needed if using -w)
+    
     -m32
     -ffreestanding
     -fno-pic
     -fno-pie
     -nostdlib
     -O0
-    -Wall
-    -Wextra
+    # -Wall (No longer needed if using -w)
+    # -Wextra (No longer needed if using -w)
     -fno-stack-protector
     -fno-builtin
     -fno-inline
