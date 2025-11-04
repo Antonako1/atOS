@@ -10,3 +10,22 @@ void disable_fpu(void) {
 
     PIC_Mask(13); // mask FPU IRQ
 }
+void fpu_enable_exceptions(void) {
+    U16 cw;
+    ASM_VOLATILE("fstcw %0" : "=m"(cw));
+    cw &= ~0x3F;  // clear exception masks
+    ASM_VOLATILE("fldcw %0" :: "m"(cw));
+}
+
+void fpu87_init(void) {
+    ASM_VOLATILE("fninit"); // Initialize FPU
+    fpu_enable_exceptions();
+}
+
+void fpu_save(void *state) {
+    ASM_VOLATILE("fxsave (%0)" :: "r"(state) : "memory");
+}
+
+void fpu_restore(void *state) {
+    ASM_VOLATILE("fxrstor (%0)" :: "r"(state) : "memory");
+}

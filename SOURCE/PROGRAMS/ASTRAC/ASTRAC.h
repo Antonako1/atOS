@@ -1,6 +1,7 @@
 #ifndef ASTRAC_H
 #define ASTRAC_H
 #include <STD/TYPEDEF.h>
+#include <STD/FS_DISK.h>
 
 #define VERSION "0.0.1"
 #define TRADEMARK "AstraC Compiler, Assembler and Dissasembler"

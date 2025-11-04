@@ -1,6 +1,23 @@
-MNEMONIC("mov",   MNEM_MOV,  0x89, 2)
-MNEMONIC("push",  MNEM_PUSH, 0x50, 1)
-MNEMONIC("pop",   MNEM_POP,  0x58, 1)
-MNEMONIC("add",   MNEM_ADD,  0x01, 2)
-MNEMONIC("sub",   MNEM_SUB,  0x29, 2)
-MNEMONIC("jmp",   MNEM_JMP,  0xE9, 1)
+#ifndef MNEMONICS_H
+#define MNEMONICS_H
+#include <STD/TYPEDEF.h>
+
+#define MNEMONIC(name, mnemonic, opcode, operands) mnemonic,
+typedef enum _ASM_MNEMONIC {
+    #include <PROGRAMS/ASTRAC/ASSEMBLER/MNEMONIC_LIST.h>
+} ASM_MNEMONIC;
+#undef MNEMONIC
+
+typedef struct {
+    const char* name;
+    ASM_MNEMONIC mnemonic;
+    U8 opcode[4];
+    U8 operand_count;
+} ASM_MNEMONIC_TABLE;
+
+#define MNEMONIC(name, mnemonic, opcode, operands) { name, mnemonic, opcode, operands },
+ASM_MNEMONIC_TABLE asm_mnemonics[] = {
+    #include <PROGRAMS/ASTRAC/ASSEMBLER/MNEMONIC_LIST.h>
+};
+#undef MNEMONIC
+#endif // MNEMONICS_H

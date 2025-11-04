@@ -1,0 +1,7 @@
+MNEMONIC("mov",   MNEM_MOV,  0x89, 2)
+MNEMONIC("push",  MNEM_PUSH, 0x50, 1)
+MNEMONIC("pop",   MNEM_POP,  0x58, 1)
+MNEMONIC("add",   MNEM_ADD,  0x01, 2)
+MNEMONIC("sub",   MNEM_SUB,  0x29, 2)
+MNEMONIC("jmp",   MNEM_JMP,  0xE9, 1)
+MNEMONIC("",      MNEM_MAX,  0xFF, 0)

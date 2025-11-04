@@ -56,28 +56,61 @@ typedef enum _ASM_REGS {
     REG_XMM4, REG_XMM5, REG_XMM6, REG_XMM7,
 } ASM_REGS;
 
-#define MNEMONIC(name, mnemonic, opcode, operands) mnemonic,
-typedef enum _ASM_MNEMONIC {
-    #include <PROGRAMS/ASTRAC/ASSEMBLER/MNEMONICS.h>
-    MNEM_MAX
-} ASM_MNEMONIC;
-#undef MNEMONIC
 
-typedef struct {
-    const char* name;
-    ASM_MNEMONIC mnemonic;
-    U8 opcode;
-    U8 operand_count;
-} ASM_MNEMONIC_TABLE;
+typedef enum _ASM_SYMBOLS {
+    SYM_NONE = 0,
 
-#define MNEMONIC(name, mnemonic, opcode, operands) { name, mnemonic, opcode, operands },
-ASM_MNEMONIC_TABLE asm_mnemonics[] = {
-    #include <PROGRAMS/ASTRAC/ASSEMBLER/MNEMONICS.h>
-};
-#undef MNEMONIC
+    /* Delimiters */
+    SYM_COMMA,      // ,
+    SYM_COLON,      // :
+    SYM_SEMICOLON,  // ; (should already be removed by preprocessor)
+    
+    /* Brackets for memory addressing */
+    SYM_LBRACKET,   // [
+    SYM_RBRACKET,   // ]
+    SYM_LPAREN,     // (
+    SYM_RPAREN,     // )
+
+    /* Arithmetic / Logical Operators */
+    SYM_PLUS,       // +
+    SYM_MINUS,      // -
+    SYM_ASTERISK,   // *
+    SYM_SLASH,      // /
+    SYM_PERCENT,    // %
+
+    /* Bitwise Operators */
+    SYM_AND,        // &
+    SYM_OR,         // |
+    SYM_XOR,        // ^
+    SYM_TILDE,      // ~
+    SYM_SHL,        // <<
+    SYM_SHR,        // >>
+
+    /* Assignment / Special */
+    SYM_EQUALS,     // =
+
+    /* Others */
+    SYM_DOT,        // .
+    SYM_AT,         // @
+    SYM_DOLLAR,     // $ (current instruction pointer)
+    
+    SYM_AMOUNT
+} ASM_SYMBOLS;
+
+typedef enum _ASM_VAR_TYPE {
+    TYPE_NONE,
+    
+    TYPE_BYTE,
+    TYPE_WORD,
+    TYPE_DWORD,
+    TYPE_FLOAT,
+    TYPE_PTR,    
+    TYPE_AMOUNT,
+} ASM_VAR_TYPE;
 
 typedef enum _ASM_TOKEN_TYPE {
     TOK_NONE,
+    TOK_EOL,
     TOK_EOF,
     TOK_LABEL,       // e.g. "main:"
     TOK_LOCAL_LABEL, // e.g. "@@1, @F, @b"
@@ -86,6 +119,7 @@ typedef enum _ASM_TOKEN_TYPE {
     TOK_NUMBER,      // e.g. "123", "0xFF", "0b101", 'S'
     TOK_STRING,      // e.g. "Hello"
     TOK_SYMBOL,      // ',', '[', ']', '+', '-', etc
+    TOK_IDENT_VAR,   // DD, DB, BYTE, WORD etc
     TOK_IDENTIFIER,  // variables, constants, macros. only these a case-sensitive
     TOK_DIRECTIVE,   // .section, .data, .text, etc
     TOK_AMOUNT,
@@ -108,8 +142,10 @@ typedef struct {
     union {
         U32 num;
         ASM_REGS reg;
-        ASM_MNEMONIC mnemonic;
+        U32 mnemonic;
+        ASM_SYMBOLS symbol;
         ASM_DIRECTIVE directive;
+        ASM_VAR_TYPE var_type;
     };
 } ASM_TOK, *PASM_TOK;
 

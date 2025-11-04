@@ -748,11 +748,13 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
         I32 width = 0;
         BOOL pad_zero = FALSE;
 
-        // Parse optional zero-padding and width
+        // Parse optional zero-padding
         if (*fmt == '0') {
             pad_zero = TRUE;
             fmt++;
         }
+
+        // Parse width
         while (*fmt >= '0' && *fmt <= '9') {
             width = width * 10 + (*fmt - '0');
             fmt++;
@@ -768,6 +770,9 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
             case 's': {
                 CHAR *s = va_arg(args, CHAR*);
                 if (!s) s = "(null)";
+                I32 len = STRLEN(s);
+                for (I32 i = len; i < width; i++)
+                    putch(' ', ctx);
                 while (*s) putch(*s++, ctx);
                 break;
             }
@@ -809,6 +814,17 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
                     putch(pad_zero ? '0' : ' ', ctx);
                 for (CHAR *p = buf; *p; p++)
                     putch(*p, ctx);
+                break;
+            }
+
+            case 'p': {  // pointer type
+                U32 ptr = (U32)va_arg(args, VOID*);
+                CHAR buf[32];
+                ITOA_U(ptr, buf, 16);
+                putch('0', ctx);
+                putch('x', ctx);
+                CHAR *p = buf;
+                while (*p) putch(*p++, ctx);
                 break;
             }
 
@@ -899,4 +915,14 @@ PU8 STR_REPLACE(PU8 src, PU8 repl, PU8 with) {
     }
 
     return result;
+}
+
+BOOL IS_SPACE(CHAR c) {
+    if(
+        c == ' ' ||
+        c == '\r' ||
+        c == ' \n' ||
+        c == ' \t'
+    ) return TRUE;
+    return FALSE;
 }
