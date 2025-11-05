@@ -1,5 +1,6 @@
 #include <STD/DEBUG.h>
 #include <STD/ASM.h>
+#include <STD/ARG.h>
 
 static inline U8 com1_lsr(void) {
     return _inb(COM1_BASE + 5);
@@ -100,4 +101,13 @@ void MEMORY_DUMP(const void *addr, U32 length) {
     DEBUG_NL();
     DEBUG_NL();
 }
-
+VOID debug_putch(CHAR c, VOID *ctx) {
+    (VOID)ctx;
+    DEBUG_PUTC(c);
+}
+DEBUG_PRINTF(PU8 fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    VFORMAT(debug_putch, NULL, fmt, args);
+    va_end(args);
+}

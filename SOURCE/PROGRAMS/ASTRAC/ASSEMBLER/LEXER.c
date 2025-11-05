@@ -1,11 +1,6 @@
 #include <PROGRAMS/ASTRAC/ASSEMBLER/ASSEMBLER.h>
 #include <PROGRAMS/ASTRAC/ASSEMBLER/MNEMONICS.h>
 
-typedef struct {
-    PU8 value;
-    U32 enum_val;
-} KEYWORD;
-
 static const KEYWORD registers[] ATTRIB_DATA = {
     /* == General Purpose 32-bit == */
     { "eax", REG_EAX }, { "ebx", REG_EBX }, { "ecx", REG_ECX }, { "edx", REG_EDX },
@@ -47,12 +42,11 @@ static const KEYWORD registers[] ATTRIB_DATA = {
 };
 
 static const KEYWORD directives[] ATTRIB_DATA = {
-    { ".data", DIR_DATA },       // data section
-    { ".data", DIR_RODATA },       // data section
-    { ".text", DIR_TEXT },       // code section
-    { ".bss",  DIR_BSS },        // uninitialized data
-    { ".section", DIR_SECTION }, // custom section
-    { ".code", DIR_CODE },       // macro end
+    { "data", DIR_DATA },       // data section
+    { "rodata", DIR_RODATA },       // read-only data section
+    { "code", DIR_CODE },       // code section
+    { "use32", DIR_CODE_TYPE_32}, 
+    { "use16", DIR_CODE_TYPE_16}, 
     { NULL, 0 }
 };
 
@@ -107,6 +101,11 @@ static const KEYWORD variable_types[] ATTRIB_DATA = {
     {"REAL4", TYPE_FLOAT},
     {"PTR", TYPE_PTR},
 };
+
+const KEYWORD *get_registers() {return &registers;}
+const KEYWORD *get_directives() {return &directives;}
+const KEYWORD *get_symbols() {return &symbols;}
+const KEYWORD *get_variable_types() {return &variable_types;}
 
 BOOL ADD_TOKEN(ASM_TOK_ARRAY* arr, ASM_TOKEN_TYPE type, PU8 txt, U32 _union, U32 line, U32 col) {
     if (arr->len >= MAX_TOKENS) return FALSE;
@@ -169,12 +168,12 @@ static BOOL try_symbol_at(const U8 *buf, U32 pos, U32 buflen, U32 *sym_enum) {
 // produce token from accumulated `tokbuf` (non-empty)
 static BOOL emit_token_from_buf(ASM_TOK_ARRAY *arr, PU8 tokbuf, U32 line, U32 col) {
     if (!tokbuf || !*tokbuf) return TRUE;
-
+    DEBUG_PRINTF("%s\n", tokbuf);
     // directive if starts with '.'
     if (tokbuf[0] == '.') {
         const KEYWORD *kw = lookup_keyword((const KEYWORD*)directives, tokbuf);
         if (kw) return ADD_TOKEN(arr, TOK_DIRECTIVE, tokbuf, kw->enum_val, line, col);
-        else return ADD_TOKEN(arr, TOK_DIRECTIVE, tokbuf, DIR_SECTION, line, col);
+        else return ADD_TOKEN(arr, TOK_DIRECTIVE, tokbuf, DIR_NONE, line, col);
     }
 
     // registers (case-insensitive)
@@ -183,18 +182,11 @@ static BOOL emit_token_from_buf(ASM_TOK_ARRAY *arr, PU8 tokbuf, U32 line, U32 co
 
     // variable types (DB, DW...) are often identifiers or directives; check case-insensitive
     const KEYWORD *vt = lookup_keyword((const KEYWORD*)variable_types, tokbuf);
-    if (vt) return ADD_TOKEN(arr, TOK_IDENTIFIER, tokbuf, vt->enum_val, line, col);
+    if (vt) return ADD_TOKEN(arr, TOK_IDENT_VAR, tokbuf, vt->enum_val, line, col);
 
-    // mnemonics: treat as identifier here but you may map later. For now mark as MNEMONIC if found
-    // If you have asm_mnemonics table, use it:
-    for (U32 i = 0; i < (sizeof(asm_mnemonics)/sizeof(asm_mnemonics[0])); i++) {
-        if (asm_mnemonics[i].name == NULL) break;
-        if (STRICMP((U8*)tokbuf, (U8*)asm_mnemonics[i].name) == 0) {
-            return ADD_TOKEN(arr, TOK_MNEMONIC, tokbuf, asm_mnemonics[i].mnemonic, line, col);
-        }
-    }
+    // mnemonics: treated as identifiers as of now. Parser works so only mnemonics are left as identifiers
 
-    // numbers: decimal, hex (0x), binary (0b), char literal 'A' handled elsewhere
+    // numbers: decimal, hex (0x), binary (0b), Charecter 'c'
     // quick heuristic: starts with digit or '-' followed by digit or 0x/0b
     {
         PU8 p = tokbuf;
@@ -267,7 +259,7 @@ ASM_TOK_ARRAY *LEX(PASM_INFO info) {
                 U8 c = linebuf[i];
 
                 // strings
-                if (c == '"' || c == '\'') {
+                if (c == '"') {
                     U8 quote = c;
                     U32 start_col = col;
                     // collect full string including quotes
@@ -374,18 +366,21 @@ ASM_TOK_ARRAY *LEX(PASM_INFO info) {
         ADD_TOKEN(res, TOK_EOF, "EOF", 0, lineno + 1, 0);
         FCLOSE(&file);
     }
-    // for (U32 i = 0; i < res->len; i++) {
-    //     PASM_TOK t = res->toks[i]; // note: toks[i] is a pointer in your ADD_TOKEN
-    //     printf("[TOKEN %03u] %s '%s' Enum=0x%X (Line %u, Col %u)\n",
-    //         i, TOKEN_TYPE_STR(t->type), t->txt, t->num, t->line, t->col);
-
-    // }
+    for (U32 i = 0; i < res->len; i++) {
+        PASM_TOK t = res->toks[i]; // note: toks[i] is a pointer in your ADD_TOKEN
+        DEBUG_PRINTF("[TOKEN %03u] %s '%s' Enum=0x%X (Line %u, Col %u)\n",
+            i, TOKEN_TYPE_STR(t->type), t->txt, t->num, t->line, t->col);
+    }
+    DEBUG_PRINTF("Len: %d\n", res->len);
 
     return res;
 }
 const char* TOKEN_TYPE_STR(ASM_TOKEN_TYPE t) {
     switch (t) {
+        case TOK_LOCAL_LABEL: return "LOCAL";
+        case TOK_IDENT_VAR: return "VAR";
         case TOK_EOL: return "EOL";
+        case TOK_EOF: return "EOL";
         case TOK_SYMBOL: return "SYMBOL";
         case TOK_REGISTER: return "REGISTER";
         case TOK_DIRECTIVE: return "DIRECTIVE";

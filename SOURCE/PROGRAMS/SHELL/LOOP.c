@@ -128,7 +128,6 @@ U0 EDIT_LINE_STDOUT_LOOP() {
         if (out->shell_seq != out->proc_seq) {
             PUTS(out->buf);
             out->shell_seq = out->proc_seq;
-            MEMZERO(out->buf, STDOUT_MAX_LENGTH);
             out->buf_end = 0;
             PRINTNEWLINE();
         }

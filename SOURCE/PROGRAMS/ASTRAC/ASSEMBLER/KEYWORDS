@@ -1,0 +1,55 @@
+Keywords for ASM. All are case-insensitive
+
+Variable types:
+    DB
+    DB
+    DW
+    WORD
+    DD
+    DWORD
+    REAL4
+    PTR
+
+Directives:
+    data
+    rodata
+    code
+    use32
+    use16
+
+Register names
+
+All assembly mnemonics
+
+Following symbols are used:
+
+, - Separatior
+: - Label start, 16-bit segment:offset
+; - Comment
+
+Memory addressing
+    [
+    ]
+    (
+    )
+
+Arithmetics:
+    +
+    -
+    *
+    /
+    %
+    =
+    
+Bitwise:
+    &
+    |
+    ^
+    ~
+    <<
+    >>
+
+Others:
+    .
+    @ - Local lable symbol
+    $ - Gets length of variable. Use in data sections

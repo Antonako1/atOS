@@ -12,7 +12,7 @@ typedef enum {
     STATE_EDIT_LINE, // Editing current command line
 } SHELL_STATES;
 
-#define STDOUT_MAX_LENGTH 2048
+#define STDOUT_MAX_LENGTH 4096
 #define MAX_STDOUT_BUFFS (MAX_PROC_AMOUNT - 2) // -self, -kernel
 
 // STDOUT is created when a process is created

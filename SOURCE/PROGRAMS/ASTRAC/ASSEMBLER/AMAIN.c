@@ -16,8 +16,22 @@ VOID DESTROY_AST_ARR(ASM_AST_ARRAY *ast) {
 
 }
 
-BOOL WRITE_TOKS_TO_DISK(PASM_INFO info) {
-
+BOOL WRITE_TOKS_TO_DISK(PASM_INFO info, ASM_TOK_ARRAY *toks) {
+    FILE *file;
+    FOPEN(&file, "/TMP/ASM_TOK_DUMP.TXT", MODE_W);
+    U32 char_buf_sz = sizeof(U8)*30;
+    U32 sz = (toks->len*sizeof(ASM_TOK)) + (toks->len*char_buf_sz);
+    VOIDPTR buf = MAlloc(sz);
+    if(!buf) return FALSE;
+    U32 sz2 = 0;
+    U32 ptr = 0;
+    for(U32 i = 0; i<toks->len;i++) {
+        MEMCPY_OPT(buf+ptr, toks->toks[i], sz2);        
+        ptr += sizeof(ASM_TOK) + char_buf_sz;
+    }
+    FWRITE(&file, buf, sz);
+    MFree(buf);
+    return TRUE;
 }
 
 BOOLEAN START_ASSEMBLING() {
