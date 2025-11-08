@@ -58,8 +58,50 @@ PASM_NODE PARSE_IDENTIFIER(PASM_TOK tok, U32* index, ASM_TOK_ARRAY *tok_arr, ASM
         }
     }
 }
-ASM_VAR *PARSE_VAR(PASM_TOK tok, U32* index, ASM_TOK_ARRAY *tok_arr, ASM_AST_ARRAY *node_arr) {
 
+VOID FREE_VAR(ASM_VAR *var) {
+    if(!var) return;
+    if(var->name) MFree(var->name);
+    if(var->start_value) MFree(var->start_value);
+    MFree(var);
+}
+
+ASM_VAR *PARSE_VAR(PASM_TOK tok, U32* index, ASM_TOK_ARRAY *tok_arr, ASM_AST_ARRAY *node_arr) {
+    ASM_VAR *var = MAlloc(sizeof(ASM_VAR));
+    if(!var) return NULLPTR;
+    /*
+    By syntax, first identifier is presumed as name,
+    followed by 1-2 variables <type> [ptr].
+    Then we got a value
+    "" - string
+        Strings end with , <len>
+        If <len> == 0, we will null terminate it and assign a strlen length to it
+    '' - char
+    0x10, 0b00001111, 4 - Numeral
+    1,2,3 - Array of <type_sz>
+    */
+   BOOL list_value = FALSE;
+   BOOL first_pass_name = FALSE;
+    while(*index < tok_arr->len) {
+        tok = PEEK_TOK(tok_arr, index);
+        switch (tok->type)
+        {
+        case TOK_SYMBOL:
+            break;
+        case TOK_IDENTIFIER: {
+            KEYWORD *kws = get_variable_types();
+        } break;
+        default:
+            break;
+        }
+        if(!first_pass_name) {
+            
+            return NULLPTR;
+        }
+    }
+
+    var->is_list = list_value;
+    return var;
 }
 
 PASM_NODE PARSE_RAW_NUMBER(PASM_TOK tok, U32* index, ASM_TOK_ARRAY *tok_arr, ASM_AST_ARRAY *node_arr) {}

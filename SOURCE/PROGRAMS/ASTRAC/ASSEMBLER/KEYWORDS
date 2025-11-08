@@ -52,4 +52,5 @@ Bitwise:
 Others:
     .
     @ - Local lable symbol
-    $ - Gets length of variable. Use in data sections
+    $ - Current location counter
+    $$ - Start address of current section

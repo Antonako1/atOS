@@ -93,10 +93,10 @@ static const KEYWORD symbols[] ATTRIB_DATA = {
 
 static const KEYWORD variable_types[] ATTRIB_DATA = {
     {"DB", TYPE_BYTE},
-    {"DB", TYPE_BYTE},
-    {"DW", TYPE_WORD},
-    {"WORD", TYPE_WORD},
-    {"DD", TYPE_DWORD},
+    {"DW", TYPE_BYTE},
+    {"DD", TYPE_WORD},
+    {"BYTE", TYPE_WORD},
+    {"WORD", TYPE_DWORD},
     {"DWORD", TYPE_DWORD},
     {"REAL4", TYPE_FLOAT},
     {"PTR", TYPE_PTR},

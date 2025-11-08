@@ -2,7 +2,7 @@
 .org 0x7c00 
 jmp 0x1000:0x1000
 
-
+jmp [es:di]
 
 .use32
 ; Test program for 80386 and 8086 lexer

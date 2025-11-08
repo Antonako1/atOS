@@ -16,7 +16,7 @@ typedef struct {
 
 
 typedef enum _ASM_REGS {
-    REG_NONE = 0,
+    REG_NONE = -1,
 
     /* == General Purpose Registers (32-bit) == */
     REG_EAX, REG_EBX, REG_ECX, REG_EDX,
@@ -100,11 +100,12 @@ typedef enum _ASM_SYMBOLS {
 typedef enum _ASM_VAR_TYPE {
     TYPE_NONE,
     
-    TYPE_BYTE,
-    TYPE_WORD,
-    TYPE_DWORD,
-    TYPE_FLOAT,
-    TYPE_PTR,    
+    TYPE_BYTE,  // 8-bit
+    TYPE_WORD,  // 16-bit
+    TYPE_DWORD, // 32-bit
+    TYPE_FLOAT, // 32-bit
+    TYPE_PTR,   // 16-bit or 32-bit depends on .use case
+
     TYPE_AMOUNT,
 } ASM_VAR_TYPE;
 
@@ -168,8 +169,12 @@ typedef struct {
 
 typedef struct _ASM_VAR {
     ASM_VAR_TYPE var_type;
-    PU8 name;
+    PU8 name; // Name of variable
     PU8 start_value;
+
+    BOOL is_list; // If true, value will be tokenized by ',' char
+    U32 list_len;
+
 } ASM_VAR, *PASM_VAR;
 
 #define MAX_VARS 100
@@ -187,7 +192,7 @@ typedef enum {
     SYNT_NODE_LABEL,       // e.g., main_loop:
     SYNT_NODE_LOCAL_LABEL, // e,g., @@1:
     SYNT_NODE_RAW_NUM,     // Raw number inserted
-    
+
     // Data sections
     SYNT_NODE_DIRECTIVE,   // e.g., DB test 10
 
@@ -237,16 +242,6 @@ typedef enum {
     OPN_THREE = 3,
     OPN_FOUR  = 4,
 } ASM_OPERAND_COUNT;
-
-//
-// ─── FIXED REGISTER ───────────────────────────────────────────────────────────
-//
-typedef enum {
-    RF_NONE = -1,
-    RF_AX, RF_BX, RF_CX, RF_DX,
-    RF_SI, RF_DI, RF_BP, RF_SP,
-    RF_CS, RF_DS, RF_ES, RF_SS, RF_FS, RF_GS,
-} ASM_FIXED_REGISTER;
 
 //
 // ─── MODRM EXTENSION (/digit) ─────────────────────────────────────────────────
@@ -397,7 +392,7 @@ typedef struct {
     ASM_OPERAND_TYPE   operand[4];     // operand types
     ASM_OPERAND_COUNT  operand_count;  // operand count
     ASM_OPERAND_SIZE   size;           // operand size (8/16/32)
-    ASM_FIXED_REGISTER reg_fixed;      // fixed register (if any)
+    ASM_REGS reg_fixed;      // fixed register (if any)
     ASM_MODRM_EXTENSION modrm_ext;     // /digit field
     BOOL               has_modrm;      // uses ModR/M?
     ASM_PROCESSOR      processor;      // processor generation
@@ -416,11 +411,11 @@ typedef struct {
 } ASM_MNEMONIC_TABLE;
 
 typedef struct ASM_NODE_MEM {
-    ASM_FIXED_REGISTER base_reg;    // RF_EAX (Base register)
-    ASM_FIXED_REGISTER index_reg;   // RF_EBX (Index register)
+    ASM_REGS base_reg;    // RF_EAX (Base register)
+    ASM_REGS index_reg;   // RF_EBX (Index register)
     S32 scale;                      // 1, 2, 4, or 8 (Scale factor)
     S32 displacement;               // Constant offset
-    ASM_FIXED_REGISTER segment;     // RF_CS, RF_DS, etc. (Segment override, if present)
+    ASM_REGS segment;     // RF_CS, RF_DS, etc. (Segment override, if present)
     PU8 symbol_name;                // If the displacement is a label/symbol (e.g., [var_a])
 } ASM_NODE_MEM;
 

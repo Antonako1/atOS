@@ -277,8 +277,9 @@ run:
 	-debugcon file:OUTPUT/DEBUG/debug.log \
 		-global isa-debugcon.iobase=0xe9 \
 		-audiodev sdl,id=snd0 \
-		-nic user,model=rtl8139,mac=52:54:00:12:34:56
-
+		-nic user,model=rtl8139,mac=52:54:00:12:34:56 \
+	-cpu 386
+	
 # remove tap device
 clean_tap:
 	@if ip link show tap0 >/dev/null 2>&1; then \
