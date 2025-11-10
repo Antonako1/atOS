@@ -44,7 +44,7 @@ static U8 tmp_str[BUF_SZ] ATTRIB_DATA = { 0 };
 static MACRO_ARR glb_macros ATTRIB_DATA = { 0 };
 
 typedef struct {
-    FILE file;
+    FILE *file;
     MACRO_ARR macros;
     U32 type;
 } PREPROCESSING_UNIT;
@@ -439,15 +439,15 @@ BOOL PREPROCESS_FILE(FILE* file, FILE* tmp_file, MACRO_ARR* mcr, PREPROCESSING_U
                                 }
                                 
                                 if(is_system) {
-                                    STRCPY(tmp_str, "/SYS_SRC");
+                                    STRCPY(tmp_str, "/ATOS/SYS_SRC");
                                     if(path[0] != '/') STRCAT(tmp_str, "/");
                                     STRCAT(tmp_str, path);
                                 } else {
                                     STRCPY(tmp_str, path);
                                 }
 
-                                FILE inc;
-                                if (!FOPEN(&inc, tmp_str, MODE_R | MODE_FAT32)) {
+                                FILE *inc = FOPEN(tmp_str, MODE_R | MODE_FAT32);
+                                if (!inc) {
                                     printf("[PP] Could not open include file: %s\n", tmp_str);
                                     MFree(value);
                                     return FALSE;
@@ -530,8 +530,8 @@ PASM_INFO PREPROCESS_ASM() {
             FREE_PREPROCESSING_UNITS();
         }
 
-        FILE tmp;
-        if(!FOPEN(&tmp, buf, MODE_RA | MODE_FAT32)) {
+        FILE *tmp=FOPEN(buf, MODE_RA | MODE_FAT32);
+        if(!tmp) {
             FREE_PREPROCESSING_UNITS();
             return info;
         }
@@ -540,7 +540,8 @@ PASM_INFO PREPROCESS_ASM() {
 
         units[unit_cnt].type = ASM_PREPROCESSOR;
         PU8 file_name = args->input_files[i];
-        if(!FOPEN(&units[unit_cnt].file, file_name, MODE_R | MODE_FAT32)) {
+        units[unit_cnt].file = FOPEN(file_name, MODE_R | MODE_FAT32);
+        if(!units[unit_cnt].file) {
             FREE_PREPROCESSING_UNITS();
             return NULLPTR;
         }
@@ -562,13 +563,12 @@ VOID FREE_PREPROCESSING_UNITS() {
         PREPROCESSING_UNIT *unit = &units[i];
 
         // Close file if still open
-        FCLOSE(&unit->file);
+        FCLOSE(unit->file);
 
         // Free macros in this unit
         FREE_MACROS(&unit->macros);
 
         // Reset structure fields
-        MEMSET(&unit->file, 0, sizeof(FILE));
         MEMSET(&unit->macros, 0, sizeof(MACRO_ARR));
         unit->type = 0;
     }

@@ -43,7 +43,7 @@ RTOSKRNLCompArgs ?= $(CompArgs) $(RTOSKRNL_INCLUDES) -DRTOS_KERNEL -D__32RTOS__ 
 
 
 INPUT_ISO_DIR_SYSTEM ?= $(INPUT_ISO_DIR)/ATOS
-INPUT_ISO_DIR_USER ?= $(INPUT_ISO_DIR)/USER
+INPUT_ISO_DIR_HOME ?= $(INPUT_ISO_DIR)/HOME
 INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 
 .PHONY: all kernel bootloader iso clean run help programs diskvbr clean_tap runn setup_tap
@@ -232,20 +232,17 @@ programs:
 # ISO build
 iso: bootloader kernel programs diskvbr
 	@echo "Creating ISO directory structure..."
-	mkdir -p $(INPUT_ISO_DIR)/INNER/INNER2
-	mkdir -p $(INPUT_ISO_DIR)/HOME/DOCS
-	mkdir -p $(INPUT_ISO_DIR)/SYS_SRC
+	mkdir -p $(INPUT_ISO_DIR_SYSTEM)/SYS_SRC
 	mkdir -p $(INPUT_ISO_DIR_SYSTEM)
-	mkdir -p $(INPUT_ISO_DIR_USER)
+	mkdir -p $(INPUT_ISO_DIR_HOME)
+	mkdir -p $(INPUT_ISO_DIR_HOME)/DOCS/
 	mkdir -p $(INPUT_ISO_DIR_PROGRAMS)
 	cp -f $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN $(INPUT_ISO_DIR)/BOOTLOADER.BIN
 	cp -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN $(INPUT_ISO_DIR_SYSTEM)/DISK_VBR.BIN
-	cp -f $(SOURCE_DIR)/BAsE.txt $(INPUT_ISO_DIR)/BAsE.txt
 
-	mkdir -p $(INPUT_ISO_DIR)/INNER/INNER2
-	cp -f $(SOURCE_DIR)/INSIDE_1.txt $(INPUT_ISO_DIR)/INNER/INNER2/INSIDE_1.txt
-	cp -rf $(SOURCE_DIR)/FILES/* $(INPUT_ISO_DIR)/HOME/DOCS
-	cp -rf $(SOURCE_DIR)/SYS_SRC/* $(INPUT_ISO_DIR)/SYS_SRC
+	cp -rf $(SOURCE_DIR)/../HOME/* $(INPUT_ISO_DIR_HOME)/
+	cp -rf $(SOURCE_DIR)/FILES/* $(INPUT_ISO_DIR_HOME)/DOCS
+	cp -rf $(SOURCE_DIR)/SYS_SRC/* $(INPUT_ISO_DIR_SYSTEM)/SYS_SRC
 	cp -f $(OUTPUT_KERNEL_DIR)/KERNEL.BIN $(INPUT_ISO_DIR)/KERNEL.BIN
 	cp -f $(OUTPUT_KERNEL_DIR)/32RTOSKRNL.BIN $(INPUT_ISO_DIR_SYSTEM)/32RTOSKRNL.BIN
 	cp -f $(SOURCE_DIR)/ATOSHELL.SH $(INPUT_ISO_DIR_SYSTEM)/ATOSHELL.SH
@@ -278,7 +275,6 @@ run:
 		-global isa-debugcon.iobase=0xe9 \
 		-audiodev sdl,id=snd0 \
 		-nic user,model=rtl8139,mac=52:54:00:12:34:56 \
-	-cpu 386
 	
 # remove tap device
 clean_tap:

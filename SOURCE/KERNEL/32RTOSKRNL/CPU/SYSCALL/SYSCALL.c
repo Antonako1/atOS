@@ -17,6 +17,8 @@
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
 #include <DRIVERS/AC97/AC97.h>
 
+#include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
+
 #define SYSCALL_ENTRY(id, fn) [id] = fn,
 static SYSCALL_HANDLER syscall_table[SYSCALL_MAX] = {
     #include <CPU/SYSCALL/SYSCALL_LIST.h>
@@ -385,7 +387,10 @@ U32 SYS_PATH_RESOLVE_ENTRY(U32 path_ptr, U32 out_entry_ptr, U32 unused3, U32 unu
     return PATH_RESOLVE_ENTRY((U8*)path_ptr, (FAT_LFN_ENTRY*)out_entry_ptr);
 }
 
-
+U32 SYS_RESTART_MACHINE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    system_reboot();
+}   
 
 U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5) {
     if (num >= SYSCALL_MAX) return (U32)-1;

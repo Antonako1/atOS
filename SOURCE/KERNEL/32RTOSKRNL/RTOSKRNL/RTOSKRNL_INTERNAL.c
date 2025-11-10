@@ -628,6 +628,7 @@ BOOL initialize_filestructure(VOID) {
 
 void RTOSKRNL_LOOP(VOID) {
     // early_debug_tcb(get_last_pid());
+    kernel_loop_init();
     while(1) {
         handle_kernel_messages();
     }

@@ -421,32 +421,33 @@ VOID FAT_83FILENAMEFY(DIR_ENTRY *entry, const U8 *original) {
 
     // Find the last dot in the name
     const U8 *dot = STRRCHR(original, '.');
-    U32 base_len = 0, ext_len = 0;
+    U32 base_len = 0;
+    const U8 *extension_start = NULL;
 
     if (dot) {
         base_len = (U32)(dot - original);
-        ext_len  = STRLEN(dot + 1);
+        extension_start = dot + 1;
     } else {
         base_len = STRLEN(original);
     }
 
-    // Clamp lengths to FAT limits
+    // Clamp base name length to 8
     if (base_len > 8) base_len = 8;
-    if (ext_len > 3)  ext_len  = 3;
 
-    // Copy base name (uppercase)
+    // 1. Copy base name (uppercase) to positions 0-7
     for (U32 i = 0; i < base_len; i++)
         entry->FILENAME[i] = TOUPPER(original[i]);
 
-    // If extension exists, add dot right after base name (not at position 8)
-    if (dot && ext_len > 0 && base_len < 8) {
-        entry->FILENAME[base_len] = '.';
-        // Copy extension immediately after the dot
+    // 2. Copy extension (uppercase) to positions 8-10
+    if (extension_start) {
+        U32 ext_len = STRLEN(extension_start);
+        // Clamp extension length to 3
+        if (ext_len > 3) ext_len = 3;
+
         for (U32 i = 0; i < ext_len; i++)
-            entry->FILENAME[base_len + 1 + i] = TOUPPER(dot[1 + i]);
+            entry->FILENAME[8 + i] = TOUPPER(extension_start[i]);
     }
 }
-
 
 
 // For display: convert 8.3 name into printable string with dot
@@ -731,6 +732,32 @@ BOOLEAN CREATE_FSINFO() {
     return FAT_WRITE_SECTOR_ON_DISK(bpb.EXBR.FS_INFO_SECTOR, (U8 *)&fsinfo);
 }
 
+// Assumed Helper Function based on previous conversation's logic
+VOID FAT_83_TO_STR(const U8 filename_11[11], U8 *out_str, U32 max_len) {
+    U8 base_name[9];
+    U8 ext_name[4];
+
+    // 1. Extract and trim Base Name (8 bytes)
+    MEMCPY(base_name, filename_11, 8);
+    base_name[8] = '\0';
+    // Assuming a function that removes trailing spaces
+    str_trim(base_name); 
+
+    // 2. Extract and trim Extension (3 bytes)
+    MEMCPY(ext_name, filename_11 + 8, 3);
+    ext_name[3] = '\0';
+    str_trim(ext_name);
+
+    // 3. Assemble Full Name (Base.Ext)
+    MEMZERO(out_str, max_len);
+    STRNCPY(out_str, base_name, max_len - 1);
+
+    if (STRLEN(ext_name) > 0 && STRLEN(out_str) < max_len - 1) {
+        STRNCAT(out_str, ".", max_len - STRLEN(out_str) - 1);
+        STRNCAT(out_str, ext_name, max_len - STRLEN(out_str) - 1);
+    }
+}
+
 // Recursive function to copy ISO directories and files
 BOOLEAN copy_iso_to_fat32(IsoDirectoryRecord *iso_dir, U32 parent_cluster) {
     if (!iso_dir) return FALSE;
@@ -977,8 +1004,14 @@ BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent_cluster, U8
                 MEMCPY(&lfns[lfn_count++], &entries[i], sizeof(DIR_ENTRY));
             continue;
         }
+        
+        // Skip Volume ID for finding file/dir
+        if (entries[i].ATTRIB & FAT_ATTRIB_VOL_ID) {
+            lfn_count = 0; // Volume ID entries reset LFN chain too
+            continue;
+        }
 
-        // if we reach a normal entry, check accumulated LFNs first
+        // 1. Check accumulated LFNs first
         if (lfn_count > 0) {
             if (LFN_MATCH(name, lfns, lfn_count)) {
                 MEMCPY(out, &entries[i], sizeof(DIR_ENTRY));
@@ -987,22 +1020,11 @@ BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent_cluster, U8
             lfn_count = 0; // reset after using them
         }
 
-        // fallback: compare short 8.3 name
-        U8 shortname[13];
-        MEMZERO(shortname, sizeof(shortname));
-
-        // Copy base name (trim spaces)
-        U32 j = 0;
-        for (; j < 8 && entries[i].FILENAME[j] != ' ' && entries[i].FILENAME[j] != '\0'; j++)
-            shortname[j] = entries[i].FILENAME[j];
-
-        // Add dot + extension if present
-        if (entries[i].FILENAME[8] != ' ' && entries[i].FILENAME[8] != '\0') {
-            shortname[j++] = '.';
-            for (U32 k = 0; k < 3 && entries[i].FILENAME[8 + k] != ' ' && entries[i].FILENAME[8 + k] != '\0'; k++)
-                shortname[j++] = entries[i].FILENAME[8 + k];
-        }
-        shortname[j] = '\0';
+        // 2. Fallback: compare short 8.3 name
+        U8 shortname[14]; // Sufficient for "8.3" + NULL
+        
+        // Convert the 11-byte array to a "BASE.EXT" string
+        FAT_83_TO_STR(entries[i].FILENAME, shortname, sizeof(shortname));
 
         // FAT short names are uppercase; make case-insensitive compare
         if (STRICMP(shortname, name) == 0) {
@@ -1013,7 +1035,6 @@ BOOLEAN FIND_DIR_ENTRY_BY_NAME_AND_PARENT(DIR_ENTRY *out, U32 parent_cluster, U8
 
     return FALSE;
 }
-
 U32 FIND_DIR_BY_NAME_AND_PARENT(U32 parent_cluster, U8 *name) {
     DIR_ENTRY e;
     if (FIND_DIR_ENTRY_BY_NAME_AND_PARENT(&e, parent_cluster, name)) {
@@ -1315,19 +1336,21 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
         for (U32 i = 0; i < actual_count; i++) {
             DIR_ENTRY *e = &entries[i];
             if (DIR_ENTRY_IS_FREE(e)) continue;
+            // Skip Volume ID and LFN entries for direct component comparison
+            if (e->ATTRIB & FAT_ATTRIB_VOL_ID || e->ATTRIB == FAT_ATTRIB_LFN) continue; 
 
             // Retrieve name (LFN preferred, fallback to 8.3)
             U8 entry_name[FAT_MAX_FILENAME];
             MEMZERO(entry_name, sizeof(entry_name));
 
             if (!READ_LFNS(e, entry_name, sizeof(entry_name))) {
-                // fallback: convert FILENAME[11] to string manually
-                STRNCPY(entry_name, e->FILENAME, 11);
-                entry_name[11] = '\0';
-                str_trim(entry_name);
+                // FALLBACK: convert FILENAME[11] to string manually
+                // The FAT_83_TO_STR helper (or inline logic) is used here
+                FAT_83_TO_STR(e->FILENAME, entry_name, sizeof(entry_name));
             }
 
-            if (STRCMP(entry_name, component) == 0 || DIR_NAME_COMP_CASE(e, component)) {
+            // Comparison: match LFN (if retrieved) or 8.3 short name (case-insensitive for robustness)
+            if (STRICMP(entry_name, component) == 0) {
                 MEMCPY(&out_entry->entry, e, sizeof(DIR_ENTRY));
                 STRNCPY(out_entry->lfn, entry_name, FAT_MAX_FILENAME - 1);
                 out_entry->lfn[FAT_MAX_FILENAME - 1] = '\0';
@@ -1346,7 +1369,6 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
 
     return TRUE;
 }
-
 
 BOOL DIR_ENTRY_IS_DIR(DIR_ENTRY *entry) {
     if(IS_FLAG_SET(entry->ATTRIB, FAT_ATTRB_DIR)) return TRUE;

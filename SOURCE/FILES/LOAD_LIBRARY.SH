@@ -1,2 +1,1 @@
 echo q  
-cd..

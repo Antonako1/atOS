@@ -31,6 +31,11 @@ typedef enum {
     MODE_RA       = MODE_R | MODE_A,
     MODE_FAT32    = 0x0100,  // FAT32 backend
     MODE_ISO9660  = 0x0200,  // ISO9660 backend
+    MODE_FR       = MODE_R | MODE_FAT32,
+    MODE_FW       = MODE_W | MODE_FAT32,
+    MODR_FRW      = MODE_RW| MODE_FAT32,
+    MODE_FA       = MODE_A | MODE_FAT32,
+    MODE_FRA      = MODE_RA| MODE_FAT32,
 } FILEMODES;
 
 typedef struct {
@@ -50,8 +55,7 @@ typedef struct {
 // ===================================================
 
 // Open a file in the specified mode (FAT32 or ISO9660)
-// Returns TRUE if file opened successfully, FALSE otherwise
-BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode);
+FILE *FOPEN(PU8 path, FILEMODES mode);
 
 // Close a file and free associated memory
 VOID FCLOSE(FILE *file);
@@ -62,6 +66,7 @@ U32 FREAD(FILE *file, VOIDPTR buffer, U32 len);
 
 // Write up to `len` bytes from `buffer` into file
 // Returns number of bytes written; always 0 for read-only (ISO9660) files
+// To write file's buffer, point parameters to file.data and file.sz
 U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len);
 
 // Move the read pointer to `offset` bytes from the beginning

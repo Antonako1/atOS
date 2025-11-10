@@ -245,8 +245,9 @@ DIR_ENTRY FAT32_GET_ROOT_DIR_ENTRY() {
 
 
 
-BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
-    if (!file || !path) return FALSE;
+FILE * FOPEN(PU8 path, FILEMODES mode) {
+    if (!path) return FALSE;
+    FILE *file = MAlloc(sizeof(FILE));
     MEMZERO(file, sizeof(FILE));
 
     file->mode = mode;
@@ -270,7 +271,7 @@ BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
 
         MFree(ent);
         if (!file->data) goto failure;
-        return TRUE;
+        return file;
     }
 
     if (fat) {
@@ -286,12 +287,12 @@ BOOLEAN FOPEN(FILE *file, PU8 path, FILEMODES mode) {
             if (!file->data) goto failure;
         }
 
-        return TRUE;
+        return file;
     }
 
 failure:
     FCLOSE(file);
-    return FALSE;
+    return NULLPTR;
 }
 
 BOOLEAN FILE_FROM_RAW_FAT_DATA(FILE *file, VOIDPTR data, U32 sz, FAT_LFN_ENTRY *ent) {
@@ -327,6 +328,7 @@ VOID FCLOSE(FILE *file) {
     file->sz = 0;
     file->mode = 0;
     file->read_ptr = 0;
+    MFree(file);
 }
 
 U32 FREAD(FILE *file, VOIDPTR buffer, U32 len) {

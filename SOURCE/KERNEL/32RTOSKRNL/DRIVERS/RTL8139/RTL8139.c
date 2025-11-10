@@ -130,6 +130,19 @@ void RTL8139_HANDLER(U32 vec, U32 errno);
 #define BAR     (1 << 13)
 #define PAM     (1 << 14)
 #define MAR     (1 << 15)
+typedef struct {
+    U8 *data;
+    U16 length;
+} PACKET_QUEUE_ENTRY;
+
+// Define the size of the pending queue
+#define RTL8139_QUEUE_SIZE 3
+
+// Global state for the pending packet queue
+static PACKET_QUEUE_ENTRY RTL8139_RX_PENDING_QUEUE[RTL8139_QUEUE_SIZE] ATTRIB_DATA;
+static U8 RTL8139_RX_QUEUE_HEAD ATTRIB_DATA = 0;
+static U8 RTL8139_RX_QUEUE_TAIL ATTRIB_DATA = 0;
+static U8 RTL8139_RX_QUEUE_COUNT ATTRIB_DATA = 0;
 
 static U32 RTL8139_IO_BASE ATTRIB_DATA = 0;
 static U32 RTL8139_RX_OFFSET ATTRIB_DATA = 0;
@@ -327,46 +340,6 @@ U32 BUILD_ETH_FRAME(U8 *buf, const U8 *dst, const U8 *src, U16 ether_type, const
     return offset;
 }
 
-// Try to send a single frame. Returns TRUE on queued, FALSE if no free descriptor.
-BOOL SEND_RTL8139_PACKET(U8 *packet, U32 len) {
-    // len must be >= 60 (Ethernet minimum payload with headers) or NIC will pad,
-    // and <= 0x1FFF (13-bit length register).
-    if (len == 0 || len > 0x1FFF) return FALSE;
-
-    // Find a free TX descriptor (try all 4)
-    for (U8 i = 0; i < 4; i++) {
-        U32 txstatus_reg = RTL8139_IO_BASE + RTL8139_TXSTATUS0 + (i * 4);
-        U32 txstatus = _inl(txstatus_reg);
-
-        // Common approach: if NIC sets "OWN/ACTIVE" bit when busy, test that bit.
-        // Many implementations check bit 13 (0x2000) to see if it's busy; if bit is 0 it's free.
-        // If uncertain, check the RTL8139 datasheet for the exact "active" bit in TX status.
-        if (txstatus & 0x2000) {
-            // descriptor busy, try next
-            continue;
-        }
-
-        // Descriptor is free — copy the frame into the DMA buffer
-        MEMCPY_OPT(RTLX8139_TX_BUFS[i], packet, len);
-
-        // Write physical address (driver already stored physical pointer at init)
-        _outl(RTL8139_IO_BASE + RTL8139_TXADDR0 + (i * 4),
-              (U32)RTLX8139_TX_BUFS[i]);
-
-        // Kick transmission by writing frame length (lower 13 bits)
-        // According to typical RTL8139 usage, writing length (len & 0x1FFF) starts TX
-        _outl(RTL8139_IO_BASE + RTL8139_TXSTATUS0 + (i * 4), (len & 0x1FFF));
-
-        // Optionally update a ring pointer if you use one for bookkeeping:
-        // RTL8139_TX_CUR = (i + 1) % 4; // not strictly required if you search each time
-
-        return TRUE; // queued successfully
-    }
-
-    // No free descriptors
-    return FALSE;
-}
-
 
 void PROCESS_PACKET(U8 *packet, U32 len) {
     VBE_CLEAR_SCREEN(VBE_BLACK);
@@ -403,10 +376,8 @@ void NET_HANDLE_PACKET(U8 *pkt, U16 len) {
 
 void RTL8139_HANDLE_RX() {
     // loop processing available packets (device raises RX OK for batches)
-    // we must read CBR (current buffer read pointer) or track our offset to know when to stop.
     while (1) {
-        // read the NIC's current buffer pointer (CBR). This points to the next byte
-        // the NIC will write; data between our RTL8139_RX_OFFSET and CBR are ready.
+        // ... (existing logic to check if offset == cbr, and sanity checks remain the same) ...
         U16 cbr = _inw(RTL8139_IO_BASE + RTL8139_CBR);
 
         // if equal, no more packets
@@ -415,98 +386,92 @@ void RTL8139_HANDLE_RX() {
         // Ensure we have a valid RX buffer
         if (!RTL8139_RX_BUF) break;
 
-        U8 *rx = (U8*)RTL8139_RX_BUF;
+        // *** QUEUE CHECK: Do not process if queue is full ***
+        if (RTL8139_RX_QUEUE_COUNT >= RTL8139_QUEUE_SIZE) {
+            // Queue full, return and let the next interrupt process remaining
+            return; 
+        }
 
-        // Read packet header that starts at RTL8139_RX_OFFSET
-        // The card writes a 4-byte header: [status (2 bytes), length (2 bytes)] (little-endian).
-        // NOTE: some implementations swap the order; adjust if you observe garbage.
+        U8 *rx = (U8*)RTL8139_RX_BUF;
         U32 offset = RTL8139_RX_OFFSET;
+        
+        // --- Packet Header Reading (Contiguous or Wrapped) ---
+        U16 pkt_status, pkt_len;
+        U8 *pkt = NULL; // Pointer to the newly allocated contiguous packet buffer
+        
+        // Logic to read header and copy payload (Handling wrap-around is complex, 
+        // using your original logic flow here for integrity)
+
+        // Read packet header (4 bytes: [status (2 bytes), length (2 bytes)])
         if (offset + 4 > RX_BUFFER_SIZE) {
-            // header straddles buffer end — copy header bytes out into local array
+            // Wrapped header logic (same as original)
             U8 header[4];
             for (int i = 0; i < 4; i++) header[i] = rx[(offset + i) % RX_BUFFER_SIZE];
-            U16 pkt_status = (U16)(header[0] | (header[1] << 8));
-            U16 pkt_len    = (U16)(header[2] | (header[3] << 8));
-            // Move offset past header
+            pkt_status = (U16)(header[0] | (header[1] << 8));
+            pkt_len    = (U16)(header[2] | (header[3] << 8));
             offset = rtl_next_rx_offset(offset, 4);
-            // Now copy payload (pkt_len bytes) into contiguous buffer below
-            U8 *pkt = KMALLOC_ALIGN(pkt_len, 4);
-            if (!pkt) {
-                // if allocation fails, drop packet and advance offset
-                RTL8139_RX_OFFSET = rtl_next_rx_offset(RTL8139_RX_OFFSET, 4 + pkt_len);
-                // update CAPR: tell NIC we've consumed up to (RTL8139_RX_OFFSET - 16)
-                U16 capr = (U16)((RTL8139_RX_OFFSET - 16) & 0xFFFF);
-                _outw(RTL8139_IO_BASE + RTL8139_CAPR, capr);
-                continue;
-            }
+
+            if (pkt_len > 2048) goto next_packet_cleanup;
+
+            pkt = KMALLOC_ALIGN(pkt_len, 4);
+            if (!pkt) goto next_packet_cleanup;
             for (U32 i = 0; i < pkt_len; i++) pkt[i] = rx[(offset + i) % RX_BUFFER_SIZE];
-            // Advance RTL8139_RX_OFFSET past this packet
-            RTL8139_RX_OFFSET = rtl_next_rx_offset(RTL8139_RX_OFFSET, 4 + pkt_len);
-            // Tell NIC we've consumed packets by writing CAPR (see note below)
-            U16 capr = (U16)((RTL8139_RX_OFFSET - 16) & 0xFFFF);
-            _outw(RTL8139_IO_BASE + RTL8139_CAPR, capr);
-            // Deliver to upper layer if status indicates OK
-            if (!(pkt_status & (FAE | CRC | LONG | RUNT | ISE))) {
-                NET_HANDLE_PACKET(pkt, pkt_len);
-            } else {
-                KFREE_ALIGN(pkt); // drop
-            }
-            continue;
-        }
-
-        // Header contiguous — read directly
-        U16 pkt_status = *((U16*)(rx + offset));
-        U16 pkt_len    = *((U16*)(rx + offset + 2));
-        // move offset past header
-        offset = rtl_next_rx_offset(offset, 4);
-
-        // Basic sanity checks
-        if (pkt_len > 2048) {
-            // bogus length — advance past header and continue
-            RTL8139_RX_OFFSET = rtl_next_rx_offset(RTL8139_RX_OFFSET, 4);
-            U16 capr = (U16)((RTL8139_RX_OFFSET - 16) & 0xFFFF);
-            _outw(RTL8139_IO_BASE + RTL8139_CAPR, capr);
-            continue;
-        }
-
-        // Allocate a contiguous buffer for the packet payload
-        U8 *pkt = KMALLOC_ALIGN(pkt_len, 4);
-        if (!pkt) {
-            // cannot allocate -> drop and advance
-            RTL8139_RX_OFFSET = rtl_next_rx_offset(RTL8139_RX_OFFSET, 4 + pkt_len);
-            U16 capr = (U16)((RTL8139_RX_OFFSET - 16) & 0xFFFF);
-            _outw(RTL8139_IO_BASE + RTL8139_CAPR, capr);
-            continue;
-        }
-
-        // Copy payload; handle possible wrap
-        if (offset + pkt_len <= RX_BUFFER_SIZE) {
-            MEMCPY(pkt, rx + offset, pkt_len);
         } else {
-            // wrapped payload
-            U32 first = RX_BUFFER_SIZE - offset;
-            MEMCPY(pkt, rx + offset, first);
-            MEMCPY(pkt + first, rx, pkt_len - first);
-        }
+            // Contiguous header logic (same as original)
+            pkt_status = *((U16*)(rx + offset));
+            pkt_len    = *((U16*)(rx + offset + 2));
+            offset = rtl_next_rx_offset(offset, 4);
 
-        // Advance RTL8139_RX_OFFSET past header + payload
+            if (pkt_len > 2048) goto next_packet_cleanup;
+            
+            pkt = KMALLOC_ALIGN(pkt_len, 4);
+            if (!pkt) goto next_packet_cleanup;
+
+            if (offset + pkt_len <= RX_BUFFER_SIZE) {
+                MEMCPY(pkt, rx + offset, pkt_len);
+            } else {
+                U32 first = RX_BUFFER_SIZE - offset;
+                MEMCPY(pkt, rx + offset, first);
+                MEMCPY(pkt + first, rx, pkt_len - first);
+            }
+        }
+        
+        // --- Packet Consumption and Enqueue ---
+
+        // Update RTL8139_RX_OFFSET past header + payload
         RTL8139_RX_OFFSET = rtl_next_rx_offset(RTL8139_RX_OFFSET, 4 + pkt_len);
 
-        // Update CAPR to indicate consumed bytes. Many RTL8139 drivers write (offset - 16).
-        // This -16 is required by the chip to allow internal read pointer space (chip quirk).
-        // If you see missed packets or lockups, you may need to adjust this value.
+        // Update CAPR to indicate consumed bytes
         U16 capr = (U16)((RTL8139_RX_OFFSET - 16) & 0xFFFF);
         _outw(RTL8139_IO_BASE + RTL8139_CAPR, capr);
 
-        // If status indicates OK, hand packet to net stack, otherwise free
+        // If status indicates OK, ENQUEUE, otherwise free
         if (pkt_status & ROK) {
-            NET_HANDLE_PACKET(pkt, pkt_len);
+            // ENQUEUE the packet
+            RTL8139_RX_PENDING_QUEUE[RTL8139_RX_QUEUE_TAIL].data = pkt;
+            RTL8139_RX_PENDING_QUEUE[RTL8139_RX_QUEUE_TAIL].length = pkt_len;
+            RTL8139_RX_QUEUE_TAIL = (RTL8139_RX_QUEUE_TAIL + 1) % RTL8139_QUEUE_SIZE;
+            RTL8139_RX_QUEUE_COUNT++;
+            // Note: Now you should trigger a separate thread/task to process the queue.
         } else {
+            // Error status -> free the buffer
             KFREE_ALIGN(pkt);
         }
+        continue;
+
+
+        next_packet_cleanup:
+        // Generic cleanup for failed allocation or bogus length
+        if(pkt) KFREE_ALIGN(pkt);
+        
+        // Since we can't reliably determine the true end of the packet on error,
+        // the safest recovery for a driver is often to stop reading or reset the card.
+        // For simple advance-and-continue:
+        RTL8139_RX_OFFSET = rtl_next_rx_offset(RTL8139_RX_OFFSET, 4); // Only skip header
+        U16 capr_err = (U16)((RTL8139_RX_OFFSET - 16) & 0xFFFF);
+        _outw(RTL8139_IO_BASE + RTL8139_CAPR, capr_err);
     } // end while packets available
 }
-
 
 void RTL8139_HANDLE_TX(){
     // handle transmit done
@@ -563,3 +528,37 @@ void RTL8139_HANDLER(U32 vec, U32 errno) {
     end:
     pic_send_eoi(RTL8139_IRQ);
 }
+
+// BOOLEAN RTL8139_PROCESS_QUEUE() {
+//     if (RTL8139_RX_QUEUE_COUNT == 0) return FALSE; // Queue is empty
+
+//     CLI; // Protect access to shared queue state
+//     PACKET_QUEUE_ENTRY entry = RTL8139_RX_PENDING_QUEUE[RTL8139_RX_QUEUE_HEAD];
+//     RTL8139_RX_QUEUE_HEAD = (RTL8139_RX_QUEUE_HEAD + 1) % RTL8139_QUEUE_SIZE;
+//     RTL8139_RX_QUEUE_COUNT--;
+//     STI; // Release lock
+
+//     return TRUE;
+// }
+
+// BOOL RTL8139_SEND_PACKET_TO_MAC(const U8 dst_mac[6], const U8 *payload, U32 payload_len, U16 ether_type) {
+//     if (!dst_mac || !payload || payload_len == 0) return FALSE;
+    
+//     // Max frame size is typically 1518 (1500 payload + 18 header/FCS), 
+//     // we use a buffer of 1536 bytes for safety and alignment, but it must be <= 2048
+//     // based on your INIT_TX_BUFFERS (2048).
+//     U8 frame_buffer[2048]; 
+    
+//     // BUILD_ETH_FRAME requires the local MAC (stored globally in MAC[])
+//     U32 frame_len = BUILD_ETH_FRAME(
+//         frame_buffer, 
+//         dst_mac, 
+//         MAC, // Use the device's own MAC address as source
+//         ether_type, 
+//         payload, 
+//         payload_len
+//     );
+
+//     // frame_len will be at least 60 (min Ethernet frame size)
+//     return SEND_RTL8139_PACKET(frame_buffer, frame_len);
+// }

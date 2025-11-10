@@ -5,8 +5,9 @@
 #include <STD/STRING.h>
 #include <STD/TYPEDEF.h>
 #include <STD/IO.h>
+#include <STD/PROC_COM.h>
 #include <STD/MEM.h>
-
+#include <STD/DEBUG.h>
 VOID HANDLE_KB_CMDI(KEYPRESS *kp, MODIFIERS *mod) {
     if(!kp->pressed) return; // We only care about key presses, not releases
     
@@ -34,7 +35,8 @@ VOID HANDLE_KB_CMDI(KEYPRESS *kp, MODIFIERS *mod) {
 
 VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
     if (!kp->pressed) return;
-
+    SHELL_INSTANCE *shndl = GET_SHNDL();
+    // DEBUG_PRINTF("Pressed: %d. \nMods: \n\tALT:%d\n\tCTRL:%d\n\tSHIFT:%d\n", kp->keycode, mod->alt, mod->ctrl, mod->shift);
     switch (kp->keycode) {
         case KEY_INSERT: TOGGLE_INSERT_MODE(); break;
         case KEY_ENTER: HANDLE_LE_ENTER(); break;
@@ -47,6 +49,9 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
         case KEY_HOME: HANDLE_LE_HOME(); break;
         case KEY_END: HANDLE_LE_END(); break;
         default: 
+            // if(mod->shift) {
+            // }
+            // else 
             if(mod->ctrl) {
                 switch(kp->keycode) {
                     case KEY_ARROW_RIGHT: HANDLE_LE_CTRL_RIGHT(); break;
@@ -59,7 +64,10 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
                     case KEY_Y: HANDLE_LE_CTRL_Y(); break;
                     case KEY_L: HANDLE_LE_CTRL_L(); break;
                     case KEY_TAB: HANDLE_LE_CTRL_TAB(); break;
-                    case KEY_C: HANDLE_CTRL_C(); break;
+                    case KEY_C: 
+                        if(shndl->active_keybinds & AK_CTRL_C)
+                            HANDLE_CTRL_C(); 
+                        break;
                 }
             }
             else

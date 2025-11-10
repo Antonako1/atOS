@@ -17,8 +17,8 @@ VOID DESTROY_AST_ARR(ASM_AST_ARRAY *ast) {
 }
 
 BOOL WRITE_TOKS_TO_DISK(PASM_INFO info, ASM_TOK_ARRAY *toks) {
-    FILE *file;
-    FOPEN(&file, "/TMP/ASM_TOK_DUMP.TXT", MODE_W);
+    FILE *file = FOPEN("/TMP/ASM_TOK_DUMP.TXT", MODE_W);
+    if(!file) return FALSE;
     U32 char_buf_sz = sizeof(U8)*30;
     U32 sz = (toks->len*sizeof(ASM_TOK)) + (toks->len*char_buf_sz);
     VOIDPTR buf = MAlloc(sz);

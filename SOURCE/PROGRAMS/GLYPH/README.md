@@ -1,1 +1,0 @@
-# Glyph — Minimal console text-editor 

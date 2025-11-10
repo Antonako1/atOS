@@ -48,7 +48,7 @@ set(CompArgs
     -D__USER__
     -D__PROCESS__
     -D__UP__
-    -D__ASTRAC__
+    -D__${ProgramName}__
     
     # 🛑 Disables ALL warnings (including those enabled by -Wall/-Wextra)
     -w

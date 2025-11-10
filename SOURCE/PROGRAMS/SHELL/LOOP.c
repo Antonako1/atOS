@@ -106,6 +106,7 @@ U0 EDIT_LINE_MSG_LOOP() {
 
             case SHELL_CMD_SHELL_FOCUS: {
                 SHELL_INSTANCE *shndl = GET_SHNDL();
+                shndl->previously_focused_pid = shndl->focused_pid;
                 shndl->focused_pid = msg->sender_pid;
             } break;
         }

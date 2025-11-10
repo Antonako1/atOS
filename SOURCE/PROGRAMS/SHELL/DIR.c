@@ -288,7 +288,8 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
 
     U32 cluster = ((U32)dir->entry.HIGH_CLUSTER_BITS << 16) | dir->entry.LOW_CLUSTER_BITS;
     U32 count = MAX_COUNT_DIRS;
-    U32 res = FAT32_DIR_ENUMERATE(cluster, dirs, &count);
+    // Assuming 'dirs' and 'FAT32_DIR_ENUMERATE' are defined/available
+    U32 res = FAT32_DIR_ENUMERATE(cluster, dirs, &count); 
     if (!res) return;
 
     PUTS("\n");
@@ -298,8 +299,8 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
     for (U32 i = 0; i < count; i++) {
         DIR_ENTRY *f = &dirs[i];
 
-        // Skip empty or deleted entries
-        if (f->FILENAME[0] == 0x00 || f->FILENAME[0] == 0xE5) continue;
+        // Skip empty or deleted entries, and Volume Label/LFN entries if you're only printing 8.3
+        if (f->FILENAME[0] == 0x00 || f->FILENAME[0] == 0xE5 || (f->ATTRIB & FAT_ATTRIB_VOL_ID) || (f->ATTRIB == FAT_ATTRIB_LFN)) continue;
 
         // Type
         if (f->ATTRIB & FAT_ATTRB_DIR)
@@ -333,28 +334,46 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
         PUTS(time_buf);
         PUTS("  ");
 
-        // Name
-        U8 name_buf[13];
+        // Name (Corrected 8.3 formatting)
+        U8 name_buf[14]; // Need 8 (base) + 1 (dot) + 3 (ext) + 1 (null) = 13 (use 14 for safety)
+        U8 base_name[9];
+        U8 ext_name[4];
+
+        // 1. Extract Base Name (8 bytes)
+        MEMCPY(base_name, f->FILENAME, 8);
+        base_name[8] = '\0';
+        str_trim(base_name); // Removes trailing spaces from the base
+
+        // 2. Extract Extension (3 bytes)
+        MEMCPY(ext_name, f->FILENAME + 8, 3);
+        ext_name[3] = '\0';
+        str_trim(ext_name); // Removes trailing spaces from the extension
+
+        // 3. Assemble Full Name (Base.Ext)
         MEMZERO(name_buf, sizeof(name_buf));
-        STRNCPY(name_buf, f->FILENAME, 11);
-        name_buf[12] = '\0';
-        str_trim(name_buf);
+        STRCPY(name_buf, base_name);
+
+        if (STRLEN(ext_name) > 0) {
+            STRCAT(name_buf, ".");
+            STRCAT(name_buf, ext_name);
+        }
 
         PUTS(name_buf);
         PUTS("\n");
     }
 }
-
 VOID PRINT_CONTENTS_PATH(PU8 path) {
     if (!path || !*path) return;
 
-    if (!ResolvePath(path, tmp_line, sizeof(tmp_line))) {
+    // Assuming 'ResolvePath' and 'tmp_line' are defined/available
+    if (!ResolvePath(path, tmp_line, sizeof(tmp_line))) { 
         PUTS("dir: Failed to resolve path.\n");
         return;
     }
 
     FAT_LFN_ENTRY ent = { 0 };
-    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
+    // Assuming 'FAT32_PATH_RESOLVE_ENTRY' is defined/available
+    if (!FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) { 
         PUTS("dir: Entry not found.\n");
         return;
     }
@@ -395,18 +414,34 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
         PUTS(time_buf);
         PUTS("  ");
 
-        // Name
-        U8 name_buf[13];
+        // Name (Corrected 8.3 formatting)
+        U8 name_buf[14]; // Need 8 (base) + 1 (dot) + 3 (ext) + 1 (null) = 13 (use 14 for safety)
+        U8 base_name[9];
+        U8 ext_name[4];
+        
+        // 1. Extract Base Name (8 bytes)
+        MEMCPY(base_name, ent.entry.FILENAME, 8);
+        base_name[8] = '\0';
+        str_trim(base_name); // Removes trailing spaces from the base
+
+        // 2. Extract Extension (3 bytes)
+        MEMCPY(ext_name, ent.entry.FILENAME + 8, 3);
+        ext_name[3] = '\0';
+        str_trim(ext_name); // Removes trailing spaces from the extension
+
+        // 3. Assemble Full Name (Base.Ext)
         MEMZERO(name_buf, sizeof(name_buf));
-        STRNCPY(name_buf, ent.entry.FILENAME, 11);
-        name_buf[12] = '\0';
-        str_trim(name_buf);
+        STRCPY(name_buf, base_name);
+
+        if (STRLEN(ext_name) > 0) {
+            STRCAT(name_buf, ".");
+            STRCAT(name_buf, ext_name);
+        }
 
         PUTS(name_buf);
         PUTS("\n");
     }
 }
-
 //==================== MKDIR ====================
 
 BOOLEAN MAKE_DIR(PU8 path) {

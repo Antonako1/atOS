@@ -95,6 +95,8 @@ U32 GET_SYS_SECONDS();
 
 U32 CPU_SLEEP(U32 ms); // Sleep for ms milliseconds, returns 0 on success, 1 on error
 
+VOID SYS_RESTART();
+
 /**
  * SHELLCOM
  */

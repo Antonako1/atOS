@@ -932,6 +932,13 @@ void send_msg(PROC_MESSAGE *msg) {
 }
 
 // e.g., terminate self, sleep, wait, etc.
+static U32 seq = 0;
+    
+static KP_DATA *data = NULLPTR;
+
+void kernel_loop_init() {
+    data = GET_KP_DATA();
+}
 void handle_kernel_messages(void) {
     // Handle messages sent to kernel by tasks
     TCB *master = get_master_tcb();
@@ -1076,4 +1083,9 @@ void handle_kernel_messages(void) {
     TCB *t = get_current_tcb();
     if (!t) return;
     UPDATE_KP_DATA();
+
+    if(data->seq != seq) {
+        seq++;
+        if(data->cur.pressed && data->mods.alt && data->mods.shift && data->cur.keycode == KEY_DELETE) system_reboot();
+    }
 }

@@ -14,8 +14,8 @@ U32 EDITOR(PU8 file) {
 #define PAGE_SIZE (BYTES_PER_LINE * LINES_PER_PAGE)
 
 U32 HEXDUMP(PU8 path) {
-    FILE file = { 0 };
-    if (!FOPEN(&file, path, MODE_R | MODE_FAT32)) {
+    FILE *file = FOPEN(path, MODE_R | MODE_FAT32);
+    if (!file) {
         printf("Failed to open file %s\n", path);
         return 1;
     }
@@ -27,7 +27,7 @@ U32 HEXDUMP(PU8 path) {
 
     while (looping) {
         MEMZERO(buffer, sizeof(buffer));
-        bytes_read = FREAD(&file, buffer, PAGE_SIZE);
+        bytes_read = FREAD(file, buffer, PAGE_SIZE);
         if (bytes_read == 0) {
             printf("\n<End of file>\n");
             break;
@@ -77,6 +77,6 @@ U32 HEXDUMP(PU8 path) {
         }
     }
 
-    FCLOSE(&file);
+    FCLOSE(file);
     return 0;
 }

@@ -1,17 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
-project(ATRC C)
+project(JOT C)
 
 # === Configuration ===
+set(ProgramName JOT)
 set(CUR_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(ProgramName ATRC)
 set(SOURCE_KERNEL_DIR ${CUR_DIR}/../../KERNEL)
-set(OUTPUT_DIR ${CUR_DIR}/../../../OUTPUT/LIBS/${ProgramName})
+set(OUTPUT_DIR ${CUR_DIR}/../../../OUTPUT/PROGRAMS/${ProgramName})
 set(STD_DIR ${CUR_DIR}/../../STD)
 
 # === Sources ===
-file(GLOB STD_SOURCES CONFIGURE_DEPENDS "${STD_DIR}/*.c")
+file(GLOB STD_SOURCES
+    CONFIGURE_DEPENDS
+    "${STD_DIR}/*.c"
+)
 set(Sources
-    ${CUR_DIR}/ATRC.c
+    ${CUR_DIR}/JOT.c
     ${STD_SOURCES}
 )
 
@@ -19,8 +22,8 @@ set(Sources
 include_directories(
     ${CUR_DIR}
     ${CUR_DIR}/../../
-    ${SOURCE_KERNEL_DIR}/32RTOSKRNL/
     ${SOURCE_KERNEL_DIR}/32RTOSKRNL/DRIVERS/
+    ${SOURCE_KERNEL_DIR}/32RTOSKRNL/
     ${SOURCE_KERNEL_DIR}/32RTOSKRNL/CPU/
     ${SOURCE_KERNEL_DIR}/32RTOSKRNL/MEMORY/
     ${SOURCE_KERNEL_DIR}/32RTOSKRNL/FS/
@@ -29,46 +32,54 @@ include_directories(
 
 # === Compiler flags ===
 set(CompArgs
-    -DPROCBIN_VADDR=0x20000000
+    -DPROCBIN_VADDR=0x10000000
     -D__USER__
-    -D__LIB__
+    -D__PROCESS__
+    -D__UP__
+    -D__${ProgramName}__
+    
+    # 🛑 Disables ALL warnings (including those enabled by -Wall/-Wextra)
+    -w
+    
+    # -Wno-comment (No longer needed if using -w)
+    # -Wno-comments (No longer needed if using -w)
+    
     -m32
     -ffreestanding
     -fno-pic
     -fno-pie
     -nostdlib
-    -O2
-    -Wall
-    -Wextra
+    -O0
+    # -Wall (No longer needed if using -w)
+    # -Wextra (No longer needed if using -w)
     -fno-stack-protector
     -fno-builtin
     -fno-inline
-    -Wno-comments
 )
 
 add_compile_options(${CompArgs})
 
 # === Build target ===
-add_executable(${ProgramName}.LIB ${Sources})
+add_executable(${ProgramName}.BIN ${Sources})
 
-# Output to IronClad library directory
-set_target_properties(${ProgramName}.LIB PROPERTIES
-    OUTPUT_NAME "${ProgramName}.LIB"
+# Tell CMake to use GCC and treat this as a freestanding binary
+set_target_properties(${ProgramName}.BIN PROPERTIES
+    OUTPUT_NAME "${ProgramName}.BIN"
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
 )
 
-# === Linker options ===
-target_link_options(${ProgramName}.LIB PRIVATE
+# === Custom linker options ===
+target_link_options(${ProgramName}.BIN PRIVATE
     -m32
     -nostdlib
     -ffreestanding
-    -Wl,-T,${CUR_DIR}/../LIB.ld
+    -Wl,-T,${CUR_DIR}/../USER_PROGRAMS.ld
     -Wl,-e,_start
     -Wl,--oformat=binary
 )
 
 # === Clean target ===
 add_custom_target(clean_${ProgramName}
-    COMMAND ${CMAKE_COMMAND} -E remove -f ${OUTPUT_DIR}/*.LIB ${OUTPUT_DIR}/*.o
+    COMMAND ${CMAKE_COMMAND} -E remove -f ${OUTPUT_DIR}/*.BIN ${OUTPUT_DIR}/*.o
     COMMENT "Cleaning ${ProgramName} build outputs"
 )

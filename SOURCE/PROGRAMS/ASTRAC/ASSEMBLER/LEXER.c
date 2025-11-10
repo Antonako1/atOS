@@ -242,8 +242,8 @@ ASM_TOK_ARRAY *LEX(PASM_INFO info) {
     U32 lineno = 0;
 
     for (U32 f = 0; f < info->tmp_file_count; f++) {
-        FILE file;
-        if (!FOPEN(&file, info->tmp_files[f], MODE_R | MODE_FAT32)) {
+        FILE *file = FOPEN(info->tmp_files[f], MODE_R | MODE_FAT32);
+        if (!file) {
             printf("[ASM LEX] Unable to open tmp file '%s'\n", info->tmp_files[f]);
             DESTROY_TOK_ARR(res);
             return NULLPTR;

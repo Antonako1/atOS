@@ -37,7 +37,7 @@ set(CompArgs
     -D__USER__
     -D__PROCESS__
     -D__UP__
-    -D__ASTRAC__
+    -D__${ProgramName}__
     -Wno-comment
     -Wno-comments
     -m32

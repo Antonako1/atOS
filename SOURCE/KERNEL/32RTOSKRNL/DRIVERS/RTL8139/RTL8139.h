@@ -6,22 +6,27 @@ BOOLEAN RTL8139_START();
 BOOLEAN RTL8139_STATUS();
 BOOLEAN RTL8139_STOP(); // NOTE: This will ALWAYS return FALSE
 
-U32 BUILD_ETH_FRAME(U8 *buf, const U8 *dst, const U8 *src, U16 ether_type, const U8 *payload, U32 payload_len);
+typedef struct {
+    U8 receiver[6];
+    U8 sender[6];
+    U16 type;
+    U32 header; // Additional information
+    U32 id; // Id of packet
+    U32 data_len;
+    U8 data[1];
+} ATTRIB_PACKED ETH_PACKET;
 
-/*
-U8 frame_buf[1520];
-    U8 dst[6] = {0x52,0x54,0x00,0x12,0x34,0x56};
-    U8 src[6];
-    MEMCPY_OPT(src, MAC, 6); // read earlier with READ_RTL8139_MAC()
-    const char *msg = "Hello RTL8139!";
+#define ETH_TYPE_IPV4 0x0800
+#define ETH_TYPE_ARP  0x0806
+/**
+ * @brief Sends an Ethernet frame with a given payload to a destination MAC address.
+ * * @param dst_mac The 6-byte destination MAC address.
+ * @param payload The data to send (e.g., an IP packet).
+ * @param payload_len The length of the payload data.
+ * @param ether_type The 16-bit EtherType (e.g., ETH_TYPE_IPV4).
+ * @return TRUE if the packet was successfully queued for transmission, FALSE otherwise.
+ */
+BOOL RTL8139_SEND_PACKET_TO_MAC(const U8 dst_mac[6], const U8 *payload, U32 payload_len, U16 ether_type);
 
-    // EtherType IPv4 or choose 0x888E/0x1234
-    U32 frame_len = BUILD_ETH_FRAME(frame_buf, dst, src, 0x0800 , (const U8*)msg, (U32)strlen(msg));
-    if (!SEND_RTL8139_PACKET(frame_buf, frame_len)) {
-        // no free transmit descriptors — retry later or return error
-    }
-*/
-BOOL SEND_RTL8139_PACKET(U8 *packet, U32 len);
-void RTL8139_HANDLER(U32 vec, U32 errno);
 
 #endif // RTL8139_DRIVER_H

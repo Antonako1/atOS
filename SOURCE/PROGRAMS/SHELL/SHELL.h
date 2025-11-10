@@ -30,9 +30,16 @@ typedef struct {
     EXTRA_STDOUT_ACTIONS actions;
 } STDOUT;
 
+typedef enum ACTIVE_KEYBINDS {
+    AK_CTRL_C = 0x0001,
+
+    AK_DEFAULT = AK_CTRL_C,
+} ACTIVE_KEYBINDS;
+
 typedef struct {
     U32 focused_pid; // PID of the currently focused process.
     U32 previously_focused_pid;
+    U32 self_pid;
     OutputHandle cursor;
     SHELL_STATES state;
     BOOLEAN aborted;    
@@ -44,6 +51,7 @@ typedef struct {
     } fat_info;
     STDOUT *stdouts[MAX_STDOUT_BUFFS];
     U32 stdout_count;
+    ACTIVE_KEYBINDS active_keybinds;
 } SHELL_INSTANCE;
 
 #ifdef __SHELL__
