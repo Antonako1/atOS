@@ -25,7 +25,7 @@ typedef struct {
     PU8 args[MAX_ARGS];
     U32 arg_count;
 
-    VOIDPTR *shndl; // VOIDPTR because SHELL.h can't be included here. Safe to cast
+    VOIDPTR shndl; // VOIDPTR because SHELL.h can't be included here. Safe to cast
 
     U32 status_code;
     
