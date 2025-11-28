@@ -41,7 +41,7 @@ VOID console_putch(CHAR c, VOID *ctx) {
     (VOID)ctx;
     putc(c);
 }
-VOID printf(CHAR *fmt, ...) {
+VOID printf(PU8 fmt, ...) {
     va_list args;
     va_start(args, fmt);
     VFORMAT(console_putch, NULL, fmt, args);

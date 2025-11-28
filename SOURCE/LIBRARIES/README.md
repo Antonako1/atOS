@@ -1,1 +1,3 @@
-Dynamic, memory loaded 
+# Dynamic or static libraries
+
+## ATRC - Resource file library

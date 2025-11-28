@@ -1,2 +1,5 @@
 #!ATRC
 # Config file for JOT text editor
+
+[Keybinds]
+MoveUp=A

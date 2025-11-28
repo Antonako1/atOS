@@ -10,7 +10,6 @@
 
 #define ATTRIB_DATA __attribute__((section(".data")))
 #define ATTRIB_RODATA __attribute__((section(".rodata")))
-#define ATTRIB_BSS  __attribute__((section(".bss")))
 #define ATTRIB_CODE __attribute__((section(".text")))
 #define ATTRIB_PACKED __attribute__((packed))
 #define ATTRIB_ALIGNED(x) __attribute__((aligned(x)))
@@ -43,6 +42,7 @@
 #define RESTRICT    restrict
 #define NULL         ((void*)0)
 #define NULLPTR      ((void*)0)
+#define NULLT     '\0'
 #define VOID         void
 #define VOIDPTR     void*
 // Integer definitions
@@ -118,6 +118,5 @@ typedef U32          ADDR;
 #define U32_MAX   (4294967295U)
 #define F32_MIN   (-3.402823466e+38F)
 #define F32_MAX   (3.402823466e+38F)
-
 
 #endif // TYPEDEF_H

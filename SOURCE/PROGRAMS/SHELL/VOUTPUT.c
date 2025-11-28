@@ -158,7 +158,7 @@ U0 INIT_SHELL_VOUTPUT(VOID) {
     }
     cursor.Column = 0;
     cursor.Row = 0;
-    cursor.fgColor = VBE_GREEN;
+    cursor.fgColor = VBE_WHITE;
     cursor.bgColor = VBE_BLACK;
     cursor.CURSOR_STYLE = CURSOR_UNDERLINE;
     cursor.INSERT_MODE = TRUE;

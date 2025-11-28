@@ -71,11 +71,11 @@ QEMU is the recommended environment, others aren't guaranteed to work.
 
 ### System Requirements
 
-| Resource | Recommended | Minimum |
-| -------- | ----------- | ------- |
-| RAM      | 1024 MB     | 550 MB   |
-| CPU      | 1 Core      | 1 Core  |
-| HDD      | 256 MB      | 128 MB  |
+| Resource | Recommended |
+| -------- | ----------- |
+| RAM      | 1024 MB     |
+| CPU      | 1 Core      |
+| HDD      | over 256 MB |
 
 ### Install QEMU (Debian/Ubuntu)
 
@@ -94,6 +94,8 @@ Download from the [official QEMU website](https://www.qemu.org/download/#windows
 	qemu-img create -f raw hdd.img 256M   
 
 	mkdir -p OUTPUT/DEBUG
+	qemu-img create -f raw hdd.img 256M
+	mkdir -p OUTPUT/DEBUG
 	qemu-system-i386 -vga std \
 	-m 1024 \
 	-boot order=d \
@@ -107,7 +109,7 @@ Download from the [official QEMU website](https://www.qemu.org/download/#windows
 	-debugcon file:OUTPUT/DEBUG/debug.log \
 		-global isa-debugcon.iobase=0xe9 \
 		-audiodev sdl,id=snd0 \
-		-nic user,model=rtl8139,mac=52:54:00:12:34:56
+		-nic user,model=rtl8139,mac=52:54:00:12:34:56 \
 ```
 
 ---
@@ -146,12 +148,16 @@ The project uses `make` with simple targets:
   sudo make iso runn
   ```
 
+CMake is used for processes and libraries
+
 ### Debugging
 
 Debugging support is minimal.
-Please see `DOCS/DEBUGGING.md` for options and tips. When using `make run`/`make run_user_gui`, QEMU writes a debug log to:
+Please see `DOCS/DEBUGGING.md` for options and tips. QEMU writes a debug log to:
 
 - `OUTPUT/DEBUG/debug.log` (port 0xE9 debugcon)
+
+Use `SOURCE/STD/DEBUG.h` or `SOURCE/KERNEL/32RTOSKRNL/DEBUG/KDEBUG.h`
 
 ---
 
@@ -159,20 +165,17 @@ Please see `DOCS/DEBUGGING.md` for options and tips. When using `make run`/`make
 
 Planned and in-progress features for atOS:
 
-* [X] Basic drivers (keyboard, screen, disk I/O, audio)
-* [X] Ethernet driver
+* [X] Basic drivers (keyboard, screen, disk I/O, audio, ethernet)
 * [X] FAT32 filesystem support
 * [X] Multitasking and scheduling
 * [X] Shell environment for interacting with the system
 * [X] Running custom processes via shell
-* [ ] Dynamic libraries
+* [ ] Conf file libary
 * [ ] Text editor
-* [ ] Hex editor
-* [ ] Compiler
+* [ ] Hex editor/viewer
 * [ ] Assembler
 * [ ] Dissasembler
-
-
+* [ ] Compiler
 
 *This roadmap is tentative and may evolve as the project grows.*
 

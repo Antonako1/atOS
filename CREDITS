@@ -1,12 +1,10 @@
  - 8x16 font
-
     https://github.com/spacerace/romfont/blob/master/font-headers/toshiba_t5200c_bios_vers_3__2__8x16.h
 
  - Parts of 8x8 font
-
     https://gist.github.com/rothwerx/700f275d078b3483509f
 
  - AC'97 Audio driver
  - Serial port debugging
  - Production worthy shell text rendering
-   https://github.com/retroaalto
+    https://github.com/retroaalto

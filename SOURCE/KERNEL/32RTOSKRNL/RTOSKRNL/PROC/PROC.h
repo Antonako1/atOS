@@ -81,10 +81,10 @@ typedef enum {
     PROC_EVENT_INFORM_ON_MOUSE_EVENTS = 0x0002, // Tells kernel to inform this process when mouse events occur
 } PROC_EVENT_TYPE;
 
-#define TASK_NAME_MAX_LEN 64
+#define TASK_NAME_MAX_LEN 255
 typedef struct TaskInfo {
     U32 pid;
-    U8 name[TASK_NAME_MAX_LEN]; // Required for ps command
+    U8 name[TASK_NAME_MAX_LEN]; // Required for ps command.
     U32 state;
     U32 state_info; // Additional info about state, e.g. sleep duration
 

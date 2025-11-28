@@ -15,9 +15,6 @@ F32 powf(F32 base, F32 exp) {
     return result;
 }
 
-#define pow2(x) (x*x)
-#define pow3(x) (x*x*x)
-
 I32 sqrt(I32 x) {
     I32 left = 0;
     I32 right = x;
