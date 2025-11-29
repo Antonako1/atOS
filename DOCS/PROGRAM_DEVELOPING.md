@@ -117,6 +117,8 @@ set(CompArgs
 
 add_compile_options(${CompArgs})
 
+add_compile_options(-include ${STD_DIR}/TYPEDEF.h)
+
 # === Build target ===
 add_executable(${ProgramName}.BIN ${Sources})
 
