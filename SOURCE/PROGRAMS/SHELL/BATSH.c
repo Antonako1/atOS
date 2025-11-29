@@ -1423,13 +1423,7 @@ VOID CMD_TAIL(PU8 raw_line) {
 
 VOID SETUP_BATSH_PROCESSER() {
     SET_VAR("PATH", 
-        ";/ATOS/;"
-        "/PROGRAMS/ASTRAC/;"
-        "/PROGRAMS/JOT/;"
-        "/PROGRAMS/HEXNEST/;"
-        "/PROGRAMS/IRONCLAD/;"
-        "/PROGRAMS/SATP/;"
-        "/PROGRAMS/SHELL/;"
+        #include <ATOSH.PATH>
     );
     SET_VAR("HOME", "/HOME");
     SET_VAR("DOCS", "/HOME/DOCS");
