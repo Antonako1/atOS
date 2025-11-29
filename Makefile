@@ -227,6 +227,8 @@ programs:
 			cmake --build $$prog_dir/build || exit 1; \
 		done \
 	)
+	cmake -S $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS -B $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS/build -G "Unix Makefiles"
+	cmake --build $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS/build
 	@echo "All user programs built successfully."
 
 # ISO build
