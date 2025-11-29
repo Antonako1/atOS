@@ -7,6 +7,7 @@ set(CUR_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCE_KERNEL_DIR ${CUR_DIR}/../../KERNEL)
 set(OUTPUT_DIR ${CUR_DIR}/../../../OUTPUT/PROGRAMS/${ProgramName})
 set(STD_DIR ${CUR_DIR}/../../STD)
+set(RUNTIME_DIR ${CUR_DIR}/../../RUNTIME)
 
 # === Sources ===
 file(GLOB STD_SOURCES
@@ -17,6 +18,7 @@ set(Sources
     ${CUR_DIR}/HEXNEST.c
     ${CUR_DIR}/HEX.c
     ${STD_SOURCES}
+    ${RUNTIME_DIR}/RUNTIME.c
 )
 
 # === Include directories ===

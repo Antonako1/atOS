@@ -2,7 +2,6 @@
 #include <PROGRAMS/ASTRAC/ASSEMBLER/ASSEMBLER.h>
 #include <STD/GRAPHICS.h>
 #include <STD/IO.h>
-#include <STD/RUNTIME.h>
 #include <STD/STRING.h>
 #include <STD/MEM.h>
 

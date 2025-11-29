@@ -13,6 +13,7 @@ file(GLOB STD_SOURCES
     CONFIGURE_DEPENDS
     "${STD_DIR}/*.c"
 )
+
 set(Sources
     ${CUR_DIR}/SHELL.c
     ${CUR_DIR}/VOUTPUT.c

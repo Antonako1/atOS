@@ -169,7 +169,7 @@ PU8 PARSE_VALUE(PU8 val, PKEY_VALUE_ARR vars) {
             // append variable value
             U32 vlen = STRLEN(kv->value);
             // ensure capacity (naive)
-            out = MRealloc(out, out_pos + vlen + 256);
+            out = ReAlloc(out, out_pos + vlen + 256);
             for(U32 k = 0; k < vlen; k++) out[out_pos++] = kv->value[k];
             i = j; // jump past closing %
             continue;
@@ -835,7 +835,7 @@ PU8 INSERT_VAR(PU8 line, PPU8 args) {
                             numbuf[k] = line[digits_start + k];
                         numbuf[digits_len] = '\0';
 
-                        idx = STRTOI(numbuf);
+                        idx = ATOI(numbuf);
                         MFree(numbuf);
                     }
                 }
@@ -850,7 +850,7 @@ PU8 INSERT_VAR(PU8 line, PPU8 args) {
                     // Resize output buffer if needed
                     if(out_pos + rlen + 1 >= cap) {
                         cap = cap + rlen + 128;
-                        out = MRealloc(out, cap);
+                        out = ReAlloc(out, cap);
                         if(!out) return NULLPTR;
                     }
 
@@ -873,7 +873,7 @@ PU8 INSERT_VAR(PU8 line, PPU8 args) {
         // Keep buffer safe
         if(out_pos + 4 >= cap) {
             cap = cap * 2;
-            out = MRealloc(out, cap);
+            out = ReAlloc(out, cap);
             if(!out) return NULLPTR;
         }
     }

@@ -231,6 +231,7 @@ void DUMP_STRING_U32(STRING str, U32 num) {
 
 void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     CLI;
+    debug_vram_start();
     AC97_TONE(300, 150, 14400, 8000);
     AC97_TONE(200, 200, 14400, 8000);
     VBE_COLOUR fg = VBE_WHITE;
@@ -358,10 +359,6 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
 void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     CLI;
     debug_vram_start();
-    VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
     VBE_UPDATE_VRAM();
     AC97_TONE(300, 150, 14400, 8000);
     AC97_TONE(200, 200, 14400, 8000);

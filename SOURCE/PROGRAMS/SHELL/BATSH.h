@@ -53,6 +53,6 @@ VOID SETUP_BATSH_PROCESSER();
 VOID BATSH_SET_MODE(U8 mode);
 U8 BATSH_GET_MODE(void);
 BOOLEAN RUN_PROCESS(PU8 line);
-#endif __SHELL__
+#endif // __SHELL__
 
 #endif // BATSH_H
