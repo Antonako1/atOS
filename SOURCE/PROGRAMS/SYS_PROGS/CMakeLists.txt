@@ -71,6 +71,7 @@ function(add_system_program PROGNAME)
     # --- storage for collected files ---
     set(ALL_SOURCES "")
     set(ATOS_FILES "")
+    list(APPEND ALL_SOURCES "${RUNTIME_DIR}/RUNTIME.c")
 
     # 1. Load program source files
     load_rows(PROG_SOURCES ${SOURCES_FILE})
@@ -92,7 +93,6 @@ function(add_system_program PROGNAME)
     # Add STD and Runtime files (always code files)
     file(GLOB STD_SOURCES CONFIGURE_DEPENDS "${STD_DIR}/*.c")
     list(APPEND ALL_SOURCES ${STD_SOURCES})
-    list(APPEND ALL_SOURCES "${RUNTIME_DIR}/RUNTIME.c")
 
     # Output folder
     set(OUTPUT_DIR ${CUR_DIR}/../../../ISO_DIR/ATOS)
@@ -130,7 +130,6 @@ function(add_system_program PROGNAME)
         -fno-inline
     )
     add_compile_options(${CompArgs})
-    add_compile_options(-include ${STD_DIR}/TYPEDEF.h)
 
     # Executable
     add_executable(${PROGNAME}.BIN ${ALL_SOURCES})
@@ -142,9 +141,10 @@ function(add_system_program PROGNAME)
         )
         
         foreach(RES ${ATOS_FILES})
+            get_filename_component(FNAME2 "${RES}" NAME_WE)
             if(IS_DIRECTORY "${RES}")
                 add_custom_command(TARGET ${PROGNAME}.BIN POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_directory "${RES}" "${ATOS_OUT_DIR}"
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory "${RES}" "${ATOS_OUT_DIR}/${FNAME2}"
                     COMMENT "Copying directory ${RES} to ATOS/"
                 )
             else()

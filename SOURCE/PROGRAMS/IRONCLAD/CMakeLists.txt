@@ -15,9 +15,9 @@ file(GLOB STD_SOURCES
     "${STD_DIR}/*.c"
 )
 set(Sources
+    ${RUNTIME_DIR}/RUNTIME.c
     ${CUR_DIR}/IRONCLAD.c
     ${STD_SOURCES}
-    ${RUNTIME_DIR}/RUNTIME.c
 )
 
 # === Include directories ===

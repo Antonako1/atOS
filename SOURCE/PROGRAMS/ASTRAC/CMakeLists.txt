@@ -15,6 +15,7 @@ file(GLOB STD_SOURCES
     "${STD_DIR}/*.c"
 )
 set(Sources
+    ${RUNTIME_DIR}/RUNTIME.c
     ${CUR_DIR}/ASTRAC.c
     ${CUR_DIR}/SHARED/PREPROCESS.c
     ${CUR_DIR}/FULL_BUILD.c
@@ -29,7 +30,6 @@ set(Sources
     ${CUR_DIR}/COMPILER/COMPMAIN.c
     ${CUR_DIR}/COMPILER/PARSER.c
     ${STD_SOURCES}
-    ${RUNTIME_DIR}/RUNTIME.c
 )
 
 # === Include directories ===

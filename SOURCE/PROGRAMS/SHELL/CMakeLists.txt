@@ -59,7 +59,6 @@ set(CompArgs
 )
 
 add_compile_options(${CompArgs})
-
 # === Build target ===
 add_executable(${ProgramName}.BIN ${Sources})
 

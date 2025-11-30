@@ -15,10 +15,10 @@ file(GLOB STD_SOURCES
     "${STD_DIR}/*.c"
 )
 set(Sources
+    ${RUNTIME_DIR}/RUNTIME.c
     ${CUR_DIR}/HEXNEST.c
     ${CUR_DIR}/HEX.c
     ${STD_SOURCES}
-    ${RUNTIME_DIR}/RUNTIME.c
 )
 
 # === Include directories ===
