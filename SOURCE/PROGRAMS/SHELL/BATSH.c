@@ -1433,24 +1433,31 @@ VOID SETUP_BATSH_PROCESSER() {
 
 BOOLEAN RUN_PROCESS(PU8 line) {
     if (!line || !*line) return FALSE;
-    // --------------------------------------------------
-    // Prepare working buffers
-    // --------------------------------------------------
-    U8 tmp_line[512];
-    STRNCPY(tmp_line, line, sizeof(tmp_line) - 1);
-    str_trim(tmp_line);
 
-    // --------------------------------------------------
+    // ---------------------------------------------------------------------
+    // Make ONE safe copy of the raw command line (for parsing path & args)
+    // ---------------------------------------------------------------------
+    U8 original_line[512];
+    STRNCPY(original_line, line, sizeof(original_line) - 1);
+    original_line[sizeof(original_line) - 1] = 0;
+    str_trim(original_line);
+
+    if (!*original_line) return FALSE;
+
+    // ---------------------------------------------------------------------
     // Extract first token (program path)
-    // --------------------------------------------------
-    PU8 first_space = STRCHR(tmp_line, ' ');
-    U32 prog_len = first_space ? (U32)(first_space - tmp_line) : STRLEN(tmp_line);
+    // ---------------------------------------------------------------------
+    PU8 first_space = STRCHR(original_line, ' ');
+    U32 prog_len = first_space ? (U32)(first_space - original_line)
+                               : STRLEN(original_line);
 
     PU8 prog_copy = MAlloc(prog_len + 1);
-    STRNCPY(prog_copy, tmp_line, prog_len);
+    STRNCPY(prog_copy, original_line, prog_len);
     prog_copy[prog_len] = 0;
 
-    // Extract program name
+    // ---------------------------------------------------------------------
+    // Extract pure program name (strip directories)
+    // ---------------------------------------------------------------------
     PU8 prog_name = STRDUP(prog_copy);
     PU8 last_slash = STRRCHR(prog_name, '/');
     if (last_slash) {
@@ -1459,94 +1466,99 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         prog_name = tmp;
     }
 
-    // --------------------------------------------------
-    // Resolve absolute path or search in PATH
-    // --------------------------------------------------
+    // ---------------------------------------------------------------------
+    // Try resolving directly, else search PATH
+    // ---------------------------------------------------------------------
     U8 abs_path_buf[512];
-    BOOLEAN found = FALSE;
     FAT_LFN_ENTRY ent;
-
+    BOOLEAN found = FALSE;
     BOOLEAN is_found_as_bin = FALSE;
-    BOOLEAN is_found_as_sh = FALSE;
+    BOOLEAN is_found_as_sh  = FALSE;
 
+    // ---- First attempt: raw program path ----
     if (ResolvePath(prog_copy, abs_path_buf, sizeof(abs_path_buf))) {
-        if(FAT32_PATH_RESOLVE_ENTRY(prog_copy, &ent))
+        if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
             found = TRUE;
-        else {
-            // try appending .bin or .sh
-            STRCPY(tmp_line, abs_path_buf);
-            STRNCAT(tmp_line, ".BIN", sizeof(tmp_line));
-            if(FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
+        } else {
+            // Try with extensions
+            U8 candidate[512];
+
+            STRCPY(candidate, abs_path_buf);
+            STRNCAT(candidate, ".BIN", sizeof(candidate) - STRLEN(candidate) - 1);
+            if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
+                STRCPY(abs_path_buf, candidate);
+                found = TRUE;
                 is_found_as_bin = TRUE;
-                found = TRUE;
-                goto skip;
-            } 
-            STRCPY(tmp_line, abs_path_buf);
-            STRNCAT(tmp_line, ".SH", sizeof(tmp_line));
-            if(FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
-                is_found_as_sh = TRUE;
-                found = TRUE;
-                goto skip;
+            } else {
+                STRCPY(candidate, abs_path_buf);
+                STRNCAT(candidate, ".SH", sizeof(candidate) - STRLEN(candidate) - 1);
+                if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
+                    STRCPY(abs_path_buf, candidate);
+                    found = TRUE;
+                    is_found_as_sh = TRUE;
+                }
             }
         }
-        goto no_luck_above;
-    } else {
-        no_luck_above:
+    }
+
+    // ---- If still not found, search PATH ----
+    if (!found) {
         PU8 path_val = GET_VAR((PU8)"PATH");
 
         if (path_val && *path_val) {
             PU8 path_dup = STRDUP(path_val);
-            PU8 saveptr = NULL;  // <-- state pointer for reentrant tokenization
-            PU8 tok = STRTOK_R(path_dup, ";", &saveptr);
+            PU8 saveptr  = NULL;
+            PU8 tok      = STRTOK_R(path_dup, ";", &saveptr);
 
-            while (tok != NULL) {
-                // Skip empty tokens
-                if(*tok == '\0') {
-                    tok = STRTOK_R(NULL, ";", &saveptr);
-                    continue;
-                }
+            while (tok && !found) {
+                if (*tok) {
+                    U8 candidate[512] = {0};
+                    STRNCPY(candidate, tok, sizeof(candidate) - 1);
 
-                U8 candidate[512] = {0};
-                STRNCPY(candidate, tok, sizeof(candidate) - 1);
+                    // Append slash if needed
+                    U32 len = STRLEN(candidate);
+                    if (len && candidate[len - 1] != '/' && candidate[len - 1] != '\\') {
+                        STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
+                    }
 
-                // Append slash if missing
-                U32 len = STRLEN(candidate);
-                if(len > 0 && candidate[len - 1] != '/' && candidate[len - 1] != '\\') {
-                    STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
-                }
+                    STRNCAT(candidate, prog_name, sizeof(candidate) - STRLEN(candidate) - 1);
 
-                STRNCAT(candidate, prog_name, sizeof(candidate) - STRLEN(candidate) - 1);
+                    // Try resolving
+                    if (ResolvePath(candidate, abs_path_buf, sizeof(abs_path_buf))) {
+                        if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
+                            found = TRUE;
+                            break;
+                        }
 
-                if (ResolvePath(candidate, abs_path_buf, sizeof(abs_path_buf))) {
-                    if(FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
-                        found = TRUE;
-                        break;
-                    } else {
-                        // try appending .bin or .sh
-                        STRCPY(tmp_line, abs_path_buf);
-                        STRNCAT(tmp_line, ".BIN", sizeof(tmp_line));
-                        if(FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
+                        // Try .BIN / .SH
+                        U8 try_ext[512];
+
+                        STRCPY(try_ext, abs_path_buf);
+                        STRNCAT(try_ext, ".BIN", sizeof(try_ext) - STRLEN(try_ext) - 1);
+                        if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
+                            STRCPY(abs_path_buf, try_ext);
+                            found = TRUE;
                             is_found_as_bin = TRUE;
+                            break;
+                        }
+
+                        STRCPY(try_ext, abs_path_buf);
+                        STRNCAT(try_ext, ".SH", sizeof(try_ext) - STRLEN(try_ext) - 1);
+                        if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
+                            STRCPY(abs_path_buf, try_ext);
                             found = TRUE;
-                            goto skip;
-                        } 
-                        STRCPY(tmp_line, abs_path_buf);
-                        STRNCAT(tmp_line, ".SH", sizeof(tmp_line));
-                        if(FAT32_PATH_RESOLVE_ENTRY(tmp_line, &ent)) {
                             is_found_as_sh = TRUE;
-                            found = TRUE;
-                            goto skip;
+                            break;
                         }
                     }
                 }
-
                 tok = STRTOK_R(NULL, ";", &saveptr);
             }
 
             MFree(path_dup);
         }
     }
-    skip:
+
     if (!found) {
         PUTS("\nError: Failed to resolve path.\n");
         MFree(prog_name);
@@ -1554,84 +1566,98 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         return FALSE;
     }
 
-    PU8 abs_path = abs_path_buf;
     MFree(prog_copy);
 
-    if(is_found_as_bin || is_found_as_sh) STRCPY(abs_path, tmp_line);
-    DEBUG_PRINTF("Try of:%s\n", abs_path);
-    // --------------------------------------------------
+    // ---------------------------------------------------------------------
     // Load file contents
-    // --------------------------------------------------
-    U32 sz = 0;
-    VOIDPTR data = FAT32_READ_FILE_CONTENTS(&sz, &ent.entry);
+    // ---------------------------------------------------------------------
+    U32 file_size = 0;
+    VOIDPTR data = FAT32_READ_FILE_CONTENTS(&file_size, &ent.entry);
     if (!data) {
         MFree(prog_name);
         return FALSE;
     }
 
-    U32 pid = PROC_GETPID();
-
-    // --------------------------------------------------
-    // Parse arguments
-    // --------------------------------------------------
+    // ---------------------------------------------------------------------
+    // Parse arguments (from original_line)
+    // ---------------------------------------------------------------------
     #define MAX_ARGS 12
     PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
-    argv[argc++] = STRDUP(abs_path); // argv[0]
 
-    U8 arg_line[256];
-    STRNCPY(arg_line, line, sizeof(arg_line) - 1);
-    str_trim(arg_line);
+    argv[argc++] = STRDUP(abs_path_buf);  // argv[0] = program path
 
+    // Now parse only arguments:
     PU8 args_start = first_space ? first_space + 1 : NULL;
+
     if (args_start && *args_start) {
         PU8 p = args_start;
+
         while (*p && argc < MAX_ARGS) {
             while (*p == ' ' || *p == '\t') p++;
             if (!*p) break;
 
-            PU8 arg_start = p;
             BOOL in_quotes = FALSE;
+            PU8 ArgBegin = p;
+
             if (*p == '"') {
                 in_quotes = TRUE;
-                arg_start = ++p;
+                ArgBegin = ++p;
                 while (*p && *p != '"') p++;
             } else {
                 while (*p && *p != ' ' && *p != '\t') p++;
             }
 
-            U32 len = p - arg_start;
+            U32 len = p - ArgBegin;
             PU8 arg = MAlloc(len + 1);
-            STRNCPY(arg, arg_start, len);
+            STRNCPY(arg, ArgBegin, len);
             arg[len] = 0;
+
             argv[argc++] = arg;
 
-            if (in_quotes && *p == '"') p++;
+            if (in_quotes && *p == '"') p++;  // skip closing quote
         }
     }
 
-    // --------------------------------------------------
-    // Execute based on file type
-    // --------------------------------------------------
-    PU8 ext = STRRCHR(abs_path, '.');
-    if (ext) ext++; else ext = (PU8)"";
+    // ---------------------------------------------------------------------
+    // Determine extension (.bin or .sh)
+    // ---------------------------------------------------------------------
+    PU8 ext = STRRCHR(abs_path_buf, '.');
+    ext = ext ? (ext + 1) : (PU8)"";
 
     BOOLEAN result = FALSE;
+
+    // ---------------------------------------------------------------------
+    // Execute binary
+    // ---------------------------------------------------------------------
     if (STRICMP(ext, "BIN") == 0) {
-        U32 res = START_PROCESS(abs_path, data, sz, TCB_STATE_ACTIVE, pid, argv, argc);
+        U32 pid = PROC_GETPID();
+        U32 res = START_PROCESS(abs_path_buf, data, file_size,
+                                TCB_STATE_ACTIVE, pid, argv, argc);
         if (res) PRINTNEWLINE();
-        result = res != 0;
-    } else if (STRICMP(ext, "SH") == 0) {
-        // TODO: Crashes!
-        result = RUN_BATSH_SCRIPT(abs_path, argc, argv);
-        for(U32 i = 0; i < argc; i++) {
-            if(argv[i]) MFree(argv[i]);
-        }   
-        if(argv) MFree(argv);
-        // PUTS("\nThis would crash, not going to do that though!\n");
-        result = TRUE;
+        result = (res != 0);
     }
 
+    // ---------------------------------------------------------------------
+    // Execute script
+    // ---------------------------------------------------------------------
+    else if (STRICMP(ext, "SH") == 0) {
+        result = RUN_BATSH_SCRIPT(abs_path_buf, argc, argv);
+        for (U32 i = 0; i < argc; i++) {
+            if (argv[i]) MFree(argv[i]);
+            SET_NULL(argv[i]);
+        }
+        MFree(argv);
+        SET_NULL(argv);
+    }
+
+    // ---------------------------------------------------------------------
+    // Cleanup
+    // Only prog_name is cleared in all cases.
+    // PROC frees args for us
+    // prog_name is deep copied into RUN_BINARY_STRUCT
+    // ---------------------------------------------------------------------
     MFree(prog_name);
+    SET_NULL(prog_name);
     return result;
 }

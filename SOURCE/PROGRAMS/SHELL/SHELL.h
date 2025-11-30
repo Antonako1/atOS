@@ -8,7 +8,12 @@
 #include <PROC/PROC.h> // for MAX_PROC_AMOUNT
 
 typedef enum {
-    STATE_CMD_INTERFACE, // A focused PROC is running 
+    STATE_CMD_INTERFACE, // A focused PROC is running
+    /**
+     * This whole STATE_CMD_INTERFACE is legacy code and not used at all.
+     * The code exists in some form somewhere but is not used at all!
+     * Only Edit line mode is used!
+     */
     STATE_EDIT_LINE, // Editing current command line
 } SHELL_STATES;
 
@@ -32,8 +37,8 @@ typedef struct {
 
 typedef enum ACTIVE_KEYBINDS {
     AK_CTRL_C = 0x0001,
-
-    AK_DEFAULT = AK_CTRL_C,
+    AK_END = 0x0002,
+    AK_DEFAULT = AK_CTRL_C | AK_END,
 } ACTIVE_KEYBINDS;
 
 typedef struct {

@@ -24,6 +24,8 @@ U0 INITIALIZE_SHELL();
 U0 _start(U32 argc, PU8 argv[]) {
     draw_access_granted = FALSE;
     keyboard_access_granted = FALSE;
+    shndl = MAlloc(sizeof(SHELL_INSTANCE));
+    MEMZERO(shndl, sizeof(SHELL_INSTANCE));
 
     // --- DEBUG ---
     DEBUG_PRINTF("[SHELL %d] _start: Initializing shell components.\n", PROC_GETPID());
@@ -35,8 +37,6 @@ U0 _start(U32 argc, PU8 argv[]) {
     if(hndl->Column != 0) {
         for(;;);
     }
-    shndl = MAlloc(sizeof(SHELL_INSTANCE));
-    MEMZERO(shndl, sizeof(SHELL_INSTANCE));
     INITIALIZE_DIR(shndl);
     SETUP_BATSH_PROCESSER();
     
@@ -68,8 +68,12 @@ U0 INITIALIZE_SHELL() {
     SEND_MESSAGE(&msg);
     
     shndl->self_pid = PROC_GETPID();
+    shndl->self_pid = PROC_GETPID();
+    shndl->self_pid = PROC_GETPID();
+    shndl->self_pid = PROC_GETPID();
+    shndl->self_pid = PROC_GETPID();
     shndl->cursor = GetOutputHandle();
-    shndl->focused_pid = PROC_GETPID();
+    shndl->focused_pid = shndl->self_pid;
     shndl->previously_focused_pid = shndl->focused_pid;
     shndl->aborted = FALSE;
     SWITCH_LINE_EDIT_MODE();

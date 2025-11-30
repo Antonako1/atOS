@@ -746,16 +746,9 @@ VOID HANDLE_CTRL_C() {
     HANDLE_LE_CURSOR();
     SHELL_INSTANCE *shdnl = GET_SHNDL();
     U32 pid = shdnl->focused_pid;
-    U32 self_pid = PROC_GETPID();
+    U32 self_pid = shdnl->self_pid;
     if(pid != self_pid) {
-        PROC_MESSAGE msg;
-        shdnl->focused_pid = self_pid;
-        DELETE_STDOUT(pid);
-    
-        msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, 0, 0, self_pid);
-        SEND_MESSAGE(&msg);
-        msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
-        SEND_MESSAGE(&msg);
+        END_PROC_SHELL(pid, U16_MAX / 2, TRUE);
     }
 
     // Draw `^C` at current position

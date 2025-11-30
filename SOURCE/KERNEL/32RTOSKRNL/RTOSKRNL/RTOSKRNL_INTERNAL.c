@@ -594,7 +594,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
             sz, 
             USER_HEAP_SIZE, 
             USER_STACK_SIZE, 
-            TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
+            TCB_STATE_ACTIVE | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
             0,
             shell_argv,
             2
@@ -633,9 +633,9 @@ BOOL initialize_filestructure(VOID) {
 
 
 void RTOSKRNL_LOOP(VOID) {
-    // early_debug_tcb(get_last_pid());
     kernel_loop_init();
     while(1) {
+        early_debug_tcb(get_last_pid());
         handle_kernel_messages();
     }
 }
