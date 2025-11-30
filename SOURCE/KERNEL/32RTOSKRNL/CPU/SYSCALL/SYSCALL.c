@@ -16,6 +16,7 @@
 #include <DRIVERS/PS2/KEYBOARD.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
 #include <DRIVERS/AC97/AC97.h>
+#include <DRIVERS/CMOS/CMOS.h>
 
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 
@@ -30,6 +31,15 @@ U32 SYS_HDD_READ_SECTOR(U32 lba, U32 sector_count, U32 buf, U32 unused4, U32 unu
 }
 U32 SYS_HDD_WRITE_SECTOR(U32 lba, U32 sector_count, U32 buf, U32 unused4, U32 unused5) {
     return ATA_PIO_WRITE_SECTORS(lba, sector_count, buf);
+}
+
+U32 SYS_GET_TIME(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    RTC_DATE_TIME *m = MAlloc(sizeof(RTC_DATE_TIME));
+    if(!m) return 0;
+    RTC_DATE_TIME res = GET_SYS_TIME();
+    MEMCPY_OPT(m, &res, sizeof(RTC_DATE_TIME));
+    return m;
 }
 
 U32 SYS_VBE_UPDATE_VRAM(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
@@ -149,7 +159,7 @@ U32 SYS_GET_MESSAGE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unus
         msg_copy->data = NULL;
         msg_copy->data_size = 0;
     }
-
+    
     // --- Keep raw_data as shared pointer ---
     // (Do not copy or allocate; remains valid as-is)
     // msg_copy->raw_data and msg_copy->raw_data_size already set
