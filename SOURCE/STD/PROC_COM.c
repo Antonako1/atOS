@@ -12,6 +12,8 @@ static TCB *master ATTRIB_DATA = NULL;
 static BOOLEAN master_fetched ATTRIB_DATA = FALSE;
 static TCB *parent ATTRIB_DATA = NULL;
 static BOOLEAN parent_fetched ATTRIB_DATA = FALSE;
+static U32 pid ATTRIB_DATA = 0;
+static U32 ppid ATTRIB_DATA = 0;
 
 STDOUT *GET_PROC_STDOUT() {
     return stdout;
@@ -44,7 +46,9 @@ VOID FREE_MESSAGE(PROC_MESSAGE *msg) {
 }
 
 U32 PROC_GETPID(U0) {
-    return GET_CURRENT_TCB()->info.pid;
+    if(pid) return pid;
+    pid = GET_CURRENT_TCB()->info.pid;
+    return pid;
 }
 U8 *PROC_GETNAME(U0) {
     return GET_CURRENT_TCB()->info.name;
@@ -58,8 +62,10 @@ U32 PROC_GETPID_BY_NAME(U8 *arg) {
     return (U32)SYSCALL(SYSCALL_PROC_GETPID_BY_NAME, (U32)name, 0, 0, 0, 0);
 }
 U32 PROC_GETPPID(U0) {
+    if(ppid) return ppid;
     if (!GET_PARENT_TCB()) return (U32)-1;
-    return GET_PARENT_TCB()->info.pid;
+    ppid = GET_PARENT_TCB()->info.pid;
+    return ppid;
 }
 U8 *PROC_GETPARENTNAME(U0) {
     TCB *p = GET_PARENT_TCB();
@@ -152,8 +158,9 @@ U32 CPU_SLEEP(U32 ms) {
 VOID EXIT(U32 n) {
     PROC_MESSAGE msg;
 
-    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPPID());
-    SEND_MESSAGE(&msg);
+    DEBUG_PRINTF("[PROC COM] EXIT(%d) called\n", n);
+    // msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPPID());
+    // SEND_MESSAGE(&msg);
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_ENDED_MYSELF, NULL, 0, n);
     SEND_MESSAGE(&msg);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_TERMINATE_SELF, NULL, 0, n);
@@ -164,13 +171,16 @@ VOID EXIT(U32 n) {
 static U8 ___keyboard_access_granted = FALSE;
 static U8 ___draw_access_granted = FALSE;
 static U8 ___STDOUT_CREATED = FALSE;
+static U8 ___INFO_ARR = FALSE;
+static SHELL_INSTANCE *SHNDL;
+
 void PRIC_INIT_GRAPHICAL() {
     PROC_INIT_CONSOLE();
 }
 
 void PROC_INIT_CONSOLE() {
     PROC_MESSAGE msg;
-
+    
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_FRAMEBUFFER, NULL, 0, 0);
     SEND_MESSAGE(&msg);
 
@@ -182,36 +192,76 @@ void PROC_INIT_CONSOLE() {
 
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_SHELL_FOCUS, NULL, 0, 0);
     SEND_MESSAGE(&msg);
+
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_INFO_ARRAYS, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+
     ___keyboard_access_granted = FALSE;
     ___draw_access_granted = FALSE;
     ___STDOUT_CREATED = FALSE;
+    ___INFO_ARR = FALSE;
+    DEBUG_PRINTF("[PROC_COM] Messages sent succesfully by: %s, pid 0x%x\n", process.info.name, process.info.pid);
 }
 BOOLEAN IS_PROC_INITIALIZED() {
-    U32 msg_count = MESSAGE_AMOUNT();
-    for(U32 i = 0; i <= msg_count; i++) {
-        PROC_MESSAGE *msg = GET_MESSAGE(); // Gets last message. Marked as read
-        if (!msg) break;
-        switch(msg->type) {
-            case PROC_KEYBOARD_EVENTS_GRANTED: ___keyboard_access_granted = TRUE; break;
-            case PROC_FRAMEBUFFER_GRANTED: ___draw_access_granted = TRUE; break;
-            case SHELL_RES_STDOUT_CREATED: 
-                if(msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
-                    stdout = msg->raw_data;
-                    ___STDOUT_CREATED = TRUE; 
-                } else 
-                    EXIT(1);
+
+    PROC_MESSAGE *msg;
+
+    // Process ALL pending messages until queue is empty
+    while ((msg = GET_MESSAGE()) != NULL) {
+
+        switch (msg->type) {
+
+            case PROC_KEYBOARD_EVENTS_GRANTED:
+                ___keyboard_access_granted = TRUE;
                 break;
-            case SHELL_RES_STDOUT_FAILED: EXIT(1); break;
+
+            case PROC_FRAMEBUFFER_GRANTED:
+                ___draw_access_granted = TRUE;
+                break;
+
+            case SHELL_RES_INFO_ARRAYS: {
+                // Expect actual SHELL_INSTANCE contents, not a pointer
+                if (msg->raw_data && msg->raw_data_size == sizeof(SHELL_INSTANCE)) {
+                    SHNDL = (SHELL_INSTANCE*)msg->raw_data;
+                    ___INFO_ARR = TRUE;
+                } else {
+                    SHNDL = NULLPTR;
+                }
+            } break;
+
+            case SHELL_RES_STDOUT_CREATED: {
+                if (msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
+                    stdout = (STDOUT*)msg->raw_data;
+                    ___STDOUT_CREATED = TRUE;
+                } else {
+                    EXIT(U16_MAX);
+                }
+            } break;
+
+            case SHELL_RES_INFO_ARRAYS_FAILED:
+            case SHELL_RES_STDOUT_FAILED:
+                DEBUG_PRINTF("[PROC_COM] Failed to create");
+                DEBUG_PRINTF(msg->type == SHELL_RES_INFO_ARRAYS_FAILED  ?"INFO ARRAY" : "STDOUT");
+                DEBUG_PRINTF("\n");
+                EXIT(U8_MAX);
+                break;
         }
+
         FREE_MESSAGE(msg);
     }
+    // DEBUG_PRINTF("%d, %d, %d, %d\n", ___keyboard_access_granted, ___draw_access_granted, ___STDOUT_CREATED, ___INFO_ARR);
+    // Return TRUE only after all 4 conditions are met
     return (
-        ___keyboard_access_granted && 
+        ___keyboard_access_granted &&
         ___draw_access_granted &&
-        ___STDOUT_CREATED 
-    ) ? TRUE : FALSE;
+        ___STDOUT_CREATED &&
+        ___INFO_ARR
+    );
 }
 
+SHELL_INSTANCE *GET_SHELL_HANDLE() {
+    return SHNDL;
+}
 BOOLEAN START_PROCESS(
     U8 *proc_name, 
     VOIDPTR file, 

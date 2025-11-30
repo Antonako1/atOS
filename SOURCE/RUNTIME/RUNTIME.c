@@ -18,25 +18,28 @@ static void call_exit_functions(void);
 U32 main(U32 argc, PPU8 argv);
 
 void _start(U32 argc, PPU8 argv) {
-    NOP;
-    NOP;
-    NOP;
-    NOP;
-    NOP;
-#ifdef RUNTIME_GUI
+    DEBUG_PRINTF("[RUNTIME] Entered _start with argc:%d\n", argc);
+    for(U32 i = 0; i < argc; i++) {
+        
+    }
+    #ifdef RUNTIME_GUI
     PRIC_INIT_GRAPHICAL();
-#else
+    #else
     PROC_INIT_CONSOLE();
-#endif
-
-    while (!IS_PROC_INITIALIZED());
-
+    #endif
+    U32 timeout = U32_MAX;
+    while (!IS_PROC_INITIALIZED()) {
+        if(timeout-- == 0) {
+            DEBUG_PRINTF("[RUNTIME] Process initialization timed out!\n");
+            EXIT(-1);
+        };
+    }
+    DEBUG_PRINTF("[RUNTIME] Entering main!\n");
     U32 code = main(argc, argv);
 
     call_exit_functions();
 
     EXIT(code);
-    HLT;
 }
 
 static void call_exit_functions(void) {
@@ -44,6 +47,7 @@ static void call_exit_functions(void) {
         exit_func_count--;
         exit_func_t fn = exit_funcs[exit_func_count];
         if (fn) fn();
+        DEBUG_PRINTF("[RUNTIME] Calling exit function[%d]!\n", exit_func_count);
     }
 }
 BOOL ON_EXIT(exit_func_t fn) {
