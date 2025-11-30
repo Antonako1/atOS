@@ -14,9 +14,9 @@ VOID PRINT_HELP() {
 U32 main(U32 argc, PPU8 argv) {
     // ON_EXIT(JOT_EXIT);
     for(U32 i = 0; i < argc; i++) {
-        PU8 arg = argv[i];
-        printf("%s\n", arg);
-    }
+        // PU8 arg = argv[i];
+        // printf("%s\n", arg);
+    }   
     
     return 0;
 }
