@@ -46,16 +46,18 @@
 #define VOID         void
 #define VOIDPTR     void*
 // Integer definitions
-typedef VOID         U0;
-typedef signed char   I8;
-typedef unsigned char U8;
-typedef signed short  I16;
-typedef unsigned short U16;
-typedef signed int    I32;
-typedef unsigned int  U32;
-typedef I8            S8;
-typedef I16           S16;
-typedef I32           S32;
+typedef VOID            U0;
+typedef VOID            I0;
+typedef VOID            S0;
+typedef signed char     I8;
+typedef unsigned char   U8;
+typedef signed short    I16;
+typedef unsigned short  U16;
+typedef signed int      I32;
+typedef unsigned int    U32;
+typedef I8              S8;
+typedef I16             S16;
+typedef I32             S32;
 
 // Floating-point definitions
 // Warning: Floats are not supported as of now
