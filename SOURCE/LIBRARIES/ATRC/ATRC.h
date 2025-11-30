@@ -1,3 +1,6 @@
+/**
+ * Define ATRC_IMPLEMENTATION in atleast one source file to use
+ */
 #ifndef ATRC_H
 #define ATRC_H
 #include <STD/TYPEDEF.h>
@@ -79,6 +82,12 @@ BOOL DOES_EXIST_BLOCK(PATRC_FD fd, PU8 block_name);
 BOOL DOES_EXIST_KEY(PATRC_FD fd, PU8 block_name, PU8 key_name);
 BOOL DOES_EXIST_VARIABLE(PATRC_FD fd, PU8 variable_name);
 
+#define READ_NKEY(fd, key_name) READ_KEY(fd, " ", key_name)
+#define MODIFY_NKEY(fd, key_name, value) MODIFY_KEY(fd, " ", key_name, value)
+#define CREATE_NKEY(fd, key_name) CREATE_KEY(fd, " ", key_name)
+#define DELETE_NKEY(fd, key_name) DELETE_KEY(fd, " ", key_name)
+#define DOES_EXIST_NKEY(fd, key_name) DOES_EXIST_KEY(fd, " ", key_name)
+
 // misc
 PU8 INSERT_VAR(PU8 line, PPU8 args); // Return must be freed
 U32 GET_ENUM_VALUE(PATRC_FD fd, PU8 block_name, PU8 key_name);
@@ -96,7 +105,6 @@ PSTR_ARR ATRC_TO_LIST(PU8 val, CHAR separator); // Free with FREE_STR_ARR()
 VOID FREE_STR_ARR(PSTR_ARR arr);
 BOOL ATRC_TO_BOOL(PU8 val); // Accepts: TRUE, 1, ON, FALSE, 0, 0FF. case-insensitive.
 
-#define ATRC_IMPLEMENTATION
 #ifdef ATRC_IMPLEMENTATION
 #include <STD/MEM.h>
 #include <STD/STRING.h>
