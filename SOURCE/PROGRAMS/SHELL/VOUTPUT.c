@@ -868,19 +868,6 @@ void HANDLE_LE_ARROW_RIGHT() {
     DRAW_CURSOR_AT(cursor.Column, cursor.Row);
 }
 
-void HANDLE_LE_CTRL_C() {
-    PUTS("^C\n");
-    MEMZERO(current_line, CUR_LINE_MAX_LENGTH);
-    edit_pos = 0;
-
-    if(shndl == STATE_CMD_INTERFACE) {
-        // TERMINATE_FOCUSED_PROCESS(); // implement as needed
-    }
-
-    shndl = STATE_EDIT_LINE;
-    history_index = 0;
-    PUT_SHELL_START();
-}
 
 void HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod) {
 
