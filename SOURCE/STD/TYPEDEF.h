@@ -45,6 +45,7 @@
 #define NULLT     '\0'
 #define VOID         void
 #define VOIDPTR     void*
+#define SET_NULL(x) (x = NULLPTR);
 // Integer definitions
 typedef VOID            U0;
 typedef VOID            I0;
