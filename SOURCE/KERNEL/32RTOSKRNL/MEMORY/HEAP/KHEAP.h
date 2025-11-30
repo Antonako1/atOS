@@ -77,6 +77,7 @@ typedef struct ATTRIB_PACKED {
     U32 magic0;       // Magic value to validate block integrity
     U32 size;         // User-requested size (payload size)
     U32 magic1;       // Another magic value for extra validation
+    // U32 pid;          // Owner pid
     U32 real_size;    // Allocated payload size (after alignment)
     BOOLEAN free;     // Flag indicating if the block is free
     U32 magic2;       // A third magic value
