@@ -69,10 +69,10 @@ list(TRANSFORM ATUI_SOURCES PREPEND "${CUR_DIR}/../../LIBRARIES/ATUI/")
 
 # Add sources here
 set(Sources
+    ${RUNTIME_DIR}/RUNTIME.c # Note: This must be the first included source file!
     ${CUR_DIR}/JOT.c
     ${STD_SOURCES}
     ${ATUI_SOURCES}
-    ${RUNTIME_DIR}/RUNTIME.c
 )
 
 # If you have other resources that need to be copied into the binary output folder,
