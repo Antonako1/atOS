@@ -17,6 +17,8 @@
 
 /**
  * CMD INTERFACE
+ * 
+ * 
  */
 U0 CMD_INTERFACE_MSG_LOOP() {
     U32 msg_count = MESSAGE_AMOUNT();
@@ -48,7 +50,37 @@ U0 CMD_INTERFACE_LOOP() {
 }
 
 
+VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
+    STDOUT *proc_out = GET_STDOUT(pid);
+    if (proc_out) {
+        // 🟢 Flush any remaining buffer before deletion
+        if (proc_out->buf[0] != '\0') {
+            PUTS(proc_out->buf);
+            PRINTNEWLINE();
+        }
 
+        // Now delete the stdout
+        DELETE_STDOUT(pid);
+    }
+
+    // Print termination message
+    PUTS("Process pid 0x");
+    PUT_HEX(pid);
+    PUTS(" terminated with code 0x");
+    PUT_HEX(exit_code);
+    PUTC('\n');
+    DEBUG_PRINTF("[SHELL %d] Process end acknowledged\n", PROC_GETPID());
+    // Restore shell prompt
+    PROC_MESSAGE msg;
+    U32 self_pid = GET_SHNDL()->self_pid;
+    DELETE_STDOUT(pid);
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
+    SEND_MESSAGE(&msg);
+    // Return focus to shell
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, self_pid);
+    SEND_MESSAGE(&msg);
+    if(!end_proc) PUT_SHELL_START();
+}
 
 /**
  * Line edit
@@ -57,51 +89,31 @@ U0 CMD_INTERFACE_LOOP() {
 
 U0 EDIT_LINE_MSG_LOOP() {
     U32 msg_count = MESSAGE_AMOUNT();
-    for (U32 i = 0; i < msg_count; i++) {
-        PROC_MESSAGE *msg = GET_MESSAGE();
-        if (!msg) break;
-
+    PROC_MESSAGE *msg = NULLPTR;
+    while ((msg = GET_MESSAGE()) != NULL) {
         switch (msg->type) {
-
+            case SHELL_CMD_INFO_ARRAYS: {
+                PROC_MESSAGE res;
+                U32 sz = sizeof(SHELL_INSTANCE);
+                PU8 data = GET_SHNDL();
+                if(!data) res = CREATE_PROC_MSG_RAW(msg->sender_pid, SHELL_RES_INFO_ARRAYS_FAILED, NULL, 0, 0);
+                else res = CREATE_PROC_MSG_RAW(msg->sender_pid, SHELL_RES_INFO_ARRAYS, data, sz, 0);
+                SEND_MESSAGE(&res);
+            } break;
+            
             case SHELL_CMD_CREATE_STDOUT: {
                 PROC_MESSAGE res;
                 if (CREATE_STDOUT(msg->sender_pid)) {
                     STDOUT *ptr = GET_STDOUT(msg->sender_pid);
                     res = CREATE_PROC_MSG_RAW(msg->sender_pid, SHELL_RES_STDOUT_CREATED, ptr, sizeof(STDOUT*), 0);
-                    MEMORY_DUMP(&res, sizeof(PROC_MESSAGE));
-                } else {
-                    res = CREATE_PROC_MSG(msg->sender_pid, SHELL_RES_STDOUT_FAILED, NULL, 0, 0);
-                }
+                } else res = CREATE_PROC_MSG(msg->sender_pid, SHELL_RES_STDOUT_FAILED, NULL, 0, 0);
+                
                 SEND_MESSAGE(&res);
             } break;
             
 
             case SHELL_CMD_ENDED_MYSELF: {
-                STDOUT *proc_out = GET_STDOUT(msg->sender_pid);
-                if (proc_out) {
-                    // 🟢 Flush any remaining buffer before deletion
-                    if (proc_out->buf[0] != '\0') {
-                        PUTS(proc_out->buf);
-                        PRINTNEWLINE();
-                    }
-
-                    // Now delete the stdout
-                    DELETE_STDOUT(msg->sender_pid);
-                }
-
-                // Print termination message
-                PUTS("Process pid 0x");
-                PUT_HEX(msg->sender_pid);
-                PUTS(" terminated with code 0x");
-                PUT_HEX(msg->signal);
-                PUTC('\n');
-
-                // Restore shell prompt
-                PUT_SHELL_START();
-
-                // Return focus to shell
-                PROC_MESSAGE res = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPID());
-                SEND_MESSAGE(&res);
+                END_PROC_SHELL(msg->sender_pid, msg->signal, FALSE);
             } break;
 
             case SHELL_CMD_SHELL_FOCUS: {
@@ -109,6 +121,7 @@ U0 EDIT_LINE_MSG_LOOP() {
                 shndl->previously_focused_pid = shndl->focused_pid;
                 shndl->focused_pid = msg->sender_pid;
             } break;
+            default: break;
         }
 
         FREE_MESSAGE(msg);
@@ -130,6 +143,7 @@ U0 EDIT_LINE_STDOUT_LOOP() {
             PUTS(out->buf);
             out->shell_seq = out->proc_seq;
             out->buf_end = 0;
+            out->buf[out->buf_end] = NULLT;
             PRINTNEWLINE();
         }
     }

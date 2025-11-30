@@ -28,15 +28,15 @@ This is intended for early, low-overhead logging that does not depend on the gra
 
 The kernel logs around user shell launch to help isolate boot hangs:
 
-- `[rtos] Enter LOAD_AND_RUN_KERNEL_SHELL` — entering loader
-- `[rtos] Screen flushed` — VBE framebuffer cleared/flushed
-- `[rtos] Loading shell file record...` — ISO9660 lookup started
-- `[rtos] Shell file loaded, size=0xXXXXXXXX` — file found and size determined
-- `[rtos] Starting RUN_BINARY(atOShell) ...` — process creation starting
+- `[atOS] Enter LOAD_AND_RUN_KERNEL_SHELL` — entering loader
+- `[atOS] Screen flushed` — VBE framebuffer cleared/flushed
+- `[atOS] Loading shell file record...` — ISO9660 lookup started
+- `[atOS] Shell file loaded, size=0xXXXXXXXX` — file found and size determined
+- `[atOS] Starting RUN_BINARY(atOShell) ...` — process creation starting
 - `[proc] RUN_BINARY enter name="atOShell" size=0x...` — RUN_BINARY called with sizes
 - `[proc] setup_user_process...` and `[proc] setup_user_process OK` — user address space and binary mapping
 - `[proc] added to scheduler pid=0xXXXXXXXX` — shell enqueued in scheduler
-- `[rtos] RUN_BINARY returned OK` and `[rtos] LOAD_AND_RUN_KERNEL_SHELL done` — control returned to kernel loop
+- `[atOS] RUN_BINARY returned OK` and `[atOS] LOAD_AND_RUN_KERNEL_SHELL done` — control returned to kernel loop
 
 If the log stops before RUN_BINARY, investigate ISO9660 read or memory allocation. If it stops inside RUN_BINARY, instrument process setup (paging, mapping, or initial trap frame) further.
 

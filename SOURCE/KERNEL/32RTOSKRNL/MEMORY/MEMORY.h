@@ -2,8 +2,6 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#warning "TODO: PROCBIN_VADDR and __PROCESS__"
-
 // ----------------------------------------------------------
 // Low Memory / BIOS areas
 // ----------------------------------------------------------

@@ -1,0 +1,12 @@
+#!ATRC
+# %*0% = seconds
+# %*1% = minutes
+# %*2% = hours
+# %*3% = weekday
+# %*4% = day_of_month
+# %*5% = month
+# %*6% = year
+# %*7% = century
+# %*8% = weekday str
+# %*9% = month str
+FORMAT=%*8%, %*4%/%*5%/%*6%, %*2%:%*1%.%*0%

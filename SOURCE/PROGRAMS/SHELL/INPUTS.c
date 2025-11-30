@@ -65,7 +65,7 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
                     case KEY_L: HANDLE_LE_CTRL_L(); break;
                     case KEY_TAB: HANDLE_LE_CTRL_TAB(); break;
                     case KEY_C: 
-                        if(shndl->active_keybinds & AK_CTRL_C)
+                        // if(shndl->active_keybinds & AK_CTRL_C)
                             HANDLE_CTRL_C(); 
                         break;
                 }

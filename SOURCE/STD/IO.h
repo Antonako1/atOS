@@ -45,7 +45,7 @@ void puts(U8 *str);
  * %[00-0x8]x
  * %%
  */
-void printf(PU8 fmt, ...);
+VOID printf(PU8 fmt, ...);
 
 KP_DATA *get_kp_data();
 KEYPRESS *get_last_keypress();

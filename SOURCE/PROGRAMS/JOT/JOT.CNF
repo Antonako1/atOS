@@ -1,0 +1,8 @@
+#!ATRC
+# Config file for JOT text editor
+[ATUI]
+BG_COLOUR=BLACK
+BG_COLOUR=WHITE
+
+[Keybinds]
+MoveUp=A

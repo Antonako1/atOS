@@ -19,13 +19,6 @@ REMARKS
     Do NOT call any of these functions before PAGING_INIT()!
     Do NOT call any of these functions if you don't know what you're doing!
 
-    Do NOT use any physical memory addresses directly in the kernel or drivers,
-    always allocate/free through the page frame manager. This ensures that
-    the memory is tracked properly and avoids accidental overlaps.
-
-    Do NOT use physical addresses in user programs, as they will not work
-    once paging is enabled. User programs should use virtual addresses only.
-
 See README.md
 ---*/
 #ifndef PAGING_H

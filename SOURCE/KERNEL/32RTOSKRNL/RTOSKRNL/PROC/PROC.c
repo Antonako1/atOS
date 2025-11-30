@@ -14,6 +14,7 @@
 #include <CPU/PIC/PIC.h>
 #include <STD/BINARY.h>
 #include <DRIVERS/PS2/KEYBOARD.h>
+#include <DEBUG/KDEBUG.h>
 #define EFLAGS_IF 0x0200
 #define KDS 0x10
 #define KCS 0x08
@@ -24,6 +25,7 @@ static U32 next_pid __attribute__((section(".data"))) = 1; // start from 1 since
 static U8 initialized __attribute__((section(".data"))) = FALSE;
 static U32 proc_amount __attribute__((section(".data"))) = 0;
 static TCB *last_tcb __attribute__((section(".data"))) = &master_tcb;
+static TCB *current_shell ATTRIB_DATA = &master_tcb;
 
 // Shell informs kernel what task is focused
 static volatile TCB *focused_task __attribute__((section(".data"))) = NULL;
@@ -622,19 +624,16 @@ BOOLEAN RUN_BINARY(
     new_proc->info.name[TASK_NAME_MAX_LEN - 1] = '\0';
 
     new_proc->argc = argc;
-    if(argc > 0) {
-        new_proc->argv = KMALLOC(argc * sizeof(PU8) + 1);
-        if(!argv) {
+    if (argc > 0) {
+        new_proc->argv = KMALLOC(argc * sizeof(PPU8));
+        if (!new_proc->argv) {
             KILL_PROCESS(new_proc);
+            return; // Stop execution!
         }
-        U32 i;
-        for(i = 0; i < argc; i++){
-            U32 len = STRLEN(argv[i]) + 1;
-            PU8 p = KMALLOC(len);
-            STRCPY(p, argv[i]);
-            new_proc->argv[i] = p;
+
+        for (U32 i = 0; i < argc; i++) {
+            new_proc->argv[i] = STRDUP(argv[i]);
         }
-        new_proc->argv[i] = NULL;
     } else {
         new_proc->argv = NULLPTR;
     }
@@ -654,6 +653,9 @@ BOOLEAN RUN_BINARY(
     KDEBUG_HEX32(new_proc->stack_phys_base); 
     KDEBUG_PUTS("\n");
 
+    if(initial_state & TCB_STATE_INFO_CHILD_PROC_HANDLER) {
+        current_shell = new_proc;
+    }
     return TRUE;
 }
 
@@ -677,6 +679,7 @@ void remove_tcb_from_scheduler(TCB *tcb) {
 }
 
 
+
 void KILL_PROCESS(U32 pid) {
     if (pid == 0) return; // cannot kill master process
 
@@ -694,7 +697,7 @@ void KILL_PROCESS(U32 pid) {
 
     // If this was the focused task, reset focus to master
     if (target == focused_task) {
-        focused_task = &master_tcb;
+        focused_task = current_shell;
     }
 
     // Remove from scheduler (this adjusts proc_amount automatically)
@@ -734,6 +737,9 @@ void KILL_PROCESS(U32 pid) {
     KFREE(target);
 
     KDEBUG_PUTS("[proc] Process killed successfully\n");
+    KDEBUG_HEX32(pid);
+    KDEBUG_PUTC('\n');
+    
 }
 
 volatile static U32 tcks __attribute__((section(".data"))) = 0;
@@ -1045,7 +1051,10 @@ void handle_kernel_messages(void) {
                 break;
             case PROC_MSG_CREATE_PROCESS: 
                 {
-                    if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) break;
+                    if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) {
+                        KDEBUG_PUTS("[proc_msg] No data provided for PROC_MSG_CREATE_PROCESS\n");
+                        goto free_create_proc_data;
+                    };
                     KDEBUG_PUTS("[proc_msg] Creating new process\n");
                     RUN_BINARY_STRUCT *sct = msg->data;
                     RUN_BINARY(
@@ -1059,11 +1068,19 @@ void handle_kernel_messages(void) {
                         sct->argv,
                         sct->argc
                     );
+                    // KDEBUG_PUTS("Freeing args\n");
                     for(U32 i = 0; i < sct->argc; i++) {
+                        KDEBUG_HEX32(i);
+                        KDEBUG_PUTC('\n');
                         KFREE(sct->argv[i]);
                     }
+                    // KDEBUG_PUTS("To array\n");
                     KFREE(sct->argv);
-                    KFREE(msg->data);
+                    free_create_proc_data:
+                    // KDEBUG_PUTS("Freeing data\n");
+
+                    KFREE(sct);
+                    KDEBUG_PUTS("[proc_msg] New process created\n");
                 }
                 break;
             case PROC_MSG_KILL_PROCESS:

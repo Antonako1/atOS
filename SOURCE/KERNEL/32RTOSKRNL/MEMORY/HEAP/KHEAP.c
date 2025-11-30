@@ -6,6 +6,7 @@
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <STD/ASM.h>
 #include <STD/ASSERT.h>
+#include <PROC/PROC.h>
 
 /*+++
 
@@ -15,7 +16,7 @@ Kernel Heap Management
 
 #define KHEAP_ALIGN 8u
 #define ALIGN_UP_U32(x, a) ( (((U32)(x)) + ((a) - 1u)) & ~((a) - 1u) )
-
+// #define CUR_PID (get_current_tcb()->info.pid)
 // Minimum user-allocatable tail after splitting (avoid tiny fragments)
 // A new block requires a header and at least KHEAP_ALIGN bytes of payload.
 #define MIN_SPLIT_TAIL (sizeof(KHeapBlock) + KHEAP_ALIGN)
@@ -64,7 +65,7 @@ BOOLEAN KHEAP_INIT(U32 pageNum) {
     block->magic0 = KHEAP_BLOCK_MAGIC0;
     block->magic1 = KHEAP_BLOCK_MAGIC1;
     block->magic2 = KHEAP_BLOCK_MAGIC2;
-
+    
 
     heap_initialized = TRUE;
     return TRUE;

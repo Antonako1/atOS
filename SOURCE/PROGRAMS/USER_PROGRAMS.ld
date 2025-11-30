@@ -5,7 +5,7 @@ ENTRY(_start)
 
 SECTIONS
 {
-    /* Kernel load address in memory */
+    /* Program load address in virtual memory */
     . = 0x10000000;
 
     /* Code section */

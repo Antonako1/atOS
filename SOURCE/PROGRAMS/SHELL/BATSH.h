@@ -25,7 +25,7 @@ typedef struct {
     PU8 args[MAX_ARGS];
     U32 arg_count;
 
-    VOIDPTR *shndl; // VOIDPTR because SHELL.h can't be included here. Safe to cast
+    VOIDPTR shndl; // VOIDPTR because SHELL.h can't be included here. Safe to cast
 
     U32 status_code;
     
@@ -53,6 +53,6 @@ VOID SETUP_BATSH_PROCESSER();
 VOID BATSH_SET_MODE(U8 mode);
 U8 BATSH_GET_MODE(void);
 BOOLEAN RUN_PROCESS(PU8 line);
-#endif __SHELL__
+#endif // __SHELL__
 
 #endif // BATSH_H

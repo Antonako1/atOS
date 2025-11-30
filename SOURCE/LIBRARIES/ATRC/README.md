@@ -1,13 +1,12 @@
-# ATRC — A Static, Header only, Resource/Confifuration file library
+# ATRC — A Static, Header only, Resource/Configuration file library
 
-A "rewrite" of my old existing configuration file library. Found at [GitHub](https://github.com/Antonako1/ATRC)
+A smaller rewrite of my old existing configuration file library. Found at [GitHub](https://github.com/Antonako1/ATRC)
 
 The syntax is basically the same as in Microsoft .INI configuration files, but with some additional ease of life features.
 
 All syntax and features can be seen below
 
-File extension should be `.CNF`, does not really matter, 
-    but keeping it as `.CNF` saves the parser from having to load the file into memory to check the `#!ATRC`.
+File extension should be `.CNF`.
 
 ```ini
 #!ATRC

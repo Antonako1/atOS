@@ -231,6 +231,7 @@ void DUMP_STRING_U32(STRING str, U32 num) {
 
 void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     CLI;
+    debug_vram_start();
     AC97_TONE(300, 150, 14400, 8000);
     AC97_TONE(200, 200, 14400, 8000);
     VBE_COLOUR fg = VBE_WHITE;
@@ -359,10 +360,6 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     CLI;
     debug_vram_start();
     VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
-    VBE_UPDATE_VRAM();
     AC97_TONE(300, 150, 14400, 8000);
     AC97_TONE(200, 200, 14400, 8000);
     rki_row = 0;
@@ -373,12 +370,19 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
     VBE_DRAW_STRING(VBE_CHAR_WIDTH*13, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
+    ITOA_U(get_current_tcb()->info.pid, buf, 16);
+    VBE_DRAW_STRING(0, rki_row, "Current PID: 0x", fg, bg);
+    VBE_DRAW_STRING(VBE_CHAR_WIDTH*16, rki_row, buf, fg, bg);
+    INC_rki_row(rki_row);
     // --- Print to debug port ---
     KDEBUG_PUTS("\n=== PANIC ===\n");
     KDEBUG_PUTS("Message: ");
     KDEBUG_PUTS(msg);
     KDEBUG_PUTS("\nError Code: 0x");
     KDEBUG_HEX32(errmsg);
+    KDEBUG_PUTS("\n");
+    KDEBUG_PUTS("\nCurrent PID: 0x");
+    KDEBUG_HEX32(get_current_tcb()->info.pid);
     KDEBUG_PUTS("\n");
     // Last error
     VBE_DRAW_STRING(0, rki_row, "Last error: 0x", fg, bg);
@@ -487,6 +491,8 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
         KDEBUG_PUTS(" reserved=0x"); KDEBUG_HEX32(pf->reservedMemory);
         KDEBUG_PUTS("\n");
     }
+    KDEBUG_PUTS("Failed on "); KDEBUG_HEX32(get_current_tcb()->info.pid);
+    KDEBUG_PUTS("\n");
 
     VBE_UPDATE_VRAM();
     ASM_VOLATILE("cli; hlt");
@@ -569,7 +575,7 @@ void assert(BOOL condition) {
 
 
 void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
-    KDEBUG_PUTS("[rtos] Enter LOAD_AND_RUN_KERNEL_SHELL\n");
+    KDEBUG_PUTS("[atOS] Enter LOAD_AND_RUN_KERNEL_SHELL\n");
     VBE_FLUSH_SCREEN();
     FAT_LFN_ENTRY ent = { 0 };
     U32 sz = 0;
@@ -588,7 +594,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
             sz, 
             USER_HEAP_SIZE, 
             USER_STACK_SIZE, 
-            TCB_STATE_IMMORTAL | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
+            TCB_STATE_ACTIVE | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
             0,
             shell_argv,
             2
@@ -598,8 +604,8 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     );
     KFREE(file);
     file = NULLPTR;
-    KDEBUG_PUTS("[rtos] RUN_BINARY returned OK\n");
-    KDEBUG_PUTS("[rtos] LOAD_AND_RUN_KERNEL_SHELL done\n");
+    KDEBUG_PUTS("[atOS] RUN_BINARY returned OK\n");
+    KDEBUG_PUTS("[atOS] LOAD_AND_RUN_KERNEL_SHELL done\n");
 }
 
 BOOL initialize_filestructure(VOID) {
@@ -627,9 +633,9 @@ BOOL initialize_filestructure(VOID) {
 
 
 void RTOSKRNL_LOOP(VOID) {
-    // early_debug_tcb(get_last_pid());
     kernel_loop_init();
     while(1) {
+        early_debug_tcb(get_last_pid());
         handle_kernel_messages();
     }
 }

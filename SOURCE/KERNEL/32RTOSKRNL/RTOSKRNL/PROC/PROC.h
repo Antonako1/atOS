@@ -81,10 +81,10 @@ typedef enum {
     PROC_EVENT_INFORM_ON_MOUSE_EVENTS = 0x0002, // Tells kernel to inform this process when mouse events occur
 } PROC_EVENT_TYPE;
 
-#define TASK_NAME_MAX_LEN 64
+#define TASK_NAME_MAX_LEN 255
 typedef struct TaskInfo {
     U32 pid;
-    U8 name[TASK_NAME_MAX_LEN]; // Required for ps command
+    U8 name[TASK_NAME_MAX_LEN]; // Required for ps command.
     U32 state;
     U32 state_info; // Additional info about state, e.g. sleep duration
 
@@ -182,7 +182,7 @@ typedef enum {
     // Data, signal and message are ignored
     PROC_RELEASE_MOUSE_EVENTS = 0x00000201,
 
-    PROC_MSG_CUSTOM, // user-defined message for process communication
+    // 0x100000 is limit number. User defined types start from there!
 } PROC_MESSAGE_TYPE;
 
 typedef struct proc_message {
@@ -193,7 +193,7 @@ typedef struct proc_message {
     BOOLEAN data_provided; // TRUE if data pointer is valid
     // pointer to message data, can be NULL
     // Needs to be freed by receiver if data_provided is TRUE
-    // Use KFREE to free
+    // When sending a message via syscalls, this data is deep copied
     VOIDPTR data; 
     U32 data_size;
 
@@ -202,8 +202,8 @@ typedef struct proc_message {
     U32 timestamp; // time sent in seconds since boot
     BOOLEAN read; // TRUE if message has been read
 
-    VOIDPTR raw_data; // Raw data. Sender's job to clear
-    U32 raw_data_size; // Raw data. Sender's job to clear
+    VOIDPTR raw_data; // Raw data. Is not copied, not freed by message queue handler
+    U32 raw_data_size; // Raw data. Is not copied, not freed by message queue handler
 } PROC_MESSAGE;
 
 typedef struct TCB {

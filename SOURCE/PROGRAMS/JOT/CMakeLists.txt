@@ -7,15 +7,27 @@ set(CUR_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCE_KERNEL_DIR ${CUR_DIR}/../../KERNEL)
 set(OUTPUT_DIR ${CUR_DIR}/../../../OUTPUT/PROGRAMS/${ProgramName})
 set(STD_DIR ${CUR_DIR}/../../STD)
+set(RUNTIME_DIR ${CUR_DIR}/../../RUNTIME)
 
 # === Sources ===
 file(GLOB STD_SOURCES
     CONFIGURE_DEPENDS
     "${STD_DIR}/*.c"
 )
+
+# === ATUI ===
+file(STRINGS "${CUR_DIR}/../../LIBRARIES/ATUI/SOURCES" ATUI_SOURCES)
+list(TRANSFORM ATUI_SOURCES PREPEND "${CUR_DIR}/../../LIBRARIES/ATUI/")
+
 set(Sources
+    ${RUNTIME_DIR}/RUNTIME.c
     ${CUR_DIR}/JOT.c
     ${STD_SOURCES}
+    ${ATUI_SOURCES}
+)
+
+set(OTHER_RESOURCES
+    ${CUR_DIR}/JOT.CNF
 )
 
 # === Include directories ===
@@ -30,6 +42,7 @@ include_directories(
     ${SOURCE_KERNEL_DIR}/32RTOSKRNL/RTOSKRNL/
 )
 
+
 # === Compiler flags ===
 set(CompArgs
     -DPROCBIN_VADDR=0x10000000
@@ -38,11 +51,7 @@ set(CompArgs
     -D__UP__
     -D__${ProgramName}__
     
-    # 🛑 Disables ALL warnings (including those enabled by -Wall/-Wextra)
     -w
-    
-    # -Wno-comment (No longer needed if using -w)
-    # -Wno-comments (No longer needed if using -w)
     
     -m32
     -ffreestanding
@@ -50,8 +59,6 @@ set(CompArgs
     -fno-pie
     -nostdlib
     -O0
-    # -Wall (No longer needed if using -w)
-    # -Wextra (No longer needed if using -w)
     -fno-stack-protector
     -fno-builtin
     -fno-inline
@@ -61,6 +68,14 @@ add_compile_options(${CompArgs})
 
 # === Build target ===
 add_executable(${ProgramName}.BIN ${Sources})
+
+add_custom_command(TARGET ${ProgramName}.BIN POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${OTHER_RESOURCES}
+        ${OUTPUT_DIR}
+    COMMENT "Copying resource files..."
+)
 
 # Tell CMake to use GCC and treat this as a freestanding binary
 set_target_properties(${ProgramName}.BIN PROPERTIES

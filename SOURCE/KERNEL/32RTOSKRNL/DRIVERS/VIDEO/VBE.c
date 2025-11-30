@@ -122,9 +122,11 @@ void update_current_framebuffer() {
 
 void debug_vram_start() {
     early_mode = TRUE;
+    current_frambuffer = FRAMEBUFFER_ADDRESS;
 }
 void debug_vram_end() {
     early_mode = FALSE;
+    update_current_framebuffer();
 }
 void debug_vram_dump() {
     VBE_MODEINFO* mode = GET_VBE_MODE();
