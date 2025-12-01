@@ -52,11 +52,11 @@ U0 CMD_INTERFACE_LOOP() {
 
 VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     // Print termination message
-    PUTS("Process pid 0x");
-    PUT_HEX(pid);
-    PUTS(" terminated with code 0x");
-    PUT_HEX(exit_code);
-    PUTC('\n');
+    // PUTS("Process pid 0x");
+    // PUT_HEX(pid);
+    // PUTS(" terminated with code 0x");
+    // PUT_HEX(exit_code);
+    // PUTC('\n');
     DEBUG_PRINTF("[SHELL %d] Process end acknowledged\n", PROC_GETPID());
     // Restore shell prompt
     PROC_MESSAGE msg;
@@ -64,10 +64,13 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     STDOUT*std = GET_STDOUT(pid);
     // flush framebuffer
     if(std) {
+        BOOL prev = GetOutputHandle()->CURSOR_BLINK;
+        GetOutputHandle()->CURSOR_BLINK = FALSE;
         if(std->buf[0] != NULLT && std->proc_seq != std->shell_seq) {
             PUTS(std->buf);
             PRINTNEWLINE();
         }
+        GetOutputHandle()->CURSOR_BLINK = prev;
     }
     DELETE_STDOUT(pid);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
@@ -76,6 +79,9 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, self_pid);
     SEND_MESSAGE(&msg);
     if(!end_proc) PUT_SHELL_START();
+    U8 buf[32];
+    ITOA_U(exit_code, buf, 10);
+    SET_VAR("ERRORLEVEL", buf);
 }
 
 /**

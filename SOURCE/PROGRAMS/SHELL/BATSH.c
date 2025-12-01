@@ -1069,8 +1069,10 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
 
     if(!execute_master(root_cmd, inst)) {
         PUTS("Executing failed\n");
+        SET_VAR("ERRORLEVEL", "1");
         goto error;
     }
+    SET_VAR("ERRORLEVEL", "0");
 
     U8 res = TRUE;
     goto free;
