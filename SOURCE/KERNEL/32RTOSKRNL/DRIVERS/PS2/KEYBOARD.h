@@ -25,6 +25,7 @@ REMARKS
 #include <STD/ASM.h>
 #include <STD/TYPEDEF.h>
 
+#ifdef __RTOS__
 /*+++
 PS/2 Ports
 ---*/
@@ -103,7 +104,6 @@ typedef struct {
     U8 buffer[CMD_QUEUE_SIZE];
 } PS2KB_CMD_QUEUE;
 
-#ifdef __RTOS__
 PS2_INFO *GET_PS2_INFO(VOID);
 
 PS2KB_CMD_QUEUE *GET_CMD_QUEUE(VOID);
@@ -118,7 +118,6 @@ BOOLEAN PS2_KEYBOARD_INIT(VOID);
 BOOLEAN PS2_KEYBOARD_RESET(VOID);
 BOOLEAN PS2_SET_SCAN_CODE_SET(U8 set);
 void PS2_KEYBOARD_HANDLER(I32 num, U32 errcode);
-#endif // __RTOS__
 
 /*+++
 We only use 2 scan code sets: 1 and 2
@@ -488,6 +487,7 @@ typedef enum {
     SC2_7PART_RELEASED(PRINT_SCREEN, 0xE0, 0xF0, 0x7C, 0xE0, 0xE0, 0xF0, 0x12), // Print Screen
     SC2_8PART_PRESSED(PAUSE, 0xE1, 0x14, 0x77, 0xE1, 0xF0, 0x14, 0xF0, 0x77), // Pause
 } SC2;
+#endif // __RTOS__
 
 typedef enum {
     KEY_UNKNOWN = 0,
