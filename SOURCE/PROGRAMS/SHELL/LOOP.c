@@ -51,18 +51,6 @@ U0 CMD_INTERFACE_LOOP() {
 
 
 VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
-    STDOUT *proc_out = GET_STDOUT(pid);
-    if (proc_out) {
-        // 🟢 Flush any remaining buffer before deletion
-        if (proc_out->buf[0] != '\0') {
-            PUTS(proc_out->buf);
-            PRINTNEWLINE();
-        }
-
-        // Now delete the stdout
-        DELETE_STDOUT(pid);
-    }
-
     // Print termination message
     PUTS("Process pid 0x");
     PUT_HEX(pid);
@@ -73,6 +61,14 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     // Restore shell prompt
     PROC_MESSAGE msg;
     U32 self_pid = GET_SHNDL()->self_pid;
+    STDOUT*std = GET_STDOUT(pid);
+    // flush framebuffer
+    if(std) {
+        if(std->buf[0] != NULLT && std->proc_seq != std->shell_seq) {
+            PUTS(std->buf);
+            PRINTNEWLINE();
+        }
+    }
     DELETE_STDOUT(pid);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
     SEND_MESSAGE(&msg);
