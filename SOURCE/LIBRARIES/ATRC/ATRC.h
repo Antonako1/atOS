@@ -445,7 +445,7 @@ BOOL PARSE_ATRC(PATRC_FD fd) {
 
 error:
     res = FALSE;
-
+    DESTROY_ATRCFD(fd);
 done:
     FCLOSE(file);
     return res;
