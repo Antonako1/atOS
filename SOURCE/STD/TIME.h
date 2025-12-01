@@ -14,10 +14,10 @@ RTC_DATE_TIME GET_DATE_TIME(void);
 U32 GET_SECONDS(RTC_DATE_TIME *dt);       // 0-59
 U32 GET_MINUTES(RTC_DATE_TIME *dt);       // 0-59
 U32 GET_HOURS(RTC_DATE_TIME *dt);         // 0-23
-U32 GET_WEEKDAY(RTC_DATE_TIME *dt);       // 0-6, 0=Sunday
+U32 GET_WEEKDAY(RTC_DATE_TIME *dt);       // 1-7, 1=Sunday
 U32 GET_DAY_OF_MONTH(RTC_DATE_TIME *dt);  // 1-31
-U32 GET_MONTH(RTC_DATE_TIME *dt);         // 0-11
-U32 GET_YEAR(RTC_DATE_TIME *dt);          // Full year, e.g., 2025
+U32 GET_MONTH(RTC_DATE_TIME *dt);         // 1-12
+U32 GET_YEAR(RTC_DATE_TIME *dt);          // 0-99
 U32 GET_CENTURY(RTC_DATE_TIME *dt);       // e.g., 19, 20
 
 // Time difference utilities (32-bit safe)
@@ -29,5 +29,24 @@ BOOL SAME_DAY(RTC_DATE_TIME *dt1, RTC_DATE_TIME *dt2);
 
 // Date/time modification
 void ADD_SECONDS(RTC_DATE_TIME *dt, U32 seconds);
+void SUBTRACT_SECONDS(RTC_DATE_TIME *dt, U32 seconds);
+
+void ADD_MINUTES(RTC_DATE_TIME *dt, U32 minutes);
+void SUBTRACT_MINUTES(RTC_DATE_TIME *dt, U32 minutes);
+
+void ADD_HOURS(RTC_DATE_TIME *dt, U32 hours);
+void SUBTRACT_HOURS(RTC_DATE_TIME *dt, U32 hours);
+
+void ADD_DAYS(RTC_DATE_TIME *dt, U32 days);
+void SUBTRACT_DAYS(RTC_DATE_TIME *dt, U32 days);
+
+void ADD_WEEKS(RTC_DATE_TIME *dt, U32 weeks);
+void SUBTRACT_WEEKS(RTC_DATE_TIME *dt, U32 weeks);
+
+void ADD_MONTHS(RTC_DATE_TIME *dt, U32 months);
+void SUBTRACT_MONTHS(RTC_DATE_TIME *dt, U32 months);
+
+void ADD_YEARS(RTC_DATE_TIME *dt, U32 years);
+void SUBTRACT_YEARS(RTC_DATE_TIME *dt, U32 years);
 
 #endif // STD_TIME_H
