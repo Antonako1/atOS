@@ -89,7 +89,7 @@ BOOL DOES_EXIST_VARIABLE(PATRC_FD fd, PU8 variable_name);
 #define DOES_EXIST_NKEY(fd, key_name) DOES_EXIST_KEY(fd, " ", key_name)
 
 // misc
-PU8 INSERT_VAR(PU8 line, PPU8 args); // Return must be freed
+PU8 INSERT_VAR(PU8 line, PPU8 args, U32 arg_count); // Return must be freed
 U32 GET_ENUM_VALUE(PATRC_FD fd, PU8 block_name, PU8 key_name);
 // BOOL WRITE_COMMENT_TO_TOP(PATRC_FD fd);
 // BOOL WRITE_COMMENT_TO_BOTTOM(PATRC_FD fd);
@@ -772,123 +772,78 @@ U32 GET_ENUM_VALUE(PATRC_FD fd, PU8 block_name, PU8 key_name) {
     return (U32)-1;
 }
 
-/* ---------------- INSERT_VAR -----------------
-   Replaces %0%, %1%, ... in 'line' with args[0], args[1], ... .
-   Returns a newly allocated string (caller must free).
-   If an index is missing in args, it replaces with empty string.
-   Escapes: use \% to embed a literal percent sign.
-*/
-PU8 INSERT_VAR(PU8 line, PPU8 args) {
-    if(!line) return NULLPTR;
 
+PU8 INSERT_VAR(PU8 line, PPU8 args, U32 arg_count)
+{
+    if (!line || !args || arg_count == 0)
+        return NULLPTR;
+
+    PU8 retval = NULLPTR; // start with NULL, will grow with STRAPPEND
+    U32 current_arg = 0;
     U32 len = STRLEN(line);
 
-    // Initial buffer — oversized to avoid many reallocs
-    U32 cap = len + 128;
-    PU8 out = MAlloc(cap);
-    if(!out) return NULLPTR;
-
-    U32 out_pos = 0;
-    BOOL esc = FALSE;
-
-    for(U32 i = 0; i < len; i++) {
+    for (U32 i = 0; i < len; i++)
+    {
         CHAR c = line[i];
 
-        // Handle escape: \" \% \0 etc.
-        if(esc) {
-            out[out_pos++] = c;
-            esc = FALSE;
-            continue;
-        }
+        if (c == '%' && line[i + 1] == '*')
+        {
+            CHAR next = line[i + 2];
 
-        if(c == '\\') {
-            esc = TRUE;
-            continue;
-        }
+            // %*% → insert next argument
+            if (next == '%')
+            {
+                if (current_arg < arg_count)
+                    retval = STRAPPEND(retval, args[current_arg++]);
 
-        // ---- Placeholder logic ----
-        if(c == '%') {
-            U32 j = i + 1;
-
-            // START special * handling
-            BOOL star = FALSE;
-            if(j < len && line[j] == '*') {
-                star = TRUE;
-                j++; // skip '*'
-            }
-
-            // Read digits (optional if a star was used)
-            while(j < len && (line[j] >= '0' && line[j] <= '9'))
-                j++;
-
-            // Closing % found?
-            if(j < len && line[j] == '%') {
-
-                INT idx = 0;
-
-                // If star with no digits: treat as 0
-                if(star && (j == i + 2)) {
-                    idx = 0;
-                }
-                else {
-                    // Parse number between i+1 and j
-                    U32 digits_start = i + (star ? 2 : 1);
-                    U32 digits_len = j - digits_start;
-                    if(digits_len == 0) {
-                        idx = 0; // no digits → default 0
-                    } else {
-                        PU8 numbuf = MAlloc(digits_len + 1);
-                        if(!numbuf) { MFree(out); return NULLPTR; }
-                        for(U32 k = 0; k < digits_len; k++)
-                            numbuf[k] = line[digits_start + k];
-                        numbuf[digits_len] = '\0';
-
-                        idx = ATOI(numbuf);
-                        MFree(numbuf);
-                    }
-                }
-
-                // Insert argument if valid index
-                PU8 repl = NULLPTR;
-                if(args && idx >= 0) repl = args[idx];
-
-                if(repl) {
-                    U32 rlen = STRLEN(repl);
-
-                    // Resize output buffer if needed
-                    if(out_pos + rlen + 1 >= cap) {
-                        cap = cap + rlen + 128;
-                        out = ReAlloc(out, cap);
-                        if(!out) return NULLPTR;
-                    }
-
-                    for(U32 k = 0; k < rlen; k++)
-                        out[out_pos++] = repl[k];
-                }
-
-                i = j; // skip past closing %
+                i += 2; // skip '*%'
                 continue;
             }
 
-            // No valid placeholder → treat % literal
-            out[out_pos++] = '%';
+            // %*<digits>% → insert argument at index
+            if (IS_DIGIT(next))
+            {
+                U32 index = 0;
+                U32 j = i + 2;
+                U32 digits = 0;
+
+                // Read up to 3 digits
+                while (digits < 3 && IS_DIGIT(line[j]))
+                {
+                    index = index * 10 + (line[j] - '0');
+                    j++;
+                    digits++;
+                }
+
+                // Check for ending %
+                if (line[j] == '%' && index < arg_count)
+                {
+                    retval = STRAPPEND(retval, args[index]);
+                    i = j; // skip '*<digits>%'
+                    continue;
+                }
+
+                // Invalid pattern, treat %* literally
+                retval = STRAPPEND(retval, "%*");
+                i += 1; // skip '*' only
+                continue;
+            }
+
+            // Not a valid pattern, treat %* literally
+            retval = STRAPPEND(retval, "%*");
+            i += 1; // skip '*'
             continue;
         }
 
-        // Normal character
-        out[out_pos++] = c;
-
-        // Keep buffer safe
-        if(out_pos + 4 >= cap) {
-            cap = cap * 2;
-            out = ReAlloc(out, cap);
-            if(!out) return NULLPTR;
-        }
+        // Normal character → append single char
+        CHAR tmp[2] = { c, '\0' };
+        retval = STRAPPEND(retval, tmp);
     }
 
-    out[out_pos] = '\0';
-    return out;
+    return retval;
 }
+
+
 
 /* ---------------- Utility: ATRC_TO_LIST / FREE_STR_ARR / ATRC_TO_BOOL ----------------- */
 PSTR_ARR ATRC_TO_LIST(PU8 val, CHAR separator) {

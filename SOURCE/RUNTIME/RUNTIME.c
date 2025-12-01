@@ -19,9 +19,7 @@ U32 main(U32 argc, PPU8 argv);
 
 void _start(U32 argc, PPU8 argv) {
     DEBUG_PRINTF("[RUNTIME] Entered _start with argc:%d\n", argc);
-    for(U32 i = 0; i < argc; i++) {
-        
-    }
+
     #ifdef RUNTIME_GUI
     PRIC_INIT_GRAPHICAL();
     #else

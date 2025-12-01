@@ -736,7 +736,6 @@ BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
             }
 
             if (!line_as_is) break;
-
             resolve_vars(&line_as_is, inst);
             HANDLE_COMMAND(line_as_is);
             MFree(line_as_is);
@@ -928,8 +927,11 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
             i++;
             U32 start = i;
             while (i < len) {
-                if (input[i] == '"' && input[i - 1] != '\\')
+                if (input[i] == '"' && input[i - 1] != '\\') {
+                    start--;
+                    i++;
                     break;
+                }
                 i++;
             }
             U32 str_len = i - start;
@@ -1067,8 +1069,10 @@ BOOLEAN PARSE_BATSH_INPUT(PU8 input, BATSH_INSTANCE *inst) {
 
     if(!execute_master(root_cmd, inst)) {
         PUTS("Executing failed\n");
+        SET_VAR("ERRORLEVEL", "1");
         goto error;
     }
+    SET_VAR("ERRORLEVEL", "0");
 
     U8 res = TRUE;
     goto free;
@@ -1594,28 +1598,37 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         PU8 p = args_start;
 
         while (*p && argc < MAX_ARGS) {
+            // skip leading whitespace
             while (*p == ' ' || *p == '\t') p++;
             if (!*p) break;
 
             BOOL in_quotes = FALSE;
-            PU8 ArgBegin = p;
+            PU8 ArgBegin;
 
             if (*p == '"') {
                 in_quotes = TRUE;
-                ArgBegin = ++p;
+                p++;                 // skip opening quote
+                ArgBegin = p;
+
                 while (*p && *p != '"') p++;
             } else {
+                ArgBegin = p;
                 while (*p && *p != ' ' && *p != '\t') p++;
             }
 
             U32 len = p - ArgBegin;
+
             PU8 arg = MAlloc(len + 1);
             STRNCPY(arg, ArgBegin, len);
             arg[len] = 0;
 
             argv[argc++] = arg;
 
-            if (in_quotes && *p == '"') p++;  // skip closing quote
+            if (in_quotes && *p == '"')
+                p++; // skip closing quote
+
+            // skip trailing whitespace before next argument
+            while (*p == ' ' || *p == '\t') p++;
         }
     }
 

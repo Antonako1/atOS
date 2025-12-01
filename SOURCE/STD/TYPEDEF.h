@@ -73,8 +73,8 @@ __attribute__((packed))
 U64;
 
 // Boolean definitions
-#define BOOL         U32
-#define BOOLEAN      BOOL
+typedef U32          BOOL;
+typedef BOOL         BOOLEAN;
 #define TRUE         1
 #define FALSE        0
 

@@ -10,7 +10,7 @@ typedef struct {
     U8 weekday;  // +0x6, 1-7. 1=sunday
     U8 day_of_month; // +0x7, 1-31
     U8 month;   // +0x8, 1-12
-    U8 year;    // +0x9, 0-99
+    U16 year;    // +0x9, 0-99
     U8 century; // +0x32, 19-20?
 } RTC_DATE_TIME;
 
