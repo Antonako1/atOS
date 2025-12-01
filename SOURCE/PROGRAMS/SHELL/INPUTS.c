@@ -42,20 +42,26 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
         case KEY_ENTER: HANDLE_LE_ENTER(); break;
         case KEY_BACKSPACE: HANDLE_LE_BACKSPACE(); break;
         case KEY_DELETE: HANDLE_LE_DELETE(); break;
-        case KEY_ARROW_LEFT: HANDLE_LE_ARROW_LEFT(); break;
-        case KEY_ARROW_RIGHT: HANDLE_LE_ARROW_RIGHT(); break;
         case KEY_ARROW_DOWN: HANDLE_LE_ARROW_DOWN(); break;
         case KEY_ARROW_UP: HANDLE_LE_ARROW_UP(); break;
         case KEY_HOME: HANDLE_LE_HOME(); break;
         case KEY_END: HANDLE_LE_END(); break;
+        case KEY_ARROW_LEFT: 
+            if(mod->ctrl)
+            HANDLE_LE_CTRL_LEFT();
+            else
+            HANDLE_LE_ARROW_LEFT(); break;
+        case KEY_ARROW_RIGHT: 
+            if(mod->ctrl)
+            HANDLE_LE_CTRL_RIGHT();
+            else
+            HANDLE_LE_ARROW_RIGHT(); break;
         default: 
             // if(mod->shift) {
             // }
             // else 
             if(mod->ctrl) {
                 switch(kp->keycode) {
-                    case KEY_ARROW_RIGHT: HANDLE_LE_CTRL_RIGHT(); break;
-                    case KEY_ARROW_LEFT: HANDLE_LE_CTRL_LEFT(); break;
                     case KEY_A: HANDLE_LE_CTRL_A(); break;
                     case KEY_E: HANDLE_LE_CTRL_E(); break;
                     case KEY_U: HANDLE_LE_CTRL_U(); break;

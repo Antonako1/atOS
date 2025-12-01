@@ -968,11 +968,13 @@ void HANDLE_LE_END() {
 
 void HANDLE_LE_CTRL_LEFT() {
     if (edit_pos == 0) return;
+    RESTORE_CURSOR_BEFORE_MOVE();
 
     // Skip spaces left of cursor
     while (edit_pos > 0 && current_line[edit_pos - 1] == ' ')
         edit_pos--;
 
+    RESTORE_CURSOR_BEFORE_MOVE();
     // Skip the word left of cursor
     while (edit_pos > 0 && current_line[edit_pos - 1] != ' ')
         edit_pos--;
@@ -984,10 +986,12 @@ void HANDLE_LE_CTRL_RIGHT() {
     U32 len = STRLEN(current_line);
     if (edit_pos >= len) return;
 
+    RESTORE_CURSOR_BEFORE_MOVE();
     // Skip non-space (current word)
     while (edit_pos < len && current_line[edit_pos] != ' ')
         edit_pos++;
 
+    RESTORE_CURSOR_BEFORE_MOVE();
     // Skip spaces after the word
     while (edit_pos < len && current_line[edit_pos] == ' ')
         edit_pos++;
