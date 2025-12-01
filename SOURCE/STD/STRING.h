@@ -46,6 +46,7 @@ VOID STRSHIFTLEFTAT(PU8 src, U32 index);
 VOID STRNSHIFTRIGHTAT(PU8 src, U32 index, CHAR ch, U32 maxlen);
 
 U32 ATOI(CONST U8* str);
+I32 ATOI_I32(CONST U8* str);
 U32 ATOI_HEX(CONST U8* str);
 U32 ATOI_BIN(CONST U8* str);
 U0 *ITOA(S32 value, I8* buffer, U32 base);

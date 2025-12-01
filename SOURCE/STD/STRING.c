@@ -149,6 +149,32 @@ U32 ATOI(CONST U8* str) {
     }
     return res;
 }
+I32 ATOI_I32(CONST U8* str) {
+    if (!str) return 0;
+
+    I32 res = 0;
+    BOOL negative = FALSE;
+
+    // Skip leading spaces
+    while (*str == ' ' || *str == '\t') str++;
+
+    // Optional sign
+    if (*str == '-') {
+        negative = TRUE;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
+
+    // Parse digits
+    while (*str >= '0' && *str <= '9') {
+        res = res * 10 + (*str - '0');
+        str++;
+    }
+
+    return negative ? -res : res;
+}
+
 U32 ATOI_HEX(CONST U8* str) {
     U32 res = 0;
     while ((*str >= '0' && *str <= '9') || (*str >= 'A' && *str <= 'F') || (*str >= 'a' && *str <= 'f')) {
