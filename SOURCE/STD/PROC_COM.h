@@ -22,14 +22,15 @@
  * If you ever add custom messaged, add them here
  */
 typedef enum {
-    SHELL_CMD_CREATE_STDOUT = 0x100000,
-    SHELL_RES_STDOUT_CREATED,
-    SHELL_RES_STDOUT_FAILED,
-    SHELL_CMD_ENDED_MYSELF,
-    SHELL_CMD_SHELL_FOCUS,
-    SHELL_CMD_INFO_ARRAYS,
-    SHELL_RES_INFO_ARRAYS,
-    SHELL_RES_INFO_ARRAYS_FAILED,
+    SHELL_CMD_CREATE_STDOUT = 0x100000, // Create a new console stdout buffer for this process
+    SHELL_RES_STDOUT_CREATED, // Response: stdout created successfully
+    SHELL_RES_STDOUT_FAILED, // Response: stdout creation failed successfully
+    SHELL_CMD_ENDED_MYSELF, // Inform shell that process will end itself
+    SHELL_CMD_SHELL_FOCUS, // Inform shell to focus this process's screen buffer
+    SHELL_CMD_INFO_ARRAYS, // Request array of information about shell (SHELL_INSTANCE)
+    SHELL_RES_INFO_ARRAYS, // Response: array of information about shell (SHELL_INSTANCE)
+    SHELL_RES_INFO_ARRAYS_FAILED, // Response: failed to get array of information about shell
+    SHELL_CMD_EXECUTE_BATSH, // Executes a batsh command (sys command)
 } COMMND_TYPE;
 
 

@@ -90,3 +90,11 @@ U8 keypress_to_char(U32 kcode) {
     U8 c = (U8)SYSCALL(SYSCALL_KEYPRESS_TO_CHARS, kcode, 0, 0, 0, 0);
     return c;
 }
+
+void sys(PU8 cmd) {
+    U32 parent = PROC_GETPPID();
+    PU8 cmd_dup = STRDUP(cmd); // Duplicate command for string sending. Will be freed by receiver
+    if(!cmd_dup) return;
+    PROC_MESSAGE msg = CREATE_PROC_MSG_RAW(parent, SHELL_CMD_EXECUTE_BATSH, cmd_dup, STRLEN(cmd_dup) + 1, 0);
+    SEND_MESSAGE(&msg);
+}

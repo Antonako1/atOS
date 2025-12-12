@@ -94,6 +94,12 @@ U0 EDIT_LINE_MSG_LOOP() {
     PROC_MESSAGE *msg = NULLPTR;
     while ((msg = GET_MESSAGE()) != NULL) {
         switch (msg->type) {
+            case SHELL_CMD_EXECUTE_BATSH: {
+                if(msg->data_provided && msg->raw_data && msg->raw_data_size > 0) {
+                    PARSE_BATSH_INPUT(msg->raw_data, NULLPTR);
+                    MFree(msg->raw_data);
+                }
+            } break;
             case SHELL_CMD_INFO_ARRAYS: {
                 PROC_MESSAGE res;
                 U32 sz = sizeof(SHELL_INSTANCE);
