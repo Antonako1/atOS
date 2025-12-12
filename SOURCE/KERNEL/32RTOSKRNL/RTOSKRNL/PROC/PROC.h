@@ -1,7 +1,8 @@
 /*
-Process management and multitasking for atOS-RT.
+Process management, multitasking and inter-process messaging for atOS-RT.
 
 Basically, this is kernel-level user process management with context switching
+and message passing between processes and the kernel.
 */
 #ifndef RTOS_PROC_H
 #define RTOS_PROC_H
@@ -77,6 +78,8 @@ typedef struct TrapFrame {
 } __attribute__((packed)) TrapFrame;
 
 typedef enum {
+    // KB and Mouse events still exist in code, but are legacy and don't serve any purpose.
+    // Please use STD/IO.h functions instead for keyboard and mouse events as they are more efficient and easier to use!
     PROC_EVENT_INFORM_ON_KB_EVENTS = 0x0001, // Tells kernel to inform this process when keyboard events occur
     PROC_EVENT_INFORM_ON_MOUSE_EVENTS = 0x0002, // Tells kernel to inform this process when mouse events occur
 } PROC_EVENT_TYPE;
@@ -94,7 +97,7 @@ typedef struct TaskInfo {
 
     U32 cpu_time; // in ticks, total CPU time used
     U32 num_switches; // number of times scheduled
-    U32 event_types; // Bitfield of event types this process is interested in
+    PROC_EVENT_TYPE event_types; // Bitfield of event types this process is interested in
 } __attribute__((packed)) TaskInfo;
 
 #define PROC_MSG_QUEUE_SIZE 30
@@ -110,13 +113,15 @@ typedef enum {
     /*
     Kernel sent a keyboard event
     Data contains
-    KEYPRESS and MODIFIERS structs back-to-back
+    KEYPRESS and MODIFIERS structs back-to-back.
+    Not sent anymore, use STD/IO.h functions instead.
     */
     PROC_MSG_KEYBOARD = 0x00000001,
     /*
     Kernel sent a mouse event
     Data contains
     MOUSE_EVENT struct
+    Not sent anymore, use STD/IO.h functions instead.
     */
     PROC_MSG_MOUSE = 0x00000002,
 
@@ -135,11 +140,11 @@ typedef enum {
 
     // User sent a sleep request to kernel
     // Data, signal and message are ignored
-    PROC_MSG_SLEEP = 0x00000008, // go to sleep
+    PROC_MSG_SLEEP = 0x00000008, // go to sleep. Not implemented yet.
 
     // User sent a wake request to kernel
     // Data, signal and message are ignored
-    PROC_MSG_WAKE = 0x00000010,  // wake up if sleeping
+    PROC_MSG_WAKE = 0x00000010,  // wake up if sleeping Not implemented yet.
 
     /*
     Set signal to PID of process to set focus to
@@ -164,8 +169,12 @@ typedef enum {
     // Data, signal and message are ignored
     PROC_RELEASE_FRAMEBUFFER = 0x00000081,
 
+
+
     // Request keyboard events
     // Data, signal and message are ignored
+    // These keyboard ones are legacy. You can request keyboard events, but none are sent.
+    // Use STD/IO.h functions instead.
     PROC_GET_KEYBOARD_EVENTS = 0x00000100,
     PROC_KEYBOARD_EVENTS_GRANTED = 0x00000101,
 
@@ -175,6 +184,7 @@ typedef enum {
     
     // Request mouse events
     // Data, signal and message are ignored
+    // Legacy. Use STD/IO.h functions instead.
     PROC_GET_MOUSE_EVENTS = 0x00000200,
     PROC_MOUSE_EVENTS_GRANTED = 0x00000201,
 
@@ -299,7 +309,7 @@ U32 get_uptime_sec(void);
 /// @param parent_pid PID of the parent process, or -1 for no parent
 /// @return TRUE on success, FALSE on failure
 /// @note The binary must be a flat binary. 
-/// @note IMPORTANT: Only for kernel
+/// @note IMPORTANT: Only for kernel. User processes should run a new process via Shell communication or sys() function!
 BOOLEAN RUN_BINARY(
     U8 *proc_name, 
     VOIDPTR file, 
