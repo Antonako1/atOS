@@ -31,11 +31,11 @@ typedef enum {
     MODE_RA       = MODE_R | MODE_A,
     MODE_FAT32    = 0x0100,  // FAT32 backend
     MODE_ISO9660  = 0x0200,  // ISO9660 backend
-    MODE_FR       = MODE_R | MODE_FAT32,
-    MODE_FW       = MODE_W | MODE_FAT32,
-    MODR_FRW      = MODE_RW| MODE_FAT32,
-    MODE_FA       = MODE_A | MODE_FAT32,
-    MODE_FRA      = MODE_RA| MODE_FAT32,
+    MODE_FR       = MODE_R | MODE_FAT32, // FAT32 Read
+    MODE_FW       = MODE_W | MODE_FAT32, // FAT32 Write
+    MODR_FRW      = MODE_RW| MODE_FAT32, // FAT32 Read & Write
+    MODE_FA       = MODE_A | MODE_FAT32, // FAT32 Append
+    MODE_FRA      = MODE_RA| MODE_FAT32, // FAT32 Read & Append
 } FILEMODES;
 
 typedef struct {

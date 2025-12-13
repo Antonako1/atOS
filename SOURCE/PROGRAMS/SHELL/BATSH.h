@@ -47,6 +47,7 @@ BOOLEAN RUN_BATSH_SCRIPT(PU8 path, U32 argc, PPU8 argv);
 BATSH_INSTANCE *CREATE_BATSH_INSTANCE(PU8 path, U32 argc, PPU8 argv);
 VOID DESTROY_BATSH_INSTANCE(BATSH_INSTANCE *inst);
 
+// Parses a line of batsh input and executes it. Use NULLPTR for global instance
 BOOLEAN PARSE_BATSH_INPUT(PU8 line, BATSH_INSTANCE *inst);
 VOID SETUP_BATSH_PROCESSER();
 

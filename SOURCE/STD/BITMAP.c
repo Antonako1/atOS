@@ -1,4 +1,4 @@
-#include <RTOSKRNL/BITMAP/BITMAP.h>
+#include <STD/BITMAP.h>
 
 VOID BITMAP_CREATE(U32 size, VOIDPTR buff_addr, BITMAP *bm) {
     if (!bm || !buff_addr || size == 0) return;

@@ -374,6 +374,8 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     VBE_DRAW_STRING(0, rki_row, "Current PID: 0x", fg, bg);
     VBE_DRAW_STRING(VBE_CHAR_WIDTH*16, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
+    VBE_DRAW_STRING(0, rki_row, get_current_tcb()->info.name, fg, bg);
+    INC_rki_row(rki_row);
     // --- Print to debug port ---
     KDEBUG_PUTS("\n=== PANIC ===\n");
     KDEBUG_PUTS("Message: ");
@@ -492,6 +494,8 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
         KDEBUG_PUTS("\n");
     }
     KDEBUG_PUTS("Failed on "); KDEBUG_HEX32(get_current_tcb()->info.pid);
+    KDEBUG_PUTS(" ");
+    KDEBUG_PUTS(get_current_tcb()->info.name);
     KDEBUG_PUTS("\n");
 
     VBE_UPDATE_VRAM();

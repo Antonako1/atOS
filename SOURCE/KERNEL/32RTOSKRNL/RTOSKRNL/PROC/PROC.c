@@ -896,6 +896,11 @@ U32 get_uptime_sec(void) {
 TCB *get_focused_task(void) {
     return focused_task;
 }
+
+/**
+ * Message passing, handling and queue management for processes
+ */
+
 void free_message(PROC_MESSAGE *msg) {
     if (!msg) return;
     if(msg->data_provided && msg->data) {

@@ -36,6 +36,11 @@ Function table:
 void putc(U8 c);
 void puts(U8 *str);
 
+
+// Executes a batsh shell command
+// cmd: Command string
+void sys(PU8 cmd);
+
 /**
  * Supports
  * 
