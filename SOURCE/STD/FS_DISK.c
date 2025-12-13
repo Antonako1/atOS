@@ -253,10 +253,10 @@ FILE * FOPEN(PU8 path, FILEMODES mode) {
     file->mode = mode;
     file->read_ptr = 0;
     file->sz = 0;
+    file->data = NULLPTR;   
 
     const BOOLEAN iso = (mode & MODE_ISO9660) != 0;
     const BOOLEAN fat = (mode & MODE_FAT32) != 0;
-
     if (iso) {
         IsoDirectoryRecord *ent = READ_ISO9660_FILERECORD(path);
         if (!ent) goto failure;
