@@ -56,8 +56,11 @@ typedef struct _ATRCFD {
 //  No need to free anything unless told otherwise
 
 // file handling
+
+// Create a new instance of ATRCFD and parse the file
 PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode); // Free with DESTROY_ATRCFD()
 BOOL READ_ATRCFD(PATRC_FD fd, PU8 filepath, READMODES mode); // Free with DESTROY_ATRCFD()
+
 VOID DESTROY_ATRCFD(PATRC_FD fd);
 VOID SET_WRITECHECK(PATRC_FD fd, BOOL writecheck);
 VOID SET_AUTOSAVE(PATRC_FD fd, BOOL autosave);
@@ -109,7 +112,12 @@ BOOL ATRC_TO_BOOL(PU8 val); // Accepts: TRUE, 1, ON, FALSE, 0, 0FF. case-insensi
 #include <STD/MEM.h>
 #include <STD/STRING.h>
 #include <STD/FS_DISK.h>
-
+#ifdef ATRC_DEBUG
+#include <STD/DEBUG.h>
+#define DEBUG_PRINTF(...) DEBUG_PRINTF(__VA_ARGS__)
+#else
+#define DEBUG_PRINTF(...)
+#endif
 /* --------- Helper: find key_value by name ---------- */
 PKEY_VALUE GET_KEY_VALUE(PKEY_VALUE_ARR arr, PU8 name) {
     if(!arr || !name) return NULLPTR;
@@ -166,8 +174,28 @@ PU8 PARSE_VALUE(PU8 val, PKEY_VALUE_ARR vars) {
                 MFree(out);
                 return NULLPTR;
             }
+
             for(U32 k = 0; k < nlen; k++) name[k] = val[i + 1 + k];
             name[nlen] = '\0';
+            
+            if(name[0] == '*') {
+                PU8 tmp = ReAlloc(out, out_pos + nlen + 3);
+                if(!tmp) {
+                    MFree(out);
+                    MFree(name);
+                    return NULLPTR;
+                }
+                out = tmp;
+                out[out_pos++] = '%';
+                for(U32 k = 0; k < nlen; k++) {
+                    out[out_pos++] = name[k];
+                }
+                out[out_pos++] = '%';
+                MFree(name);
+                i = j; // jump past closing %
+                continue; // %*[i]%, add and skip
+            }
+            
             PKEY_VALUE kv = GET_KEY_VALUE(vars, name);
             MFree(name);
             if(!kv || !kv->value) {
@@ -177,7 +205,15 @@ PU8 PARSE_VALUE(PU8 val, PKEY_VALUE_ARR vars) {
             // append variable value
             U32 vlen = STRLEN(kv->value);
             // ensure capacity (naive)
-            out = ReAlloc(out, out_pos + vlen + 256);
+
+            PU8 tmp = ReAlloc(out, out_pos + vlen + 256);
+            if(!tmp) {
+                MFree(out);
+                MFree(name);
+                return NULLPTR;
+            }
+            out = tmp;
+
             for(U32 k = 0; k < vlen; k++) out[out_pos++] = kv->value[k];
             i = j; // jump past closing %
             continue;
@@ -188,6 +224,7 @@ PU8 PARSE_VALUE(PU8 val, PKEY_VALUE_ARR vars) {
 
     out[out_pos] = '\0';
     str_trim(out);
+    DEBUG_PRINTF("Parsed value: '%s'\n", out);
     return out;
 }
 
@@ -224,7 +261,11 @@ BOOL ADD_KEY_VALUE(PKEY_VALUE_ARR arr, PU8 name, PU8 value) {
     PKEY_VALUE kv = MAlloc(sizeof(KEY_VALUE));
     if(!kv) return FALSE;
     kv->name = STRDUP(name);
+    if(!kv->name) { MFree(kv); return FALSE; }
+
     kv->value = STRDUP(value);
+    if(!kv->value) { MFree(kv->name); MFree(kv); return FALSE; }
+
     kv->enum_val = arr->len;
     arr->key_value_pairs[arr->len] = kv;
     arr->len++;
@@ -265,6 +306,8 @@ BOOL ADD_BLOCK(PBLOCK_ARR arr, PU8 name) {
     }
     arr->blocks[arr->len] = b;
     arr->len++;
+    arr->blocks[arr->len - 1]->keys.len = 0;
+    
     return TRUE;
 }
 
@@ -316,143 +359,270 @@ U32 PARSE_PREPROCESSOR_TAG(PU8 line, U32 line_len, PREPROC_DATA *data_out) {
 /* ---------------- PARSE_ATRC -----------------
    Parses the file pointed by fd->filepath into fd->vars and fd->blocks.
 */
-BOOL PARSE_ATRC(PATRC_FD fd) {
-    if(!fd || !fd->filepath) return FALSE;
+BOOL PARSE_ATRC(PATRC_FD fd)
+{
+    if (!fd || !fd->filepath)
+        return FALSE;
+
     PBLOCK_ARR blocks = &fd->blocks;
     PKEY_VALUE_ARR vars = &fd->vars;
-    BOOL res = FALSE;
+    BOOL result = FALSE;
+    FILE *file = NULL;
 
-    // initialize arrays
     blocks->len = 0;
     vars->len = 0;
 
-    if(!ADD_BLOCK(blocks, " ")) return res; // blockless keys live in block named single-space
+    /* Create blockless block " " */
+    DEBUG_PRINTF("Creating default block\n");
+    if (!ADD_BLOCK(blocks, " "))
+        return FALSE;
+
     PBLOCK current_block = blocks->blocks[0];
 
     U8 line[1024];
-
-    FILE *file = FOPEN(fd->filepath, MODE_FR);
-    if(!file) return FALSE;
+    DEBUG_PRINTF("Opening ATRC file: %s\n", fd->filepath);
+    file = FOPEN(fd->filepath, MODE_FR);
+    if (!file)
+        goto fail;
 
     BOOL in_raw_string = FALSE;
-    U8 raw_str_buffer[4096] = { 0 };
+    BOOL raw_into_var = FALSE;            // true => write into vars, false => write into current block keys
+    U8 raw_key_name[256] = {0};
+    U8 raw_buffer[4096];
     U32 raw_len = 0;
-    U32 ln = 0;
+    BOOL have_raw_target = FALSE;         // whether we currently have a %name% target to append into
 
-    while(FILE_GET_LINE(file, line, sizeof(line))) {
+    U32 ln = 0;
+    DEBUG_PRINTF("Starting to parse ATRC file: %s\n", fd->filepath);
+    while (FILE_GET_LINE(file, line, sizeof(line)))
+    {
         ln++;
         str_trim(line);
         U32 len = STRLEN(line);
-        if(ln == 1 && STRICMP(line, "#!ATRC") != 0) {
-            // not an ATRC file
-            goto error;
+        DEBUG_PRINTF("ATRC: Line %d: '%s'\n", ln, line);
+        /* First line must be #!ATRC */
+        if (ln == 1) {
+            if (STRICMP(line, "#!ATRC") != 0)
+                goto fail;
+            continue;
         }
-        if(len == 0) continue;
 
-        // preprocessor / comments
-        if(line[0] == '#') {
-            if(line[1] == '.') {
+        if (len == 0) {
+            /* If inside raw mode, preserve empty lines as single newline */
+            if (in_raw_string && have_raw_target) {
+                if (raw_len + 1 >= sizeof(raw_buffer)) goto fail;
+                raw_buffer[raw_len++] = '\n';
+                raw_buffer[raw_len] = '\0';
+            }
+            continue;
+        }
+
+        /* ============================
+           PREPROCESSOR / COMMENTS
+        ============================ */
+        if (line[0] == '#') {
+            if (line[1] == '.') {
                 PREPROC_DATA dt = {0};
                 U32 ptype = PARSE_PREPROCESSOR_TAG(line, len, &dt);
-                if(ptype == PREPROC_INCLUDE) {
-                    // include file (recursively parse)
+
+                if (ptype == PREPROC_INCLUDE) {
+                    /* Recursively parse include */
                     PU8 oldpath = fd->filepath;
                     fd->filepath = dt.include_file;
-                    BOOL pr = PARSE_ATRC(fd);
+                    BOOL ok = PARSE_ATRC(fd);
                     fd->filepath = oldpath;
                     MFree(dt.include_file);
-                    if(!pr) goto error;
-                    continue;
-                } else if(ptype == PREPROC_RAW_STR_KEY || ptype == PREPROC_RAW_STR_VAR) {
-                    // enter raw string mode
-                    in_raw_string = TRUE;
-                    raw_len = 0;
-                    // record whether next assignments go to key or var
-                    // store in a small flag in fd? Simpler: keep ptype in local static? We'll implement direct parsing below by using in_raw_string and current target
-                    // For simplicity, we will handle raw strings inline in next lines (the directive will be followed by lines giving a name=value and we treat until .ER)
-                    // In this minimal implementation we'll treat raw block lines until .ER: each non-empty line appended into current raw buffer under same key name.
-                    // (A fuller implementation would parse the immediate next assignment's left side as name.)
-                    // To keep simplicity, we just skip: real-life files in your examples use direct pattern ".SR VAR" then %name%=value lines until .ER.
-                    // We'll rely on normal parsing to handle lines inside raw string (no special handling needed here).
-                    continue;
-                } else if(ptype == PREPROC_RAW_STR_END) {
-                    in_raw_string = FALSE;
-                    continue;
-                } else {
+                    if (!ok) goto fail;
                     continue;
                 }
-            } else {
-                // normal comment
+                else if (ptype == PREPROC_RAW_STR_KEY || ptype == PREPROC_RAW_STR_VAR) {
+                    /* Begin raw string mode */
+                    in_raw_string = TRUE;
+                    raw_len = 0;
+                    raw_buffer[0] = '\0';
+                    have_raw_target = FALSE;
+                    raw_into_var = (ptype == PREPROC_RAW_STR_VAR);
+                    /* dt does not carry a name in your parser; the first %name%=value inside block provides it. */
+                    continue;
+                }
+                else if (ptype == PREPROC_RAW_STR_END) {
+                    if (!in_raw_string) goto fail;
+
+                    /* Finalize current raw target (if any) */
+                    if (have_raw_target) {
+                        raw_buffer[raw_len] = '\0';
+                        if (raw_into_var) {
+                            if (!ADD_KEY_VALUE(vars, raw_key_name, raw_buffer)) goto fail;
+                        } else {
+                            if (!ADD_KEY_VALUE(&current_block->keys, raw_key_name, raw_buffer)) goto fail;
+                        }
+                        have_raw_target = FALSE;
+                    }
+
+                    in_raw_string = FALSE;
+                    continue;
+                }
+
+                /* other preprocessor tags ignored */
                 continue;
             }
+
+            /* Normal comment -> ignore */
+            continue;
         }
 
-        // line parsing: choose by leading char
-        CHAR first = line[0];
-        if(first == '%') {
-            // variable assignment: %name%=value
-            PU8 equ = STRCHR(line, '=');
-            if(!equ) goto error;
-            // find closing % for name
-            PU8 first_pct = STRCHR(line, '%');
-            if(!first_pct) goto error;
+        /* ============================
+           RAW STRING MODE
+        ============================ */
+        if (in_raw_string) {
+            /* If line starts with '%' treat it as %name%=value and switch target */
+            if (line[0] == '%') {
+                /* If we already had a target, finalize it first */
+                if (have_raw_target) {
+                    raw_buffer[raw_len] = '\0';
+                    if (raw_into_var) {
+                        if (!ADD_KEY_VALUE(vars, raw_key_name, raw_buffer)) goto fail;
+                    } else {
+                        if (!ADD_KEY_VALUE(&current_block->keys, raw_key_name, raw_buffer)) goto fail;
+                    }
+                    /* Reset raw buffer for new target */
+                    raw_len = 0;
+                    raw_buffer[0] = '\0';
+                    have_raw_target = FALSE;
+                }
+
+                /* Parse %name%=value */
+                PU8 first_pct = line + 0;
+                PU8 second_pct = STRCHR(first_pct + 1, '%');
+                if (!second_pct) goto fail;
+                *second_pct = '\0';
+                PU8 name = first_pct + 1;
+
+                PU8 eq = STRCHR(second_pct + 1, '=');
+                if (!eq) goto fail;
+                PU8 value_str = eq + 1;
+
+                PU8 parsed = PARSE_VALUE(value_str, vars);
+                if (!parsed) goto fail;
+
+                /* Start new raw target with parsed as initial content */
+                STRNCPY(raw_key_name, name, sizeof(raw_key_name));
+                raw_key_name[sizeof(raw_key_name)-1] = '\0';
+
+                U32 p_len = STRLEN(parsed);
+                if (p_len >= sizeof(raw_buffer)) { MFree(parsed); goto fail; }
+                MEMCPY(raw_buffer, parsed, p_len);
+                raw_len = p_len;
+                raw_buffer[raw_len] = '\0';
+
+                have_raw_target = TRUE;
+                MFree(parsed);
+                continue;
+            }
+
+            /* Otherwise append this line + newline to current raw buffer */
+            if (!have_raw_target) {
+                /* stray text inside raw block before a %name%=value is an error */
+                goto fail;
+            }
+
+            U32 l = STRLEN(line);
+            if (raw_len + l + 2 >= sizeof(raw_buffer)) goto fail;
+            /* append newline then the line (preserve separation shown in example) */
+            raw_buffer[raw_len++] = '\n';
+            MEMCPY(raw_buffer + raw_len, line, l);
+            raw_len += l;
+            raw_buffer[raw_len] = '\0';
+            continue;
+        }
+
+        /* ============================
+           VARIABLE ASSIGNMENT  %name%=value
+           (normal non-raw-mode variables)
+        ============================ */
+        if (line[0] == '%') {
+            DEBUG_PRINTF("Parsing variable assignment line: %s\n", line);
+            PU8 first_pct = line + 0;
             PU8 second_pct = STRCHR(first_pct + 1, '%');
-            if(!second_pct || second_pct > equ) goto error;
+            if (!second_pct) goto fail;
+
             *second_pct = '\0';
             PU8 name = first_pct + 1;
-            PU8 valstr = equ + 1;
-            PU8 parsed = PARSE_VALUE(valstr, vars);
-            if(!parsed) goto error;
-            if(!ADD_KEY_VALUE(vars, name, parsed)) {
+
+            PU8 eq = STRCHR(second_pct + 1, '=');
+            if (!eq) goto fail;
+
+            PU8 value_str = eq + 1;
+            PU8 parsed = PARSE_VALUE(value_str, vars);
+            if (!parsed) goto fail;
+
+            if (!ADD_KEY_VALUE(vars, name, parsed)) {
                 MFree(parsed);
-                goto error;
+                goto fail;
             }
             MFree(parsed);
             continue;
         }
 
-        if(first == '[') {
-            PU8 close = STRRCHR(line, ']');
-            if(!close) goto error;
-            *close = '\0';
-            PU8 start = &line[1];
-            if(!ADD_BLOCK(blocks, start)) goto error;
+        /* ============================
+           BLOCK HEADER  [block]
+        ============================ */
+        if (line[0] == '[') {
+            DEBUG_PRINTF("Parsing block header line: %s\n", line);
+            PU8 end = STRRCHR(line, ']');
+            if (!end) goto fail;
+            *end = '\0';
+            PU8 block_name = line + 1;
+
+            if (!ADD_BLOCK(blocks, block_name)) goto fail;
             current_block = blocks->blocks[blocks->len - 1];
             continue;
         }
 
-        // otherwise a key assignment in current block: key=val
+        /* ============================
+           NORMAL KEY = VALUE
+        ============================ */
         {
-            PU8 equ = STRCHR(line, '=');
-            if(!equ) goto error;
-            *equ = '\0';
+            DEBUG_PRINTF("Parsing key/value line: %s\n", line);
+            PU8 eq = STRCHR(line, '=');
+            if (!eq) goto fail;
+
+            *eq = '\0';
             PU8 key = line;
-            PU8 valstr = equ + 1;
-            PU8 parsed = PARSE_VALUE(valstr, vars);
-            if(!parsed) goto error;
-            if(!ADD_KEY_VALUE(&current_block->keys, key, parsed)) {
+            PU8 value_str = eq + 1;
+            PU8 parsed = PARSE_VALUE(value_str, vars);
+            if (!parsed) goto fail;
+            DEBUG_PRINTF("Adding key '%s' with value '%s' to block '%s'\n", key, parsed, current_block->name);
+            if (!ADD_KEY_VALUE(&current_block->keys, key, parsed)) {
                 MFree(parsed);
-                goto error;
+                goto fail;
             }
             MFree(parsed);
             continue;
         }
-    }
+    } /* end reading file */
 
-    // success
-    res = TRUE;
+    /* If we exited file while still in raw mode, that's an error */
+    if (in_raw_string) goto fail;
+
+    result = TRUE;
+    DEBUG_PRINTF("Successfully parsed ATRC file: %s\n", fd->filepath);
     goto done;
 
-error:
-    res = FALSE;
+fail:
+    DEBUG_PRINTF("Failed to parse ATRC file: %s\n", fd->filepath);
+    result = FALSE;
     DESTROY_ATRCFD(fd);
+
 done:
-    FCLOSE(file);
-    return res;
+    if (file) FCLOSE(file);
+    file = NULLPTR;
+    return result;
 }
 
 /* ---------------- CREATE/READ/DESTROY ATC ----------------- */
 PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode) {
+    DEBUG_PRINTF("Create atrcfd for file: %s\n", filepath);
     PATRC_FD fd = MAlloc(sizeof(ATRCFD));
     if(!fd) return NULLPTR;
     fd->filepath = NULLPTR;
@@ -461,7 +631,6 @@ PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode) {
     fd->writecheck = FALSE;
     fd->blocks.len = 0;
     fd->vars.len = 0;
-
     if(!READ_ATRCFD(fd, filepath, mode)) {
         DESTROY_ATRCFD(fd);
         return NULLPTR;
@@ -469,12 +638,15 @@ PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode) {
     return fd;
 }
 BOOL READ_ATRCFD(PATRC_FD fd, PU8 filepath, READMODES mode) {
-    if(!fd || !filepath) return FALSE;
+    DEBUG_PRINTF("Reading atrcfd for file: %s\n", filepath);
+    if(!filepath) return FALSE;
+    if(!fd) CREATE_ATRCFD(filepath, mode);
     if(fd->filepath) { MFree(fd->filepath); fd->filepath = NULLPTR; }
     fd->filepath = STRDUP(filepath);
     fd->mode = mode;
     fd->blocks.len = 0;
     fd->vars.len = 0;
+    DEBUG_PRINTF("Parsing ATRC file: %s\n", fd->filepath);
     return PARSE_ATRC(fd);
 }
 VOID DESTROY_ATRCFD(PATRC_FD fd) {
