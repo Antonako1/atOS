@@ -9,20 +9,15 @@ Files in this directory are compiled using KERNEL defines and flags, trying to c
 
 ## Directory Structure
 
+- `FPU/`: Contains code for initializing and managing the FPU (Floating Point Unit).
 - `GDT/`: Contains code for setting up the Global Descriptor Table (GDT) for memory segmentation.
 - `IDT/`: Contains code for setting up the Interrupt Descriptor Table (IDT)
-- `TSS/`: Contains code for setting up the Task State Segment (TSS) for task management. Not implemented yet.
-- `SYSCALL/`: Contains code for handling system calls from user-space applications.
-- `ISR/`: Contains code for handling Interrupt Service Routines (ISRs) and dispatching them to appropriate handlers.
+- `INTERRUPT/`: Contains code for handling CPU interrupts and exceptions.
 - `IRQ/`: Contains code for handling hardware interrupts (IRQs).
+- `ISR/`: Contains code for handling Interrupt Service Routines (ISRs) and dispatching them to appropriate handlers.
 - `PIC/`: Contains code for programming the Programmable Interrupt Controller (PIC).
+- `PIT/`: Contains code for programming the PIT.
 - `STACK/`: Contains code for setting up stack. Not in use...
-
-## Notes on recent changes
-
-- ISR dispatch now explicitly routes `int 0x80` to the syscall dispatcher when `__RTOS__` is defined. The syscall return value is written back to `EAX`.
-- Default handlers are pre-registered for all IDT entries; IRQ vectors (0x20–0x2F) are wired to `irq_common_handler`, while exception vectors route to `isr_common_handler` unless specialized handlers are installed.
-- New exception helpers added:
-  - Divide error, NMI, invalid opcode, double fault, and FPU exceptions call into `panic_reg`/`panic` with clear messages.
-  - Page fault handler reads `CR2`, decodes error bits, and overlays fault info via VBE drawing before halting.
-- A dedicated `isr_syscall` assembly stub is provided for system calls and is installed at vector `0x80`.
+- `SYSCALL/`: Contains code for handling system calls from user-space applications.
+- `TSS/`: Contains code for setting up the Task State Segment (TSS) for task management. Not implemented yet.
+- `YIELD/`: Contains code for yielding CPU control between tasks.

@@ -1,3 +1,10 @@
+/*+++
+    SOURCE/STD/BINARY.h - Some ease-of-life binary macros
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef BINARY_H
 #define BINARY_H
 

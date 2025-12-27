@@ -1,3 +1,10 @@
+/*+++
+    SOURCE/STD/ASM.h - Incline assembly functions, macros and definitions
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef STD_ASM_H
 #define STD_ASM_H
 

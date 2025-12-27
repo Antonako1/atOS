@@ -4,6 +4,7 @@ A simple shell program for the atOS operating system.
 It provides a command-line interface for users to interact with the system, execute commands, and manage files.
 
 ## Features
+
 - Command execution
 - File management
 - Basic scripting capabilities
@@ -54,3 +55,4 @@ It provides a command-line interface for users to interact with the system, exec
 - Intended for **educational and development purposes**, not a production-grade shell.
 - Some operations may directly affect system stability or memory.
 - Always use caution when executing system-level commands.
+- For process handling information, see [PROC_COM.md](../../../DOCS/PROC_COM.md).

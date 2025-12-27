@@ -26,7 +26,11 @@ void _start(U32 argc, PPU8 argv) {
     PROC_INIT_CONSOLE();
     #endif
     U32 timeout = U32_MAX;
+    #ifdef RUNTIME_GUI
+    while(!IS_PROC_GUI_INITIALIZED()) {
+    #else
     while (!IS_PROC_INITIALIZED()) {
+    #endif
         if(timeout-- == 0) {
             DEBUG_PRINTF("[RUNTIME] Process initialization timed out!\n");
             EXIT(-1);

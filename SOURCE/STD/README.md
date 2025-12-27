@@ -1,24 +1,34 @@
-# atOS Standard Library for NASM and C
+# atOS Standard Library for C
 
+- ARG.h
+    - ... support as function argument
 - ASM.h
-    - 
-
+    - Assembly functions and definitions
+- ASSERT.h
+    - Assert support
+- AUDIO
+    - Audio driver usage
+- BINARY.h
+    - Binary macros
+- BITMAP
+    - Bitmap (not the image format) functions
+- DEBUG
+    - COM1 debug log functions
+- FS_DISK
+    - Filesystem and raw disk functions (FAT32, ISO9660, ATA[PI|PIIX3|PIO])
+- GRAPHICS
+    - Raw graphics drawing via VBE driver
+- IO
+    - User process IO (Print to shell, keyboard and mouse usage)
+- MATH
+    - Basic math functions
+- MEM
+    - Memory functions such as MAlloc, MFree, MEMZERO, MEMCPY etc.
+- PROC_COM
+    - Inter process communication and process information fetching
+- STRING
+    - String handling
+- TIME
+    - System time fetching and time calculating
 - TYPEDEF.h
-    - 
-
-- CPU_IO.inc
-    - 
-- LOGICAL_COMPARISON.inc
-    - 
-
-- MATH.h
-    - 
-
-- MEM.h
-    - 
-
-- STACK.inc
-    - 
-
-- STDIO.h
-    - 
+    - atOS type definitions.

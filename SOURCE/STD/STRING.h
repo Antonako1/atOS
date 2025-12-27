@@ -1,3 +1,10 @@
+/*+++
+    SOURCE/STD/STRING.h - String handling
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef STRING_H
 #define STRING_H
 

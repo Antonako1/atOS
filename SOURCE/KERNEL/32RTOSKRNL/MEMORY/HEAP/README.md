@@ -1,12 +1,9 @@
 # HEAP Memory Management
 
-HEAP in atOS-RT is a dynamic memory allocation system used by the kernel and processes to allocate and free memory at runtime. It is built on top of the page frame allocator and provides a more flexible way to manage memory compared to static allocation.
+HEAP memory management in the 32RTOS kernel is responsible for all dynamic memory allocations requested by the kernel and its subsystems, such as drivers, programs and libraries.
 
-## Overview
+The HEAP module provides functions to allocate, free memory blocks of varying sizes and of various alignment requirements. It manages a large contiguous memory region reserved for dynamic allocations, typically referred to as the "kernel heap pool/kmalloc pool".
 
-Every process (including the kernel) allocates its own memory from KHEAP (Kernel HEAP). The kernel heap is initialized during the kernel startup and is used for dynamic memory allocations within the kernel space.
+The "KERNEL" name is misleading, as this HEAP is used by the entire operating system, including user processes via system calls.
 
-## Components
-
-- **KHEAP.h**: Kernel heap management
-- **KHEAP.c**: Implementation of kernel heap functions
+Memory allocated in the HEAP can freely be shared between the whole operating system, including user processes, drivers etc.

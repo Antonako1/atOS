@@ -1,3 +1,10 @@
+/*+++
+    SOURCE/STD/DEBUG.h - COM1 debug logging
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef STD_DEBUG_H
 #define STD_DEBUG_H
 

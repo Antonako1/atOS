@@ -120,6 +120,10 @@ VOID SYS_RESTART();
  * SHELLCOM
  */
 
+/*
+Please note that if process is created with shell, parent pid will always be your shell.
+It is recommended that if you create a process inside your own program, the parent would be the shell
+*/
 BOOLEAN START_PROCESS(
     U8 *proc_name, 
     VOIDPTR file, 

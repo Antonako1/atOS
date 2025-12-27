@@ -1,6 +1,12 @@
+/*+++
+    SOURCE/STD/AUDIO.h - AC97 audio driver functions
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef AUDIO_H
 #define AUDIO_H
-#include <CPU/SYSCALL/SYSCALL.h>
 #include <STD/TYPEDEF.h>
 
 // Plays a simple tone using AC97 driver

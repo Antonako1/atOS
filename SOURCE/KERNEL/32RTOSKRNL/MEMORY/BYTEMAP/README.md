@@ -1,10 +1,11 @@
-#ifndef BYTEMAP_H
-#define BYTEMAP_H
+# BYTEMAP - Byte-level Memory Bitmap management
 
-#include <STD/TYPEDEF.h>
-#include <MEMORY/PAGEFRAME/PAGEFRAME.h>
+This module implements a byte-level memory bitmap for tracking memory usage in the atOS. Unlike traditional bitmaps that use one bit per page, this byte-level bitmap uses one byte per page, allowing for more granular tracking of memory states.
 
-// These are defined here to fix compiler issues with circular includes
+This is needed for because of how the memory is paged. Please see the PAGING module readme for more details.
+
+Here is the enum definition for the different page states.
+```c
 typedef enum PageState {
     PS_FREE        = 0, // Free page
     PS_ALLOC       = 1, // Allocated by the allocator
@@ -22,18 +23,5 @@ typedef enum PageState {
     PS_ALIB = 11, // Allocated library page
     PS_RLIB = 8, // Reserved library page
 } PageState;
+```
 
-// Maximum BYTEMAP size to handle up to 4GB of RAM with 4KB pages
-#define TOTAL_PAGES (0x100000000 / 0x1000) // 4GB / 4KB
-#define MAX_BYTEMAP_SIZE (TOTAL_PAGES)
-
-typedef struct {
-    U8 *data;
-    U32 size; // in bytes
-} BYTEMAP;
-
-VOID BYTEMAP_CREATE(U32 size, VOIDPTR buff_addr, BYTEMAP *bm);
-PageState BYTEMAP_GET(BYTEMAP *bm, U32 index);
-BOOLEAN BYTEMAP_SET(BYTEMAP *bm, U32 index, PageState state);
-
-#endif // BYTEMAP_H

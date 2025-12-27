@@ -1,5 +1,5 @@
 /*+++
-    SOURCE/STD/STDINT.h - Minimum definitions for atOS
+    SOURCE/STD/TYPEDEF.h - Minimum type definitions for atOS
 
     Part of atOS
 
@@ -8,6 +8,16 @@
 #ifndef TYPEDEF_H
 #define TYPEDEF_H
 
+/**
+ * Ease of life attribute definitions
+ * 
+ * If you create a static variable in your source files global scope
+ * 
+ * static U8 internal_state = 0;
+ * 
+ * It is recommended to add ATTRIB_DATA so it will be included inside the .data section,
+ * otherwise it can appear in the .bss section, which might point to some location outside the binary bounds and corrupt memory!
+ */
 #define ATTRIB_DATA __attribute__((section(".data")))
 #define ATTRIB_RODATA __attribute__((section(".rodata")))
 #define ATTRIB_CODE __attribute__((section(".text")))

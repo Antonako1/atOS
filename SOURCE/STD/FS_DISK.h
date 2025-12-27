@@ -1,8 +1,10 @@
-/**
- * @file FS_DISK.h
- * @author Antonako1
- * @brief Filesystem and Disk IO functions
- */
+/*+++
+    SOURCE/STD/FS_DISK.h - Filesystem and disk reading/writing
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef STD_FS_DISK_H
 #define STD_FS_DISK_H
 
