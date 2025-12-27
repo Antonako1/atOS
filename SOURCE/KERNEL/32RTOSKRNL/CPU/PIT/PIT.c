@@ -99,7 +99,9 @@ U32 *PIT_GET_HZ_PTR() {
     return &hz;
 }
 
-
+void SCHEDULER_YIELD(void) {
+    isr_pit();  
+}
 
 __attribute__((naked)) void isr_pit(void) {
     asm volatile(

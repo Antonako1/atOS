@@ -28,6 +28,7 @@ REMARKS
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <DRIVERS/VIDEO/VBE.h>
 #include <CPU/PIC/PIC.h>
+#include <CPU/YIELD/YIELD.h>
 #include <RTL8139/RTL8139.h>
 static ISRHandler g_Handlers[IDT_COUNT] __attribute__((section(".data"))) = { 0 };
 #else // __RTOS__
@@ -167,6 +168,9 @@ void isr_dispatch_c(int vector, U32 errcode, regs *regs_ptr) {
         U32 a5 = regs_ptr->edi;
         U32 ret = syscall_dispatcher(syscall_num, a1, a2, a3, a4, a5);
         regs_ptr->eax = ret; // Return value in eax
+        return;
+    }else if (vector == YIELD_VECTOR) {
+        yield_handler(vector, errcode);
         return;
     }
     
