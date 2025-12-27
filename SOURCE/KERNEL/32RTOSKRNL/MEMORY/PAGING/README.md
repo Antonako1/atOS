@@ -7,14 +7,15 @@ This directory contains the implementation of the paging mechanism in atOS-RT. P
 This is a simple 32-bit, single-level paging implementation with basic process isolation.
 It provides ring0 paging for atOS-RT.
 
-Kernel is linked to 0x100000 and identity-mapped there. It has the ownership of all memory
+Kernel is linked to 0x100000 (1MiB) and identity-mapped there. It has the ownership of all memory
 
-"User programs" aka processes are linked to 0x10000000
+"User programs" aka processes are linked to 0x10000000 (256MiB)
     but mapped to anywhere in physical memory in the following region: `0x10000000`-`0x20000000`.
     The copying of the pagedirectories goes something like this
+
 ```sh
 # NOTE: These memory regions are as of writing and may be changed as of reading
-# Every bit of memory is mapped for kernel
+# Every bit of memory is mapped into the kernel space
 `0x00000000`-`0x00100000` - Miscellaneous 
 `0x00100000`-`0x00550000` - Kernel image
 `0x00550000`-`0x08550000` - Kernel heap
@@ -25,7 +26,7 @@ Kernel is linked to 0x100000 and identity-mapped there. It has the ownership of 
 0x20000000 - Start of user library memory
 
 # Let's say you run a process. A memory region of 0x10040000-0x1004A000 is allocated for your process
-# Kernel mappings for memory are first copied into the process, so it looks like the kernel map
+# Kernel mappings for memory are first copied into the process, so it looks precisely like the kernel map
 0x00000000 - Miscellaneous 
 0x00100000 - Kernel image
 0x00550000 - Kernel heap

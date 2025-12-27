@@ -1429,9 +1429,7 @@ VOID SETUP_BATSH_PROCESSER() {
     SET_VAR("PATH", 
         #include <ATOSH.PATH>
     );
-    SET_VAR("HOME", "/HOME");
-    SET_VAR("DOCS", "/HOME/DOCS");
-    SET_VAR("CD", "/HOME/DOCS");
+    #include <ENV.VARS>
 }
 
 

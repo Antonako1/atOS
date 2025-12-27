@@ -1,3 +1,10 @@
+/*+++
+    SOURCE/STD/ARG.h - VA_LIST support
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef STDARG_H
 #define STDARG_H
 

@@ -1,6 +1,3 @@
-CMOS to STD/TIME
-PROC_COM RTC update ticks
-
 Panic TCB info
 
 Bitmap image support

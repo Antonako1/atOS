@@ -52,6 +52,15 @@ void sys(PU8 cmd);
  */
 VOID printf(PU8 fmt, ...);
 
+/*
+Usage:
+KP_DATA* kp = get_latest_keypress();
+if(valid_kp(kp)) {
+    // Handle new keypress
+
+    update_kp_seq(kp);
+}
+*/
 KP_DATA *get_kp_data();
 KEYPRESS *get_last_keypress();
 KEYPRESS *get_latest_keypress();
@@ -59,4 +68,6 @@ KEYPRESS *get_latest_keypress_unconsumed();
 MODIFIERS *get_modifiers();
 U32 get_kp_seq();
 U8 keypress_to_char(U32 kcode);
+VOID update_kp_seq(KP_DATA *kp);
+BOOLEAN valid_kp(KP_DATA *kp);
 #endif // IO_H

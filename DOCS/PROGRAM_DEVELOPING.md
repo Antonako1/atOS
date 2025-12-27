@@ -7,6 +7,8 @@ There are two folders that should interest you:
  1. `SOURCES/PROGRAMS`
  2. `SOURCES/PROGRAMS/SYS_PROGS`
 
+### First option: Creating your own program folder
+
 The first option uses CMake to compile your program into its own folder inside `/PROGRAMS/<PROGNAME>/`
 
 This is as simple as:
@@ -101,7 +103,8 @@ set(CompArgs
     -D__PROCESS__
     -D__UP__
     -D__${ProgramName}__
-    
+    # Add this flag to enable GUI runtime features
+    # -DRUNTIME_GUI
     -w
     
     -m32

@@ -1,5 +1,6 @@
 /**
  * Define ATRC_IMPLEMENTATION in atleast one source file to use
+ * Define ATRC_DEBUG to enable debug prints into log file.
  */
 #ifndef ATRC_H
 #define ATRC_H

@@ -92,10 +92,12 @@ Download from the [official QEMU website](https://www.qemu.org/download/#windows
 ```bash
   # Creates a hard disk image.
 	qemu-img create -f raw hdd.img 256M   
-
+  # Creates folder for the debug.log
 	mkdir -p OUTPUT/DEBUG
+ # Creates your hard disk image
 	qemu-img create -f raw hdd.img 256M
-	mkdir -p OUTPUT/DEBUG
+ 
+ # Runs the ISO file
 	qemu-system-i386 -vga std \
 	-m 1024 \
 	-boot order=d \
@@ -170,9 +172,9 @@ Planned and in-progress features for atOS:
 * [X] Multitasking and scheduling
 * [X] Shell environment for interacting with the system
 * [X] Running custom processes via shell
-* [ ] Conf file libary
+* [X] Conf file libary
 * [ ] Text editor
-* [ ] Hex editor/viewer
+* [X] Hex editor/viewer (Only viewer as of now)
 * [ ] Assembler
 * [ ] Dissasembler
 * [ ] Compiler
@@ -183,7 +185,7 @@ Planned and in-progress features for atOS:
 
 ## Documentation
 
-Additional documentation is located in the `DOCS/` folder, as well as inline within source directories and headers.
+Additional documentation is located in the `DOCS/` folder, as well as inline within source directories and headers and in README files found inside each directory!
 
 ---
 

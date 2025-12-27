@@ -1,10 +1,17 @@
- - 8x16 font
-    https://github.com/spacerace/romfont/blob/master/font-headers/toshiba_t5200c_bios_vers_3__2__8x16.h
+ - Spacerace (https://github.com/spacerace)
+   - 8x16 font
+      Thanks to spacerace for the Toshiva T5200C BIOS font header!
+      https://github.com/spacerace/romfont/blob/master/font-headers/toshiba_t5200c_bios_vers_3__2__8x16.h
 
- - Parts of 8x8 font
-    https://gist.github.com/rothwerx/700f275d078b3483509f
+ - Rothwerx (https://gist.github.com/rothwerx)
+   - Parts of 8x8 font
+      Thanks to rothwerx for the abcdefghijlkmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&? characters in his 8x8 font!
+      https://gist.github.com/rothwerx/700f275d078b3483509f
 
- - AC'97 Audio driver
- - Serial port debugging
- - Production worthy shell text rendering
-    https://github.com/retroaalto
+ - Retroaalto (https://github.com/retroaalto)
+   - SCRIPTS/SYNC_UPSTREAM_DEVELOPMENT.sh
+   - AC'97 Audio driver
+   - Serial port debugging
+   - Production worthy shell text rendering
+      Thanks to retroaalto for his atOS contributions!
+      

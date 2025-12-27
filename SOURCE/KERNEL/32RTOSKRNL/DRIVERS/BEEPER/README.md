@@ -1,0 +1,1 @@
+Does not work on modern QEMU. So this is legacy code. Use the AC-97 driver instead.

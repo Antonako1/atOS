@@ -175,17 +175,84 @@ static U8 ___INFO_ARR = FALSE;
 static SHELL_INSTANCE *SHNDL;
 
 void PRIC_INIT_GRAPHICAL() {
-    PROC_INIT_CONSOLE();
-}
-
-void PROC_INIT_CONSOLE() {
     PROC_MESSAGE msg;
     
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_FRAMEBUFFER, NULL, 0, 0);
     SEND_MESSAGE(&msg);
 
-    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_KEYBOARD_EVENTS, NULL, 0, 0);
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_CREATE_STDOUT, NULL, 0, 0);
     SEND_MESSAGE(&msg);
+
+    // Shell focus for now
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_SHELL_FOCUS, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPPID());
+    SEND_MESSAGE(&msg);
+
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_INFO_ARRAYS, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+
+    ___draw_access_granted = FALSE;
+    ___STDOUT_CREATED = FALSE;
+    ___INFO_ARR = FALSE;
+    DEBUG_PRINTF("[PROC_COM] Messages sent succesfully by: %s, pid 0x%x\n", process.info.name, process.info.pid);
+}
+BOOLEAN IS_PROC_GUI_INITIALIZED() {
+    PROC_MESSAGE *msg;
+    while ((msg = GET_MESSAGE()) != NULL) {
+        switch (msg->type) {
+            case PROC_FRAMEBUFFER_GRANTED:
+                ___draw_access_granted = TRUE;
+                break;
+
+            case SHELL_RES_INFO_ARRAYS: {
+                // Expect actual SHELL_INSTANCE contents, not a pointer
+                if (msg->raw_data && msg->raw_data_size == sizeof(SHELL_INSTANCE)) {
+                    SHNDL = (SHELL_INSTANCE*)msg->raw_data;
+                    ___INFO_ARR = TRUE;
+                } else {
+                    SHNDL = NULLPTR;
+                }
+            } break;
+
+            case SHELL_RES_STDOUT_CREATED: {
+                if (msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
+                    stdout = (STDOUT*)msg->raw_data;
+                    ___STDOUT_CREATED = TRUE;
+                } else {
+                    EXIT(U16_MAX);
+                }
+            } break;
+
+            case SHELL_RES_INFO_ARRAYS_FAILED:
+            case SHELL_RES_STDOUT_FAILED:
+                DEBUG_PRINTF("[PROC_COM] Failed to create");
+                DEBUG_PRINTF(msg->type == SHELL_RES_INFO_ARRAYS_FAILED  ?"INFO ARRAY" : "STDOUT");
+                DEBUG_PRINTF("\n");
+                EXIT(U8_MAX);
+                break;
+        }
+
+        FREE_MESSAGE(msg);
+    }
+    // DEBUG_PRINTF("%d, %d, %d, %d\n", ___keyboard_access_granted, ___draw_access_granted, ___STDOUT_CREATED, ___INFO_ARR);
+    // Return TRUE only after all 4 conditions are met
+    return (
+        ___draw_access_granted &&
+        ___STDOUT_CREATED &&
+        ___INFO_ARR
+    );
+}
+
+void PROC_INIT_CONSOLE() {
+    PROC_MESSAGE msg;
+    
+    // msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_FRAMEBUFFER, NULL, 0, 0);
+    // SEND_MESSAGE(&msg);
+
+    // msg = CREATE_PROC_MSG(KERNEL_PID, PROC_GET_KEYBOARD_EVENTS, NULL, 0, 0);
+    // SEND_MESSAGE(&msg);
 
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_CREATE_STDOUT, NULL, 0, 0);
     SEND_MESSAGE(&msg);
@@ -196,8 +263,8 @@ void PROC_INIT_CONSOLE() {
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_INFO_ARRAYS, NULL, 0, 0);
     SEND_MESSAGE(&msg);
 
-    ___keyboard_access_granted = FALSE;
-    ___draw_access_granted = FALSE;
+    // ___keyboard_access_granted = FALSE;
+    // ___draw_access_granted = FALSE;
     ___STDOUT_CREATED = FALSE;
     ___INFO_ARR = FALSE;
     DEBUG_PRINTF("[PROC_COM] Messages sent succesfully by: %s, pid 0x%x\n", process.info.name, process.info.pid);
@@ -252,8 +319,8 @@ BOOLEAN IS_PROC_INITIALIZED() {
     // DEBUG_PRINTF("%d, %d, %d, %d\n", ___keyboard_access_granted, ___draw_access_granted, ___STDOUT_CREATED, ___INFO_ARR);
     // Return TRUE only after all 4 conditions are met
     return (
-        ___keyboard_access_granted &&
-        ___draw_access_granted &&
+        // ___keyboard_access_granted &&
+        // ___draw_access_granted &&
         ___STDOUT_CREATED &&
         ___INFO_ARR
     );

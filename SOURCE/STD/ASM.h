@@ -1,3 +1,10 @@
+/*+++
+    SOURCE/STD/ASM.h - Incline assembly functions, macros and definitions
+
+    Part of atOS
+
+    Licensed under the MIT License. See LICENSE file in the project root for full license information.
+---*/
 #ifndef STD_ASM_H
 #define STD_ASM_H
 
@@ -14,6 +21,7 @@
 #define NOP ASM_VOLATILE("nop")
 #define CLI ASM_VOLATILE("cli")
 #define STI ASM_VOLATILE("sti")
+#define YIELD() ASM_VOLATILE("int $0x81")
 
 /* 
  * Port I/O macros (legacy, kept for compatibility)

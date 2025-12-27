@@ -35,8 +35,9 @@ typedef enum {
 
 
 void PROC_INIT_CONSOLE();
-void PRIC_INIT_GRAPHICAL(); // Same as console for now
+void PRIC_INIT_GRAPHICAL();
 BOOLEAN IS_PROC_INITIALIZED();
+BOOLEAN IS_PROC_GUI_INITIALIZED();
 VOID KILL_SELF();
 VOID START_HALT();
 VOID EXIT(U32 n);
@@ -119,6 +120,10 @@ VOID SYS_RESTART();
  * SHELLCOM
  */
 
+/*
+Please note that if process is created with shell, parent pid will always be your shell.
+It is recommended that if you create a process inside your own program, the parent would be the shell
+*/
 BOOLEAN START_PROCESS(
     U8 *proc_name, 
     VOIDPTR file, 

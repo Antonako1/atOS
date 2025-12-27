@@ -10,9 +10,11 @@ Contains files used by the 32-bit kernel and its entry file
   - Filesystem used by the kernel
 - MEMORY\
   - Memory definitions and functions
-- SYSCALL\
-  - Syscalls
+- DEBUG\
+  - Functions to print data into the debug log file via COM1
+- RTOSKRNL\
+  - Internal RTOSKRNL functions and modules
+- RTOSKRNL.h and KERNEL.h
+  - Includes file for the 32-bit main kernel (RTOSKRNL) and the 32-bit kernel entry stub (KERNEL)
 
-Additional subsystems:
-- `DEBUG/` — Minimal kernel debug I/O helpers (I/O port 0xE9; also mirrors to COM1 when present). See `DOCS/DEBUGGING.md` for QEMU flags and log details.
-- `DRIVERS/AC97/` — AC'97 audio driver initialization and simple playback helpers.
+
