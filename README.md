@@ -16,6 +16,7 @@ As of now, atOS includes shell with custom [shell language](DOCS/BATSH.md), mult
 ## Preview
 
 ![atOS Preview](.github/PREVIEW.png)
+![atOS Graphics Preview](.github/GRAPHICS.png)
 ![atOS Kernel Panic](DOCS/IMAGES/PANIC.png)
 
 ---
