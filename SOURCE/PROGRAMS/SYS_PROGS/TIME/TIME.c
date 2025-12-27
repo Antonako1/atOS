@@ -118,7 +118,7 @@ U32 main(U32 argc, PPU8 argv) {
             PARSE_ARG(argv[i]);
         }
     }
-    
+
     BOOL format_arg_specified = TRUE;
     if(format[0] == '\0') {
         format_arg_specified = FALSE;
