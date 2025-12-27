@@ -1,6 +1,6 @@
 #include <STD/TYPEDEF.h>
 #define ATRC_IMPLEMENTATION
-#define ATRC_DEBUG
+// #define ATRC_DEBUG
 #include <LIBRARIES/ATRC/ATRC.h>
 #include <STD/TIME.h>
 #include <STD/IO.h>
@@ -125,7 +125,7 @@ U32 main(U32 argc, PPU8 argv) {
         STRNCPY(format, FORMAT_DEF, sizeof(format));
     }
     DEBUG_PRINTF("Here I am! Rock you like a hurricane!\n");
-
+    // YIELD();
     time = GET_DATE_TIME();
     if(!format_arg_specified) {
         PATRC_FD fd = CREATE_ATRCFD("/ATOS/CONFS/TIME.CNF", ATRC_READ_WRITE);
