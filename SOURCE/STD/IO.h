@@ -58,7 +58,7 @@ KP_DATA* kp = get_latest_keypress();
 if(valid_kp(kp)) {
     // Handle new keypress
 
-    update_kp_seq(kp);
+    update_kp_seq(kp); // Update sequence number
 }
 */
 KP_DATA *get_kp_data();

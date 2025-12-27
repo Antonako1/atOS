@@ -60,7 +60,8 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     DEBUG_PRINTF("[SHELL %d] Process end acknowledged\n", PROC_GETPID());
     // Restore shell prompt
     PROC_MESSAGE msg;
-    U32 self_pid = GET_SHNDL()->self_pid;
+    SHELL_INSTANCE *shndl = GET_SHNDL();
+    U32 self_pid = shndl->self_pid;
     STDOUT*std = GET_STDOUT(pid);
     // flush framebuffer
     if(std) {
@@ -75,9 +76,13 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     DELETE_STDOUT(pid);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, 0, 0, pid);
     SEND_MESSAGE(&msg);
+    
     // Return focus to shell
-    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, self_pid);
-    SEND_MESSAGE(&msg);
+    if(shndl->focused_pid == pid) {
+        msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, self_pid);
+        SEND_MESSAGE(&msg);
+    }
+
     if(!end_proc) PUT_SHELL_START();
     U8 buf[32];
     ITOA_U(exit_code, buf, 10);

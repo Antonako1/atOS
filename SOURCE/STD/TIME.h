@@ -26,6 +26,7 @@ U32 GET_DAY_OF_MONTH(RTC_DATE_TIME *dt);  // 1-31
 U32 GET_MONTH(RTC_DATE_TIME *dt);         // 1-12
 U32 GET_YEAR(RTC_DATE_TIME *dt);          // 0-99
 U32 GET_CENTURY(RTC_DATE_TIME *dt);       // e.g., 19, 20
+VOID FORMATTED_DATE_TIME_STRING(PU8 buf, RTC_DATE_TIME *dt); // Formats dd/mm/yyyy, hh:mm:ss. minimum len is 21
 
 // Time difference utilities (32-bit safe)
 U32 SECONDS_PASSED(RTC_DATE_TIME *dt1, RTC_DATE_TIME *dt2);
@@ -55,5 +56,6 @@ void SUBTRACT_MONTHS(RTC_DATE_TIME *dt, U32 months);
 
 void ADD_YEARS(RTC_DATE_TIME *dt, U32 years);
 void SUBTRACT_YEARS(RTC_DATE_TIME *dt, U32 years);
+
 
 #endif // STD_TIME_H

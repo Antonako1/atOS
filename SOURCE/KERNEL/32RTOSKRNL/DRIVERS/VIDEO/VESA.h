@@ -59,6 +59,9 @@ external definitions
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 768
 
+#define SCREEN_CENTER_X (SCREEN_WIDTH/2)
+#define SCREEN_CENTER_Y (SCREEN_HEIGHT/2)
+
 /* Foreground/Background colors */
 #define COLOR_GREEN_ON_BLACK 0x0A
 

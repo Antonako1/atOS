@@ -105,6 +105,6 @@ VOID update_kp_seq(KP_DATA *kp) {
 }
 
 BOOLEAN valid_kp(KP_DATA *kp) {
-    if(!kp) return FALSE;
-    return (prev_seq != kp->seq);
+    if(kp) return TRUE;
+    return FALSE;
 }

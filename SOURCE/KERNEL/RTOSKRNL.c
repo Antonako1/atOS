@@ -14,7 +14,7 @@ void rtos_kernel(U0) {
     IDT_INIT();
     IRQ_INIT();
     SETUP_ISR_HANDLERS();
-    disable_fpu();
+    fpu_enable();
     panic_if(!vesa_check(), PANIC_TEXT("Failed to initialize VESA"), PANIC_INITIALIZATION_FAILED);
     KDEBUG_PUTS("[atOS] VESA/VBE OK\n");
     

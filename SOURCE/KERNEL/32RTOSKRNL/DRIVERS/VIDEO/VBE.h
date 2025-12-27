@@ -164,8 +164,10 @@ Blue min-max: 0-31
 #define VBE_LAVENDER     VBE_COLOUR(28, 24, 28)
 #define VBE_SALMON       VBE_COLOUR(31, 24, 16)
 #define VBE_CRIMSON      VBE_COLOUR(31, 0, 8)
-#define VBE_CYAN2        VBE_COLOUR(0, 63, 28)
 
+#define VBE_NOTEPAD_PAPER1 VBE_COLOUR(31, 31, 24) // slightly brighter
+#define VBE_NOTEPAD_PAPER2 VBE_COLOUR(28, 28, 16) // more muted, aged look
+#define VBE_NOTEPAD_PAPER3 VBE_COLOUR(31, 28, 16) // slightly orange tint
 
 // VBE_COLOUR macros
 typedef U16 VBE_PIXEL_COLOUR;

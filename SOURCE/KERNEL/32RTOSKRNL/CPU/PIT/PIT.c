@@ -7,6 +7,7 @@
 #include <STD/STRING.h>
 #include <VIDEO/VBE.h>
 #include <PAGING/PAGING.h>
+#include <DEBUG/KDEBUG.h>
 
 #define PIT_CHANNEL0 0x40
 #define PIT_COMMAND  0x43
@@ -81,14 +82,18 @@ U0 PIT_WAIT_MS(U32 ms) {
 
 U0 PIT_INIT(U0) {
     if(initialized) return;
+    KDEBUG_PUTS("[PIT] Initializing\n");
     initialized = TRUE;
     hz = PIT_TICKS_HZ;
     pit_set_frequency(hz);
     idt_set_gate(PIT_VECTOR, (U32)isr_pit, KCS, 0x8E);
+    KDEBUG_PUTS("[PIT] Gate set\n");
     ISR_REGISTER_HANDLER(PIC_REMAP_OFFSET + 0, isr_pit);
-    // Unmask IRQ0 (PIT)
+    KDEBUG_PUTS("[PIT] Handler registered\n");
     PIC_Unmask(0);
+    KDEBUG_PUTS("[PIT] PIC unmasked\n");
     ticks = 0;
+    KDEBUG_PUTS("[PIT] Initialized\n");
 }
 
 U32 *PIT_GET_TICKS_PTR() {
@@ -108,8 +113,6 @@ __attribute__((naked)) void isr_pit(void) {
         // eip, cs, eflags are pushed by CPU automatically
         // We push the rest manually
 
-        // "cli\n\t" // disable interrupts
-        
         // Pushes all registers from previous task
         "pushl %%gs\n\t"
         "pushl %%fs\n\t"
