@@ -98,6 +98,8 @@ typedef struct TaskInfo {
     U32 cpu_time; // in ticks, total CPU time used
     U32 num_switches; // number of times scheduled
     PROC_EVENT_TYPE event_types; // Bitfield of event types this process is interested in
+    BOOL8 request_yield;
+    BOOL8 fpu_initialized;
 } __attribute__((packed)) TaskInfo;
 
 #define PROC_MSG_QUEUE_SIZE 30
@@ -216,6 +218,10 @@ typedef struct proc_message {
     U32 raw_data_size; // Raw data. Is not copied, not freed by message queue handler
 } PROC_MESSAGE;
 
+typedef struct {
+    U8 fxstate[512] ATTRIB_ALIGNED(16); // fxsave requires 512-byte aligned area
+} FPUState;
+
 typedef struct TCB {
     TaskInfo info;
     TrapFrame *tf; // saved trap frame for context switching
@@ -254,9 +260,11 @@ typedef struct TCB {
     U32 child_count; // Number of child processes
     VOIDPTR children[MAX_PROC_AMOUNT - 2]; // List of pointers to child TCBs (excluding master and self)
 
+    FPUState fpu;
+
     U32 argc;
     PPU8 argv;
-} __attribute__((packed)) TCB;
+} TCB;
 
 
 
@@ -280,9 +288,10 @@ U32 get_current_pid(void);
 U32 get_next_pid(void);
 U32 get_last_pid(void);
 TCB *get_current_tcb(void);
-
+TCB *get_last_fpu_user(void);
 TCB *get_focused_task(void);
 void handle_kernel_messages(void);
+void set_last_fpu_user(TCB *tcb);
 U32 get_ticks(void);
 
 static inline U32 read_cr3(void) {
@@ -329,9 +338,12 @@ void KILL_PROCESS(U32 pid);
 /// Internal functions, not for public use
 /// pid == U32_MAX all processes
 void early_debug_tcb(U32 pid);
+void TCB_DUMP(TCB *t);
 
 TrapFrame* pit_handler_task_control(TrapFrame* tf);
 
+void immediate_reschedule();
+void handle_immediate_reschedule();
 
 TCB *get_tcb_by_pid(U32 pid);
 TCB *get_tcb_by_name(U8 *name);

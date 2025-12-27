@@ -1,19 +1,27 @@
 // README: Please see top of MEMORY/PAGING/PAGING.c for paging overview
+#include <PROC/PROC.h> 
+
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
+
 #include <DRIVERS/VIDEO/VBE.h>
-#include <STD/ASM.h>
+#include <DRIVERS/PS2/KEYBOARD.h>
+
 #include <MEMORY/PAGEFRAME/PAGEFRAME.h>
 #include <MEMORY/PAGING/PAGING.h>
-#include <STD/STRING.h>
 #include <MEMORY/HEAP/KHEAP.h>
+
+#include <STD/ASM.h>
+#include <STD/STRING.h>
 #include <STD/MEM.h>
+#include <STD/BINARY.h>
+
 #include <ERROR/ERROR.h>
+
 #include <CPU/PIT/PIT.h>
-#include <PROC/PROC.h> 
 #include <CPU/ISR/ISR.h> // for regs struct
 #include <CPU/PIC/PIC.h>
-#include <STD/BINARY.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <CPU/FPU/FPU.h>
+
 #include <DEBUG/KDEBUG.h>
 #define EFLAGS_IF 0x0200
 #define KDS 0x10
@@ -26,6 +34,8 @@ static U8 initialized __attribute__((section(".data"))) = FALSE;
 static U32 proc_amount __attribute__((section(".data"))) = 0;
 static TCB *last_tcb __attribute__((section(".data"))) = &master_tcb;
 static TCB *current_shell ATTRIB_DATA = &master_tcb;
+static TCB *last_fpu_user ATTRIB_DATA = NULL;
+static volatile BOOL8 immediate_reschedule_val ATTRIB_DATA = 0; 
 
 // Shell informs kernel what task is focused
 static volatile TCB *focused_task __attribute__((section(".data"))) = NULL;
@@ -67,6 +77,12 @@ TCB *get_current_tcb(void) {
 TCB *get_master_tcb(void) {
     return &master_tcb;
 }
+TCB *get_last_fpu_user(void) {
+    return last_fpu_user;
+}
+void set_last_fpu_user(TCB *tcb) {
+    last_fpu_user = tcb;
+}
 U32 get_current_pid(void) {
     for(TCB *t = &master_tcb; ; t = t->next) {
         if(t == current_tcb) return t->info.pid;
@@ -105,7 +121,9 @@ static void init_master_tcb(void) {
     master_tcb.framebuffer_phys = FRAMEBUFFER_ADDRESS;
     master_tcb.framebuffer_virt = FRAMEBUFFER_ADDRESS;
 
+    fpu_zero_init(&master_tcb);
     focused_task = &master_tcb; // start with master focused
+    KDEBUG_PUTS("[proc] Master TCB initialized\n");
 }
 
 void uninitialize_multitasking(void) {
@@ -131,7 +149,9 @@ void multitasking_shutdown(void) {
 }
 
 void init_multitasking(void) {
+    KDEBUG_PUTS("[proc] Starting up multitasking\n");
     STI;
+    immediate_reschedule_val=FALSE;
     if (initialized) return;
     init_master_tcb();
 
@@ -148,6 +168,8 @@ void init_multitasking(void) {
 
     // Now preemption can commence
     initialized = TRUE;
+    last_fpu_user = NULL;
+    KDEBUG_PUTS("[proc] Multitasking initialized\n");
     PIT_INIT();
 }
 
@@ -517,6 +539,10 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
     // Initialize trap frame
     init_task_context(proc, (void (*)(void))USER_BINARY_VADDR, stack_size, initial_state);
     KDEBUG_PUTS("[proc] Trapframe initialized\n");
+
+    // init fpu
+    fpu_zero_init(proc);
+
     return proc->pagedir_phys;
 }
 
@@ -614,12 +640,13 @@ BOOLEAN RUN_BINARY(
     if (parent_pid != U32_MAX)
         new_proc->parent = get_tcb_by_pid(parent_pid);
 
+    new_proc->info.pid = get_next_pid();
+    
     KDEBUG_PUTS("[proc] setup_user_process...\n");
     panic_if(!setup_user_process(new_proc, (U8 *)file, bin_size, heap_size, stack_size, initial_state),
              PANIC_TEXT("Failed to set up user process"), PANIC_OUT_OF_MEMORY);
     KDEBUG_PUTS("[proc] setup_user_process OK\n");
 
-    new_proc->info.pid = get_next_pid();
     STRNCPY((char *)new_proc->info.name, (char *)proc_name, TASK_NAME_MAX_LEN);
     new_proc->info.name[TASK_NAME_MAX_LEN - 1] = '\0';
 
@@ -699,7 +726,8 @@ void KILL_PROCESS(U32 pid) {
     if (target == focused_task) {
         focused_task = current_shell;
     }
-
+    if(target == last_fpu_user) 
+        last_fpu_user = NULL;
     // Remove from scheduler (this adjusts proc_amount automatically)
     remove_tcb_from_scheduler(target);
 
@@ -812,6 +840,7 @@ TrapFrame* pit_handler_task_control(TrapFrame *cur) {
     set_next_task_pid(current_tcb->info.pid);
     set_next_task_num_switches(current_tcb->info.num_switches);
     last_tcb = current_tcb;
+    fpu_mark_task_switched();
     return current_tcb->tf;
 }
 
@@ -884,6 +913,127 @@ void early_debug_tcb(U32 pid) {
 }
 
 
+void TCB_DUMP(TCB *t) {
+    if (!t) {
+        KDEBUG_PUTS("TCB: NULL\n");
+        return;
+    }
+
+    KDEBUG_PUTS("===== TCB Dump =====\n");
+
+    KDEBUG_PUTS("PID: ");
+    KDEBUG_HEX32(t->info.pid);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Name: ");
+    for (int i = 0; i < TASK_NAME_MAX_LEN && t->info.name[i]; i++) {
+        KDEBUG_PUTC(t->info.name[i]);
+    }
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("State: ");
+    KDEBUG_HEX32(t->info.state);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("State Info: ");
+    KDEBUG_HEX32(t->info.state_info);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Exit code: ");
+    KDEBUG_HEX32(t->info.exit_code);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Priority: ");
+    KDEBUG_HEX32(t->info.priority);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("CPU time: ");
+    KDEBUG_HEX32(t->info.cpu_time);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Num switches: ");
+    KDEBUG_HEX32(t->info.num_switches);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("FPU initialized: ");
+    KDEBUG_HEX32(t->info.fpu_initialized);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Stack physical base: ");
+    KDEBUG_HEX32((U32)t->stack_phys_base);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Stack virtual top: ");
+    KDEBUG_HEX32((U32)t->stack_vtop);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Pagedir (virt): ");
+    KDEBUG_HEX32((U32)t->pagedir);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Pagedir (phys): ");
+    KDEBUG_HEX32((U32)t->pagedir_phys);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Heap size: ");
+    KDEBUG_HEX32(t->heap_size);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Heap pages: ");
+    KDEBUG_HEX32(t->heap_pages);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Stack size: ");
+    KDEBUG_HEX32(t->stack_size);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Stack pages: ");
+    KDEBUG_HEX32(t->stack_pages);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Child count: ");
+    KDEBUG_HEX32(t->child_count);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Framebuffer mapped: ");
+    KDEBUG_HEX32(t->framebuffer_mapped);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Framebuffer pages: ");
+    KDEBUG_HEX32(t->framebuffer_pages);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Framebuffer physical: ");
+    KDEBUG_HEX32((U32)t->framebuffer_phys);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Framebuffer virtual: ");
+    KDEBUG_HEX32((U32)t->framebuffer_virt);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Message queue count: ");
+    KDEBUG_HEX32(t->msg_count);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Message queue head: ");
+    KDEBUG_HEX32(t->msg_queue_head);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Message queue tail: ");
+    KDEBUG_HEX32(t->msg_queue_tail);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Args count: ");
+    KDEBUG_HEX32(t->argc);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("Argv pointer: ");
+    KDEBUG_HEX32((U32)t->argv);
+    KDEBUG_PUTS("\n");
+
+    KDEBUG_PUTS("====================\n");
+}
+
 
 U32 get_ticks(void) {
     return tcks;
@@ -895,6 +1045,16 @@ U32 get_uptime_sec(void) {
 
 TCB *get_focused_task(void) {
     return focused_task;
+}
+
+void immediate_reschedule() {
+    immediate_reschedule_val = TRUE;
+}
+
+void handle_immediate_reschedule() {
+    if(immediate_reschedule_val) {
+        immediate_reschedule_val = FALSE;
+    }
 }
 
 /**

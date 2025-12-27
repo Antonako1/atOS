@@ -70,8 +70,6 @@ typedef I8              S8;
 typedef I16             S16;
 typedef I32             S32;
 
-// Floating-point definitions
-// Warning: Floats are not supported as of now
 typedef float         F32;
 
 // 64-bit integer definition... not nice...

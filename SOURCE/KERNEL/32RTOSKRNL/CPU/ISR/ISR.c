@@ -30,6 +30,9 @@ REMARKS
 #include <CPU/PIC/PIC.h>
 #include <CPU/YIELD/YIELD.h>
 #include <RTL8139/RTL8139.h>
+#include <RTOSKRNL/PROC/PROC.h>
+#include <STD/MEM.h>
+#include <CPU/FPU/FPU.h>
 static ISRHandler g_Handlers[IDT_COUNT] __attribute__((section(".data"))) = { 0 };
 #else // __RTOS__
 static ISRHandler g_Handlers[IDT_COUNT]  = { 0 };
@@ -50,11 +53,11 @@ void isr_common_handler(I32 num, U32 errcode) {
         switch (num)
         {
         default:
-            panic(PANIC_TEXT("IRQ received in isr_common_handler!"), errcode);
+            panic(PANIC_TEXT("IRQ received in isr_common_handler!"), num);
             return;
         }
     } else {
-        panic(PANIC_TEXT("Unhandled Exception. Error code provided as argument"), errcode);
+        panic(PANIC_TEXT("Unhandled Exception. Error code provided as argument"), num);
     }
     #endif // __RTOS__
     HLT;
@@ -63,9 +66,8 @@ void isr_common_handler(I32 num, U32 errcode) {
 void double_fault_handler(I32 num, U32 errcode) {
     (void)errcode; (void)num;
     #ifdef __RTOS__
-    CLI;
     // TODO: try recovering from double fault by killing offending process
-    panic(PANIC_TEXT("Double Fault Exception"), PANIC_DOUBLE_FAULT);
+    panic(PANIC_TEXT("Double Fault Exception"), num);
     #endif // __RTOS__
     HLT;
 }
@@ -93,33 +95,31 @@ void irq_common_handler(I32 vector, U32 errcode) {
 }
 
 #ifdef __RTOS__
-#include <DRIVERS/VIDEO/VBE.h>
-
 void undefined_opcode_handler(I32 num, U32 errcode, regs *r) {
     (void)num; (void)errcode; (void)r;
     CLI;
-    panic_reg(r, PANIC_TEXT("Undefined Opcode Exception"), PANIC_UNDEFINED_OPCODE);
+    panic_reg(r, PANIC_TEXT("Undefined Opcode Exception"), num);
     HLT;
 }
 
 void fpu87_fault_handler(I32 num, U32 errcode, regs *r) {
     (void)num; (void)errcode; (void)r;
     CLI;
-    panic_reg(r, PANIC_TEXT("Floating Point Exception"), PANIC_FPU_FAULT);
+    panic_reg(r, PANIC_TEXT("Floating Point Exception"), num);
     HLT;
 }
 
 void de_fault_handler(I32 num, U32 errcode, regs *r) {
     (void)num; (void)errcode; (void)r;
     CLI;
-    panic_reg(r, PANIC_TEXT("Divide Error Exception"), PANIC_DIVIDE_ERROR);
+    panic_reg(r, PANIC_TEXT("Divide Error Exception"), errcode);
     HLT;
 }
 
 void nmi_handler(I32 num, U32 errcode, regs *r) {
     (void)num; (void)errcode; (void)r;
     CLI;
-    panic_reg(r, PANIC_TEXT("Non-Maskable Interrupt"), PANIC_UNKNOWN_ERROR);
+    panic_reg(r, PANIC_TEXT("Non-Maskable Interrupt"), num);
     HLT;
 }
 
@@ -153,6 +153,31 @@ void page_fault_handler(I32 num, U32 errcode) {
     VBE_DRAW_STRING(10, 110, us ? " - User Mode" : " - Kernel Mode", VBE_WHITE, VBE_BLACK);
     system_halt();
 }
+
+void isr_device_not_available(I32 vector, U32 errcode) {
+    (void)vector; (void)errcode;
+
+    TCB* current = get_current_tcb();
+    TCB* last    = get_last_fpu_user();
+
+    if (last && last != current) {
+        fpu_save(last);
+    }
+
+    ASM_VOLATILE("clts");
+
+    if (!current->info.fpu_initialized) {
+        fpu_restore(current);   // restore zeroed state
+        current->info.fpu_initialized = TRUE;
+    } else {
+        fpu_restore(current);
+    }
+
+    set_last_fpu_user(current);
+}
+
+
+
 #endif // __RTOS__
 
 // This function is called from assembly
@@ -178,22 +203,25 @@ void isr_dispatch_c(int vector, U32 errcode, regs *regs_ptr) {
     {
     case 0: // Divide Error
         de_fault_handler(vector, errcode, regs_ptr);
-        break;
+        return;
     case 2: // NMI
         nmi_handler(vector, errcode, regs_ptr);
-        break;
+        return;
     case 6: // Invalid Opcode
         undefined_opcode_handler(vector, errcode, regs_ptr);
-        break;
+        return;
+    case 7:
+        isr_device_not_available(vector, errcode);
+        return;
     case 8: // Double Fault
         double_fault_handler(vector, errcode);
-        break;
+        return;
     case 14: // Page Fault
         page_fault_handler(vector, errcode);
-        break;
+        return;
     case 16: // FPU Fault
         fpu87_fault_handler(vector, errcode, regs_ptr);
-        break;
+        return;
     default:
         if(g_Handlers[errcode]) {
             g_Handlers[errcode](vector, errcode);
@@ -244,6 +272,7 @@ U0 SETUP_ISRS(U0) {
         idt_set_gate(SYSCALL_VECTOR, isr_syscall, cs, flags);
     #endif // __RTOS__
 }
+
 VOID SETUP_ISR_HANDLERS(VOID) {
     for(int i = 0; i < IDT_COUNT; i++) {
         if(i >= PIC_REMAP_OFFSET && i < PIC_REMAP_END) {
@@ -256,6 +285,7 @@ VOID SETUP_ISR_HANDLERS(VOID) {
     #ifdef __RTOS__
     ISR_REGISTER_HANDLER(0, de_fault_handler);
     ISR_REGISTER_HANDLER(6, undefined_opcode_handler);
+    // ISR_REGISTER_HANDLER(7, isr_device_not_available);
     ISR_REGISTER_HANDLER(16, fpu87_fault_handler);
     ISR_REGISTER_HANDLER(14, page_fault_handler);
     ISR_REGISTER_HANDLER(8, double_fault_handler);
