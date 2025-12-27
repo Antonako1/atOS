@@ -125,7 +125,6 @@ U32 main(U32 argc, PPU8 argv) {
         STRNCPY(format, FORMAT_DEF, sizeof(format));
     }
     DEBUG_PRINTF("Here I am! Rock you like a hurricane!\n");
-    // YIELD();
     time = GET_DATE_TIME();
     if(!format_arg_specified) {
         PATRC_FD fd = CREATE_ATRCFD("/ATOS/CONFS/TIME.CNF", ATRC_READ_WRITE);
