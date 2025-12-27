@@ -75,6 +75,8 @@ U64;
 // Boolean definitions
 typedef U32          BOOL;
 typedef BOOL         BOOLEAN;
+typedef U8           BOOL8;
+typedef U8           BOOLEAN8;
 #define TRUE         1
 #define FALSE        0
 
