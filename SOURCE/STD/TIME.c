@@ -88,7 +88,16 @@ U32 GET_DAY_OF_MONTH(RTC_DATE_TIME *dt) { return dt ? dt->day_of_month : 0xFFFFF
 U32 GET_MONTH(RTC_DATE_TIME *dt)        { return dt ? dt->month : 0xFFFFFFFF; }
 U32 GET_YEAR(RTC_DATE_TIME *dt)         { return dt ? dt->year : 0xFFFFFFFF; }
 U32 GET_CENTURY(RTC_DATE_TIME *dt)      { return dt ? dt->century : 0xFFFFFFFF; }
-
+VOID FORMATTED_DATE_TIME_STRING(PU8 buf, RTC_DATE_TIME *dt){
+    SPRINTF(buf, "%02d/%02d/%02d, %02d:%02d.%02d", 
+        GET_DAY_OF_MONTH(dt),
+        GET_MONTH(dt),
+        GET_YEAR(dt),
+        GET_HOURS(dt),
+        GET_MINUTES(dt),
+        GET_SECONDS(dt)
+    );
+}
 // Add/subtract seconds
 void ADD_SECONDS(RTC_DATE_TIME *dt, U32 seconds) {
     if (!dt) return;
