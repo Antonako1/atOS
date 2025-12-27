@@ -98,3 +98,13 @@ void sys(PU8 cmd) {
     PROC_MESSAGE msg = CREATE_PROC_MSG_RAW(parent, SHELL_CMD_EXECUTE_BATSH, cmd_dup, STRLEN(cmd_dup) + 1, 0);
     SEND_MESSAGE(&msg);
 }
+
+VOID update_kp_seq(KP_DATA *kp) {
+    if (!kp) return;
+    kp->seq++;
+}
+
+BOOLEAN valid_kp(KP_DATA *kp) {
+    if(!kp) return FALSE;
+    return (prev_seq != kp->seq);
+}
