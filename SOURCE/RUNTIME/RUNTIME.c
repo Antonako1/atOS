@@ -9,6 +9,7 @@
 #include <RUNTIME/RUNTIME.h>
 #include <STD/PROC_COM.h>
 #include <STD/DEBUG.h>
+#include <STD/IO.h>
 
 static exit_func_t exit_funcs[MAX_ON_EXIT_FUNCTIONS] ATTRIB_DATA = { 0 };
 static U32 exit_func_count ATTRIB_DATA = 0;
@@ -37,6 +38,7 @@ void _start(U32 argc, PPU8 argv) {
         };
     }
     DEBUG_PRINTF("[RUNTIME] Entering main!\n");
+    KB_MS_INIT();
     U32 code = main(argc, argv);
 
     call_exit_functions();
