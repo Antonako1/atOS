@@ -6,7 +6,7 @@
 #define VOUTPUT_H
 #include <DRIVERS/VIDEO/VBE.h>
 #include <STD/TYPEDEF.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 
 typedef enum {
     CURSOR_BLOCK = 0,

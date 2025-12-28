@@ -4,7 +4,7 @@
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 
 #include <DRIVERS/VIDEO/VBE.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 
 #include <MEMORY/PAGEFRAME/PAGEFRAME.h>
 #include <MEMORY/PAGING/PAGING.h>
@@ -814,6 +814,9 @@ TrapFrame* pit_handler_task_control(TrapFrame *cur) {
             past = FALSE;
         }
     }
+
+    UPDATE_KP_MOUSE_DATA();
+
     if (!initialized) {
         return cur;
     }    
@@ -1103,13 +1106,14 @@ void send_msg(PROC_MESSAGE *msg) {
 }
 
 // e.g., terminate self, sleep, wait, etc.
-static U32 seq = 0;
-    
-static KP_DATA *data = NULLPTR;
+static U32 last_kb_seq = 0;
+static U32 last_mouse_seq = 0;
+static PS2_KB_MOUSE_DATA *data = NULLPTR;
 
 void kernel_loop_init() {
-    data = GET_KP_DATA();
+    data = GET_KB_MOUSE_DATA();
 }
+
 void handle_kernel_messages(void) {
     // Handle messages sent to kernel by tasks
     TCB *master = get_master_tcb();
@@ -1264,10 +1268,19 @@ void handle_kernel_messages(void) {
     // Handle messages sent by kernel to tasks
     TCB *t = get_current_tcb();
     if (!t) return;
-    UPDATE_KP_DATA();
 
-    if(data->seq != seq) {
-        seq++;
-        if(data->cur.pressed && data->mods.alt && data->mods.shift && data->cur.keycode == KEY_DELETE) system_reboot();
+    if (data->kb.seq != last_kb_seq) {
+        last_kb_seq = data->kb.seq;
+
+        if (data->kb.cur.pressed &&
+            data->kb.mods.alt &&
+            data->kb.mods.shift &&
+            data->kb.cur.keycode == KEY_DELETE) {
+            system_reboot();
+        }
+    }
+
+    if(data->ms.seq != last_mouse_seq) {
+        last_mouse_seq = data->ms.seq;
     }
 }

@@ -8,4 +8,8 @@ ATGL (atOS Graphical Library) is a lightweight and efficient graphical library d
 - Fast: Optimized for performance. Draws directly to the task framebuffer.
 - Simple API: Easy to use functions for common graphical tasks.
 
-## Getting Started
+
+
+## In-Depth
+
+ATGL_WINDOW - Master element

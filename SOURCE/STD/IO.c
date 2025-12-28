@@ -4,7 +4,7 @@
 #include <STD/MEM.h>
 
 #include <CPU/SYSCALL/SYSCALL.h>
-#include <DRIVERS/PS2/KEYBOARD.h> // For definitions
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h> // For definitions
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <STD/DEBUG.h>
 #include <STD/ARG.h>
@@ -48,49 +48,6 @@ VOID printf(PU8 fmt, ...) {
     va_end(args);
 }
 
-static U32 prev_seq ATTRIB_DATA = 0;
-static KP_DATA *kp ATTRIB_DATA = NULLPTR;
-
-KP_DATA *get_kp_data() {
-    if(!kp) kp = SYSCALL0(SYSCALL_GET_KP_DATA);
-    return kp;
-}
-
-KEYPRESS *get_last_keypress() {
-    KP_DATA *kp = get_kp_data();
-    if(!kp) return NULLPTR;
-    return &kp->prev;
-}
-KEYPRESS *get_latest_keypress() {
-    KP_DATA *kp = get_kp_data();
-    if(!kp) return NULLPTR;
-    if(prev_seq != kp->seq) {
-        prev_seq = kp->seq;
-        return &kp->cur;
-    }
-    return NULLPTR;
-}
-KEYPRESS *get_latest_keypress_unconsumed() {
-    KP_DATA *kp = get_kp_data();
-    if (!kp) return NULLPTR;
-    return &kp->cur; // no seq check, always return latest
-}
-
-MODIFIERS *get_modifiers() {
-    KP_DATA *kp = get_kp_data();
-    if(!kp) return NULLPTR;
-    return &kp->mods;
-}
-U32 get_kp_seq() {
-    KP_DATA *kp = get_kp_data();
-    if(!kp) return NULLPTR;
-    return kp->seq;
-}
-U8 keypress_to_char(U32 kcode) {
-    U8 c = (U8)SYSCALL(SYSCALL_KEYPRESS_TO_CHARS, kcode, 0, 0, 0, 0);
-    return c;
-}
-
 void sys(PU8 cmd) {
     U32 parent = PROC_GETPPID();
     PU8 cmd_dup = STRDUP(cmd); // Duplicate command for string sending. Will be freed by receiver
@@ -99,12 +56,73 @@ void sys(PU8 cmd) {
     SEND_MESSAGE(&msg);
 }
 
-VOID update_kp_seq(KP_DATA *kp) {
-    if (!kp) return;
-    kp->seq++;
+
+typedef struct {
+    PS2_KB_MOUSE_DATA *shared;
+    U32 last_kb_seq;
+    U32 last_ms_seq;
+} INPUT_CTX;
+
+static INPUT_CTX input ATTRIB_DATA = {0};
+
+
+PS2_KB_MOUSE_DATA *get_KB_MOUSE_DATA() {
+    return input.shared;
 }
 
-BOOLEAN valid_kp(KP_DATA *kp) {
-    if(kp) return TRUE;
-    return FALSE;
+BOOLEAN KB_MS_INIT() {
+    if(!input.shared) 
+        input.shared = SYSCALL0(SYSCALL_GET_KB_MOUSE_DATA);
+    return input.shared != NULLPTR;
+}
+
+PS2_KB_DATA *kb_poll(void) {
+    if (!input.shared) return NULLPTR;
+
+    volatile PS2_KB_DATA *kb = &input.shared->kb;
+
+    if (kb->seq != input.last_kb_seq) {
+        input.last_kb_seq = kb->seq;
+        return (PS2_KB_DATA *)&kb->cur;
+    }
+    return NULLPTR;
+}
+
+PS2_KB_DATA *kb_peek(void) {
+    if (!input.shared) return NULLPTR;
+    return &input.shared->kb.cur;
+}
+
+PS2_KB_DATA *kb_last(void) {
+    if (!input.shared) return NULLPTR;
+    return &input.shared->kb.prev;
+}
+
+MODIFIERS *kb_mods(void) {
+    if (!input.shared) return NULLPTR;
+    return &input.shared->kb.mods;
+}
+
+PS2_MOUSE_DATA *mouse_poll(void) {
+    if (!input.shared) return NULLPTR;
+
+    if (input.shared->ms.seq != input.last_ms_seq) {
+        input.last_ms_seq = input.shared->ms.seq;
+        return &input.shared->ms.cur;
+    }
+    return NULLPTR;
+}
+
+PS2_MOUSE_DATA *mouse_peek(void) {
+    if(!input.shared) return NULLPTR;
+    return &input.shared->ms.cur;
+}
+PS2_MOUSE_DATA *mouse_last(void) {
+    if(!input.shared) return NULLPTR;
+    return &input.shared->ms.prev;
+}
+
+U8 keypress_to_char(U32 kcode) {
+    U8 c = (U8)SYSCALL(SYSCALL_KEYPRESS_TO_CHARS, kcode, 0, 0, 0, 0);
+    return c;
 }

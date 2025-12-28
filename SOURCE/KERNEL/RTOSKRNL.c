@@ -35,6 +35,9 @@ void rtos_kernel(U0) {
     
     panic_if(!PS2_KEYBOARD_INIT(), PANIC_TEXT("Failed to initialize PS2 keyboard"), PANIC_INITIALIZATION_FAILED);
     KDEBUG_PUTS("[atOS] PS2 keyboard OK\n");
+
+    panic_if(!PS2_MOUSE_INIT(), PANIC_TEXT("Failed to initialize PS2 mouse"), PANIC_INITIALIZATION_FAILED);
+    KDEBUG_PUTS("[atOS] PS2 mouse OK\n");
     
     PCI_INITIALIZE();
     KDEBUG_PUTS("[atOS] PCI enumerated\n");

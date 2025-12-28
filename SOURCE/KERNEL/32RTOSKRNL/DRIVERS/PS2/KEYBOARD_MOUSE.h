@@ -1,5 +1,5 @@
 /*+++
-    SOURCE/KERNEL/32RTOSKRNL/DRIVERS/PS2/KEYBOARD.h - PS/2 Keyboard Driver
+    SOURCE/KERNEL/32RTOSKRNL/DRIVERS/PS2/KEYBOARD_MOUSE.h - PS/2 Keyboard Driver
 
     Part of atOS
 
@@ -16,12 +16,12 @@ REVISION HISTORY
         Description
 
 REMARKS
-    When compiling, include KEYBOARD.c
-    User processes must communicate with the keyboard driver using syscalls.
+    When compiling, include KEYBOARD_MOUSE.c
+    User processes must communicate with the keyboard driver using std/io.
 ---*/
 #ifndef PS2_KEYBOARD_H
 #define PS2_KEYBOARD_H
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <STD/ASM.h>
 #include <STD/TYPEDEF.h>
 
@@ -32,7 +32,7 @@ PS/2 Ports
 #define PS2_DATAPORT 0x60
 #define PS2_WRITEPORT 0x60
 #define PS2_CMDPORT  0x64
-
+#define PS2_STATUSPORT 0x64
 /*+++
 PS/2 Status bits
 ---*/
@@ -86,6 +86,13 @@ PS/2 Keyboard Special Bytes
 #define DISABLE_FIRST_PS2_PORT 0xAD
 #define DISABLE_SECOND_PS2_PORT 0xA7
 
+/*+++
+PS/2 Mouse Commands
+---*/
+#define PS2_SET_SCALING_11 0xE6
+#define PS2_SET_SCALING_21 0xE7
+#define PS2_SET_RESOLUTION 0xE8
+
 typedef struct {
     U16 type; // 0 if unknown, 0xABxx if dual-channel keyboard
     BOOLEAN dual_channel; // TRUE if dual-channel controller
@@ -93,23 +100,39 @@ typedef struct {
     U8 port1_check; // Result of test of first PS/2 port
     U8 port2_check; // Result of test of second PS/2 port
     U8 scancode_set; // Current scan code set (1 or 2)
+    BOOLEAN has_wheel; // Mouse has scrollwheel support
 } PS2_INFO;
 
 extern PS2_INFO *PS2_info;
 
-#define CMD_QUEUE_SIZE 8
+#define MOUSE_PACKET 3
+#define KEYBOARD_PACKET 4
 typedef struct {
-    U8 head; // Points to the next write position
-    U8 tail; // Points to the last read position
-    U8 buffer[CMD_QUEUE_SIZE];
+    U8 device; // 0 for Keyboard, 1 for Mouse
+    U8 data;
+} PS2_PACKET;
+
+#define CMD_QUEUE_SIZE 512
+typedef struct {
+    U16 head; // Points to the next write position
+    U16 tail; // Points to the last read position
+    PS2_PACKET buffer[CMD_QUEUE_SIZE];
 } PS2KB_CMD_QUEUE;
+
+typedef struct {
+    U32 sc1, sc2;
+    U8 sc1_len, sc2_len;
+    U8 mouse_cycle;
+    U8 mouse_bytes[4];
+} PS2_DECODER_STATE;
+
 
 PS2_INFO *GET_PS2_INFO(VOID);
 
 PS2KB_CMD_QUEUE *GET_CMD_QUEUE(VOID);
 U0 CLEAR_CMD_QUEUE(VOID);
-U0 PUSH_TO_CMD_QUEUE(U8 byte);
-U8 POP_FROM_CMD_QUEUE(VOID);
+U0 PUSH_TO_CMD_QUEUE(PS2_PACKET byte);
+PS2_PACKET POP_FROM_CMD_QUEUE(VOID);
 BOOLEAN IS_CMD_QUEUE_EMPTY(VOID);
 BOOLEAN IS_CMD_QUEUE_FULL(VOID);
 
@@ -190,6 +213,20 @@ Scan code set 2
     SC2_PRESSED_PART5_##x = n5, \
     SC2_PRESSED_PART6_##x = n6, \
     SC2_PRESSED_PART7_##x = n7, \
+    SC2_PRESSED_PART8_##x = n8
+
+#define SC2_PRESSED_EXT( \
+    x, \
+    n1, \
+    n2, \
+    n3, \
+    n4, \
+    n5, \
+    n6, \
+    n7, \
+    n8 \
+) \
+    SC2_PRESSED_PART1_##x = n1, \
     SC2_PRESSED_PART8_##x = n8
 
 #define SC2_PRESSED_EXT( \
@@ -492,7 +529,7 @@ typedef enum {
 typedef enum {
     KEY_UNKNOWN = 0,
 
-    // Function keys
+    /* Function keys */
     KEY_ESC,
     KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
     KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12,
@@ -500,67 +537,61 @@ typedef enum {
     KEY_SCROLLLOCK,
     KEY_PAUSE,
 
-    // Number row + symbols
-    KEY_GRAVE, KEY_TILDE,     // ` ~
-    KEY_1, KEY_EXCLAMATION,   // 1 !
-    KEY_2, KEY_AT,            // 2 @
-    KEY_3, KEY_HASH,          // 3 #
-    KEY_4, KEY_DOLLAR,        // 4 $
-    KEY_5, KEY_PERCENT,       // 5 %
-    KEY_6, KEY_CARET,         // 6 ^
-    KEY_7, KEY_AMPERSAND,     // 7 &
-    KEY_8, KEY_ASTERISK,      // 8 *
-    KEY_9, KEY_LEFT_PAREN,    // 9 (
-    KEY_0, KEY_RIGHT_PAREN,   // 0 )
-    KEY_MINUS, KEY_UNDERSCORE,// - _
-    KEY_EQUALS, KEY_PLUS,     // = +
+    /* Number row */
+    KEY_GRAVE,        // ` ~
+    KEY_1, KEY_2, KEY_3, KEY_4, KEY_5,
+    KEY_6, KEY_7, KEY_8, KEY_9, KEY_0,
+    KEY_MINUS,        // - _
+    KEY_EQUALS,       // = +
     KEY_BACKSPACE,
 
-    // Navigation cluster
+    /* Navigation cluster */
     KEY_INSERT, KEY_HOME, KEY_PAGEUP,
     KEY_DELETE, KEY_END, KEY_PAGEDOWN,
 
-    // Tab row
+    /* Tab row */
     KEY_TAB,
-    KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T, KEY_Y, KEY_U, KEY_I, KEY_O, KEY_P,
-    KEY_LBRACKET, KEY_LEFT_CURLY,  // [ {
-    KEY_RBRACKET, KEY_RIGHT_CURLY, // ] }
+    KEY_Q, KEY_W, KEY_E, KEY_R, KEY_T,
+    KEY_Y, KEY_U, KEY_I, KEY_O, KEY_P,
+    KEY_LBRACKET,     // [ {
+    KEY_RBRACKET,     // ] }
+    KEY_BACKSLASH,    // \ |
     KEY_ENTER,
-    KEY_BACKSLASH, KEY_PIPE,       // \ |
 
-    // Caps lock row
+    /* Caps lock row */
     KEY_CAPSLOCK,
     KEY_A, KEY_S, KEY_D, KEY_F, KEY_G,
     KEY_H, KEY_J, KEY_K, KEY_L,
-    KEY_SEMICOLON, KEY_COLON,      // ; :
-    KEY_APOSTROPHE, KEY_QUOTE,     // ' "
-    
-    // Shift row
+    KEY_SEMICOLON,    // ; :
+    KEY_APOSTROPHE,   // ' "
+
+    /* Shift row */
     KEY_LSHIFT,
     KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B,
     KEY_N, KEY_M,
-    KEY_COMMA, KEY_LESS,            // , <
-    KEY_DOT, KEY_GREATER,           // . >
-    KEY_SLASH, KEY_QUESTION,        // / ?
+    KEY_COMMA,        // , <
+    KEY_DOT,          // . >
+    KEY_SLASH,        // / ?
     KEY_RSHIFT,
 
-    // Space row
-    KEY_LCTRL, KEY_LALT, KEY_SPACE, KEY_RALT, KEY_RCTRL, KEY_MENU,
+    /* Space row */
+    KEY_LCTRL, KEY_LALT, KEY_SPACE,
+    KEY_RALT, KEY_RCTRL, KEY_MENU,
 
-    // Arrow keys
-    KEY_ARROW_UP, KEY_ARROW_LEFT, KEY_ARROW_DOWN, KEY_ARROW_RIGHT,
+    /* Arrow keys */
+    KEY_ARROW_UP, KEY_ARROW_LEFT,
+    KEY_ARROW_DOWN, KEY_ARROW_RIGHT,
 
-    // Keypad
+    /* Keypad */
     KEYPAD_NUMLOCK,
     KEYPAD_DIVIDE, KEYPAD_MULTIPLY, KEYPAD_SUBTRACT,
     KEYPAD_7, KEYPAD_8, KEYPAD_9,
     KEYPAD_4, KEYPAD_5, KEYPAD_6,
     KEYPAD_1, KEYPAD_2, KEYPAD_3,
-    KEYPAD_0, KEYPAD_DOT, KEYPAD_ENTER, KEYPAD_PLUS,
-    KEYPAD_COMMA, KEYPAD_EQUALS, KEYPAD_BACKSLASH,
-    KEYPAD_ASTERISK, KEYPAD_SLASH, KEYPAD_MINUS,
+    KEYPAD_0, KEYPAD_DOT,
+    KEYPAD_ENTER, KEYPAD_PLUS,
 
-    // Multimedia keys
+    /* Multimedia */
     KEY_MEDIA_PLAY_PAUSE,
     KEY_MEDIA_STOP,
     KEY_MEDIA_PREVIOUS_TRACK,
@@ -581,23 +612,26 @@ typedef enum {
     KEY_MEDIA_EMAIL,
     KEY_MEDIA_SELECT,
 
-    KEY_MEDIA_LGUI, // Left Windows / Command key
-    KEY_MEDIA_RGUI, // Right Windows / Command key
+    /* System keys */
+    KEY_LGUI,     // Windows / Command
+    KEY_RGUI,
+    KEY_APPS,
 
-    KEY_APPS, // Menu key
-
-    // ACPI keys
+    /* ACPI */
     KEY_ACPI_POWER,
     KEY_ACPI_SLEEP,
     KEY_ACPI_WAKE,
+
+    KEY_MAX
 } KEYCODES;
 
-typedef struct {
+
+typedef struct _KEYPRESS{
     KEYCODES keycode;
     BOOLEAN pressed; // TRUE if key is pressed, FALSE if released
 } KEYPRESS;
 
-typedef struct {
+typedef struct _MODIFIERS{
     BOOLEAN shift;
     BOOLEAN ctrl;
     BOOLEAN alt;
@@ -606,24 +640,76 @@ typedef struct {
     BOOLEAN scrolllock;
 } MODIFIERS;
 
-typedef struct {
+
+typedef struct _MOUSE_DATA{
+    BOOL mouse1;
+    BOOL mouse2;
+    BOOL mouse3;
+    U32 x;
+    U32 y;
+    U32 scroll_wheel;
+} MOUSE_DATA;
+
+typedef struct _PS2_KB_DATA{
     KEYPRESS cur;
     KEYPRESS prev;
     MODIFIERS mods;
     U32 seq; // incremented by kernel on every new keypress. if prev_seq != seq, new keypress has happened
-} KP_DATA;
+} PS2_KB_DATA;
 
-KP_DATA* GET_KP_DATA();
-VOID UPDATE_KP_DATA();
+typedef struct _PS2_MOUSE_DATA{
+    MOUSE_DATA cur;
+    MOUSE_DATA prev;
+    U32 seq;
+} PS2_MOUSE_DATA;
+
+typedef struct _KB_MOUSE_DATA{
+    BOOL8 kb_event;
+    BOOL8 ms_event;
+    
+    PS2_KB_DATA kb;
+    PS2_MOUSE_DATA ms;
+} PS2_KB_MOUSE_DATA;
+
+
+#ifdef __RTOS__
+typedef struct _PS2_INTERNAL_RETVAL{
+    union {
+        KEYPRESS kb;
+        MOUSE_DATA mouse;
+    } data;
+    U8 type;
+} PS2_INTERNAL_RETVAL;
+
+typedef enum {
+    PS2_EVT_NONE,
+    PS2_EVT_KEY,
+    PS2_EVT_MOUSE
+} PS2_EVENT_TYPE;
+
+typedef struct {
+    PS2_EVENT_TYPE type;
+    union {
+        KEYPRESS key;
+        MOUSE_DATA mouse;
+    };
+} PS2_EVENT;
+
+
+PS2_KB_MOUSE_DATA* GET_KB_MOUSE_DATA();
+VOID UPDATE_KP_MOUSE_DATA();
 
 #define DEFAULT_SCANCODESET SCANCODESET2
 #define SECONDARY_SCANCODESET SCANCODESET1
 
-#ifdef __RTOS__
 MODIFIERS *GET_KEYBOARD_MODIFIERS(VOID);
-KEYPRESS GET_CURRENT_KEY_PRESSED(VOID);
+PS2_INTERNAL_RETVAL GET_CURRENT_KEY_PRESSED(VOID);
 U8 KEYPRESS_TO_CHARS(U32 kcode);
 KEYPRESS *GET_LAST_KEY_PRESSED(VOID);
+
+BOOLEAN PS2_MOUSE_INIT();
+void PS2_MOUSE_HANDLER(I32 num, U32 errcode);
+
 #endif // __RTOS__
 
 #endif // PS2_KEYBOARD_H

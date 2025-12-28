@@ -126,14 +126,13 @@ U32 main(U32 argc, PPU8 argv) {
     
     BOOL8 running = TRUE;
     while (running) {
-        KP_DATA* kp = get_latest_keypress();
-        if (valid_kp(kp)) {
+        PS2_KB_DATA* kp = kb_poll();
+        if (kp) {
             if (kp->cur.pressed) {
                 if (kp->cur.keycode == KEY_ESC) {
                     running = FALSE;
                 }
             }
-            update_kp_seq(kp);
         }
         UPDATE_CLOCK();
         cpu_relax();

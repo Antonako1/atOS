@@ -11,4 +11,4 @@ Standard US QWERTY layoyt is currently supported.
 
 ## Mouse
 
-Not yet implemented.
+Standard PS2 mouse support

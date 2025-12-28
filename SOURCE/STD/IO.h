@@ -30,7 +30,7 @@ Function table:
 
 
 #include <STD/TYPEDEF.h>
-#include <DRIVERS/PS2/KEYBOARD.h> // For definitions
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h> // For definitions
 
 #define line_end "\r\n"
 void putc(U8 c);
@@ -52,22 +52,34 @@ void sys(PU8 cmd);
  */
 VOID printf(PU8 fmt, ...);
 
-/*
-Usage:
-KP_DATA* kp = get_latest_keypress();
-if(valid_kp(kp)) {
-    // Handle new keypress
+// handled by runtime
+BOOLEAN KB_MS_INIT();
 
-    update_kp_seq(kp); // Update sequence number
+/*
+Simple keyboard example
+
+BOOL8 running = TRUE;
+while(running){
+    PS2_KB_DATA *kp = kb_poll();
+    if(kp && kp->cur.pressed) {
+        switch (kp->cur.keycode)
+        {
+        case KEY_ESC:
+            running = FALSE;
+            break;
+        }
+    }
 }
 */
-KP_DATA *get_kp_data();
-KEYPRESS *get_last_keypress();
-KEYPRESS *get_latest_keypress();
-KEYPRESS *get_latest_keypress_unconsumed();
-MODIFIERS *get_modifiers();
-U32 get_kp_seq();
+PS2_KB_DATA *kb_poll(void); // polls and returns latest keypress data
+PS2_KB_DATA *kb_peek(void); // returns keypress data gotten after last poll
+PS2_KB_DATA *kb_last(void); // return previous keypress data
+MODIFIERS  *kb_mods(void); // returns modifier states
+
+PS2_MOUSE_DATA *mouse_poll(void); // polls and returns latest mouse data
+PS2_MOUSE_DATA *mouse_peek(void); // returns mouse data gotten after last poll
+PS2_MOUSE_DATA *mouse_last(void); // return previous mouse data
+
 U8 keypress_to_char(U32 kcode);
-VOID update_kp_seq(KP_DATA *kp);
-BOOLEAN valid_kp(KP_DATA *kp);
+
 #endif // IO_H

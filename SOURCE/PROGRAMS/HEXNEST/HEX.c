@@ -67,7 +67,7 @@ U32 HEXDUMP(PU8 path) {
         // Wait for key input to scroll
         printf("\n[Press any key to continue, ESC to exit]\n");
         while (TRUE) {
-            KP_DATA *kp = get_latest_keypress();
+            PS2_KB_DATA *kp = kb_poll();
             if (kp && kp->cur.pressed) {
                 if (kp->cur.keycode == KEY_ESC) {
                     looping = FALSE;

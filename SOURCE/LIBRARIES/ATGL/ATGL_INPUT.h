@@ -1,0 +1,9 @@
+#ifndef ATGL_INPUT_H
+#define ATGL_INPUT_H
+#include <STD/TYPEDEF.h>
+
+typedef struct _ATGL_INPUT_DEVICE {
+
+} ATGL_INPUT_DEVICE, PATGL_INPUT_DEVICE;
+
+#endif // ATGL_INPUT_H

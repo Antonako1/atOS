@@ -36,11 +36,11 @@ U0 CMD_INTERFACE_MSG_LOOP() {
         // }
         FREE_MESSAGE(msg);
     }
-    KEYPRESS *kp = (KEYPRESS *)get_latest_keypress();
-    if(kp) {
-        MODIFIERS *mods = (MODIFIERS *)get_modifiers();
-        HANDLE_KB_EDIT_LINE(kp, mods);
-    }
+    // KEYPRESS *kp = (KEYPRESS *)get_latest_keypress();
+    // if(kp) {
+    //     MODIFIERS *mods = (MODIFIERS *)get_modifiers();
+    //     HANDLE_KB_EDIT_LINE(kp, mods);
+    // }
 }
 
 
@@ -141,10 +141,10 @@ U0 EDIT_LINE_MSG_LOOP() {
     }
 
     // Process keyboard input
-    KEYPRESS *kp = (KEYPRESS *)get_latest_keypress();
+    PS2_KB_DATA *kp = kb_poll();
     if (kp) {
-        MODIFIERS *mods = (MODIFIERS *)get_modifiers();
-        HANDLE_KB_EDIT_LINE(kp, mods);
+        HANDLE_KB_EDIT_LINE(&kp->cur, &kp->mods);
+        // DEBUG_PRINTF("Key %d, %c\n", kp->cur.keycode, keypress_to_char(kp->cur.keycode));
     }
 }
 
