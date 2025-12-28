@@ -15,7 +15,7 @@
 
 #include <STD/TYPEDEF.h>
 #include <PROC/PROC.h>
-#include <DRIVERS/PS2/KEYBOARD.h> // for KEYPRESS and MODIFIERS structs
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h> // for KEYPRESS and MODIFIERS structs
 #include <PROGRAMS/SHELL/SHELL.h> // For STDOUT 
 
 /**

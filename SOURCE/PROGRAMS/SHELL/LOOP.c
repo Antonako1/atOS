@@ -142,7 +142,7 @@ U0 EDIT_LINE_MSG_LOOP() {
 
     // Process keyboard input
     KEYPRESS *kp = (KEYPRESS *)get_latest_keypress();
-    if (kp) {
+    if (valid_kp(kp)) {
         MODIFIERS *mods = (MODIFIERS *)get_modifiers();
         HANDLE_KB_EDIT_LINE(kp, mods);
     }

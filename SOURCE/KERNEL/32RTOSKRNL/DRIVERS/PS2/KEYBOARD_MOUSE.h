@@ -1,5 +1,5 @@
 /*+++
-    SOURCE/KERNEL/32RTOSKRNL/DRIVERS/PS2/KEYBOARD.h - PS/2 Keyboard Driver
+    SOURCE/KERNEL/32RTOSKRNL/DRIVERS/PS2/KEYBOARD_MOUSE.h - PS/2 Keyboard Driver
 
     Part of atOS
 
@@ -16,12 +16,12 @@ REVISION HISTORY
         Description
 
 REMARKS
-    When compiling, include KEYBOARD.c
+    When compiling, include KEYBOARD_MOUSE.c
     User processes must communicate with the keyboard driver using syscalls.
 ---*/
 #ifndef PS2_KEYBOARD_H
 #define PS2_KEYBOARD_H
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <STD/ASM.h>
 #include <STD/TYPEDEF.h>
 
@@ -32,7 +32,7 @@ PS/2 Ports
 #define PS2_DATAPORT 0x60
 #define PS2_WRITEPORT 0x60
 #define PS2_CMDPORT  0x64
-
+#define PS2_STATUSPORT 0x64
 /*+++
 PS/2 Status bits
 ---*/
@@ -97,19 +97,26 @@ typedef struct {
 
 extern PS2_INFO *PS2_info;
 
-#define CMD_QUEUE_SIZE 8
+#define MOUSE_PACKET 3
+#define KEYBOARD_PACKET 4
+typedef struct {
+    U8 device; // 0 for Keyboard, 1 for Mouse
+    U8 data;
+} PS2_PACKET;
+
+#define CMD_QUEUE_SIZE 32
 typedef struct {
     U8 head; // Points to the next write position
     U8 tail; // Points to the last read position
-    U8 buffer[CMD_QUEUE_SIZE];
+    PS2_PACKET buffer[CMD_QUEUE_SIZE];
 } PS2KB_CMD_QUEUE;
 
 PS2_INFO *GET_PS2_INFO(VOID);
 
 PS2KB_CMD_QUEUE *GET_CMD_QUEUE(VOID);
 U0 CLEAR_CMD_QUEUE(VOID);
-U0 PUSH_TO_CMD_QUEUE(U8 byte);
-U8 POP_FROM_CMD_QUEUE(VOID);
+U0 PUSH_TO_CMD_QUEUE(PS2_PACKET byte);
+PS2_PACKET POP_FROM_CMD_QUEUE(VOID);
 BOOLEAN IS_CMD_QUEUE_EMPTY(VOID);
 BOOLEAN IS_CMD_QUEUE_FULL(VOID);
 
@@ -592,12 +599,12 @@ typedef enum {
     KEY_ACPI_WAKE,
 } KEYCODES;
 
-typedef struct {
+typedef struct _KEYPRESS{
     KEYCODES keycode;
     BOOLEAN pressed; // TRUE if key is pressed, FALSE if released
 } KEYPRESS;
 
-typedef struct {
+typedef struct _MODIFIERS{
     BOOLEAN shift;
     BOOLEAN ctrl;
     BOOLEAN alt;
@@ -606,24 +613,61 @@ typedef struct {
     BOOLEAN scrolllock;
 } MODIFIERS;
 
-typedef struct {
+
+typedef struct _MOUSE_DATA{
+    BOOL mouse1;
+    BOOL mouse2;
+    BOOL mouse3;
+    U32 x;
+    U32 y;
+    U32 scroll_wheel;
+} MOUSE_DATA;
+
+typedef struct _PS2_KB_DATA{
     KEYPRESS cur;
     KEYPRESS prev;
     MODIFIERS mods;
     U32 seq; // incremented by kernel on every new keypress. if prev_seq != seq, new keypress has happened
-} KP_DATA;
+} PS2_KB_DATA;
 
-KP_DATA* GET_KP_DATA();
-VOID UPDATE_KP_DATA();
+typedef struct _PS2_MOUSE_DATA{
+    MOUSE_DATA cur;
+    MOUSE_DATA prev;
+    U32 seq;
+} PS2_MOUSE_DATA;
+
+typedef struct _KB_MOUSE_DATA{
+    BOOL8 kb_event;
+    BOOL8 ms_event;
+    
+    PS2_KB_DATA kb;
+    PS2_MOUSE_DATA ms;
+} PS2_KB_MOUSE_DATA;
+
+
+#ifdef __RTOS__
+typedef struct _PS2_INTERNAL_RETVAL{
+    union {
+        KEYPRESS kb;
+        MOUSE_DATA mouse;
+    } data;
+    U8 type;
+} PS2_INTERNAL_RETVAL;
+
+PS2_KB_MOUSE_DATA* GET_KB_MOUSE_DATA();
+VOID UPDATE_KP_MOUSE_DATA();
 
 #define DEFAULT_SCANCODESET SCANCODESET2
 #define SECONDARY_SCANCODESET SCANCODESET1
 
-#ifdef __RTOS__
 MODIFIERS *GET_KEYBOARD_MODIFIERS(VOID);
-KEYPRESS GET_CURRENT_KEY_PRESSED(VOID);
+PS2_INTERNAL_RETVAL GET_CURRENT_KEY_PRESSED(VOID);
 U8 KEYPRESS_TO_CHARS(U32 kcode);
 KEYPRESS *GET_LAST_KEY_PRESSED(VOID);
+
+BOOLEAN PS2_MOUSE_INIT();
+void PS2_MOUSE_HANDLER(I32 num, U32 errcode);
+
 #endif // __RTOS__
 
 #endif // PS2_KEYBOARD_H

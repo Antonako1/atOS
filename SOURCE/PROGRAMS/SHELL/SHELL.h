@@ -3,7 +3,7 @@
 #include <STD/TYPEDEF.h>
 #include <PROGRAMS/SHELL/VOUTPUT.h>
 #include <PROGRAMS/SHELL/BATSH.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <FAT/FAT.h>
 #include <PROC/PROC.h> // for MAX_PROC_AMOUNT
 

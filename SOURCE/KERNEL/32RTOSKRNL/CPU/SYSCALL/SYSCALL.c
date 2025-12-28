@@ -13,7 +13,7 @@
 #include <FS/FAT/FAT.h>
 
 #include <DRIVERS/VIDEO/VBE.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
 #include <DRIVERS/AC97/AC97.h>
 #include <DRIVERS/CMOS/CMOS.h>
@@ -87,21 +87,8 @@ U32 SYS_VBE_DRAW_RECTANGLE(U32 x, U32 y, U32 width, U32 height, U32 colour) {
     return (U32)VBE_DRAW_RECTANGLE(x, y, width, height, (VBE_PIXEL_COLOUR)colour);
 }
 
-U32 SYS_PS2_KEYBOARD_RESET(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
-    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
-    return PS2_KEYBOARD_RESET();
-}
-U32 SYS_GET_CURRENT_KEY_PRESSED(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
-    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
-    KEYPRESS *key = (KEYPRESS *)KMALLOC(sizeof(KEYPRESS));
-    KEYPRESS retval = GET_CURRENT_KEY_PRESSED();
-    MEMCPY(key, &retval, sizeof(KEYPRESS));
-    return (U32)key;
-}
-U32 SYS_GET_LAST_KEY_PRESSED(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
-    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
-    return (U32)(GET_LAST_KEY_PRESSED());
-}
+
+
 U32 SYS_KEYPRESS_TO_CHARS(U32 kcode, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     U8 chars = KEYPRESS_TO_CHARS(kcode);
@@ -255,9 +242,9 @@ U32 SYS_PROC_GETPID_BY_NAME(U32 name_ptr, U32 unused2, U32 unused3, U32 unused4,
     return pid;
 }
 
-U32 SYS_GET_KP_DATA(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+U32 SYS_GET_KB_MOUSE_DATA(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
-    return GET_KP_DATA();
+    return GET_KB_MOUSE_DATA();
 }
 
 U32 SYS_KMALLOC(U32 size, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {

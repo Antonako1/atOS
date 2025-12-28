@@ -1,26 +1,45 @@
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <CPU/PIC/PIC.h>
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <CPU/ISR/ISR.h>
+#include <DRIVERS/VIDEO/VBE.h>
 #include <STD/BINARY.h>
+#include <STD/MATH.h>
+#include <DEBUG/KDEBUG.h>
+
+void PARSE_KEYPRESS(KEYPRESS *key);
+KEYPRESS ParsePS2_CS2(U32 scancode1, U32 scancode2, U8 scancode1_bytes, U8 scancode2_bytes);
+KEYPRESS ParsePS2_CS1(U32 scancode1, U32 scancode2);
 
 static PS2KB_CMD_QUEUE cmd_queue __attribute__((section(".data"))) = {0};
 static PS2_INFO ps2_info __attribute__((section(".data"))) = {0};
 static KEYPRESS last_key __attribute__((section(".data"))) = {0}; // Store the last key pressed to avoid repeats
+static MOUSE_DATA last_mouse __attribute__((section(".data"))) = {0};
 static MODIFIERS modifiers __attribute__((section(".data"))) = {0};
+static U8 mouse_cycle = 0;
+static U8 mouse_bytes[3];
+static volatile PS2_KB_MOUSE_DATA GLOBAL_KB_MOUSE_DATA ATTRIB_DATA = { 0 };
 
-static volatile KP_DATA GLOBAL_KP_DATA ATTRIB_DATA = { 0 };
-
-KP_DATA* GET_KP_DATA() {
-    return &GLOBAL_KP_DATA;
+PS2_KB_MOUSE_DATA* GET_KB_MOUSE_DATA() {
+    return &GLOBAL_KB_MOUSE_DATA;
 }
-VOID UPDATE_KP_DATA() {
-    KEYPRESS kp = GET_CURRENT_KEY_PRESSED();
-    if(kp.keycode != KEY_UNKNOWN) {
-        GLOBAL_KP_DATA.seq++;
-        GLOBAL_KP_DATA.cur = kp;
-        GLOBAL_KP_DATA.prev = last_key;
-        GLOBAL_KP_DATA.mods = modifiers;
+VOID UPDATE_KP_MOUSE_DATA() {
+    PS2_INTERNAL_RETVAL kp = GET_CURRENT_KEY_PRESSED();
+    GLOBAL_KB_MOUSE_DATA.kb_event = FALSE;
+    GLOBAL_KB_MOUSE_DATA.ms_event = FALSE;
+    if(kp.type == KEYBOARD_PACKET) {
+        GLOBAL_KB_MOUSE_DATA.kb.prev = last_key;
+        GLOBAL_KB_MOUSE_DATA.kb.cur = kp.data.kb;
+        GLOBAL_KB_MOUSE_DATA.kb.mods = modifiers;
+        GLOBAL_KB_MOUSE_DATA.kb.seq++;
+        GLOBAL_KB_MOUSE_DATA.kb_event = TRUE;
+    }
+    if(kp.type == MOUSE_PACKET) {
+        GLOBAL_KB_MOUSE_DATA.ms.prev = last_mouse;
+        GLOBAL_KB_MOUSE_DATA.ms.cur = kp.data.mouse;
+        GLOBAL_KB_MOUSE_DATA.ms.seq++;
+        GLOBAL_KB_MOUSE_DATA.ms_event = TRUE;
+        KDEBUG_STR_HEX_LN("Mouse: ", kp.data.mouse.x);
     }
 }
 
@@ -31,7 +50,7 @@ PS2_INFO *GET_PS2_INFO(VOID) {
 BOOLEAN IS_CMD_QUEUE_EMPTY(VOID) { 
     return cmd_queue.head == cmd_queue.tail; 
 }
-void PUSH_TO_CMD_QUEUE(U8 byte) {
+void PUSH_TO_CMD_QUEUE(PS2_PACKET byte) {
     U8 next = (cmd_queue.head + 1) % CMD_QUEUE_SIZE;
     if(next == cmd_queue.tail) {
         return;
@@ -43,12 +62,15 @@ void PUSH_TO_CMD_QUEUE(U8 byte) {
 PS2KB_CMD_QUEUE *GET_CMD_QUEUE(VOID) { 
     return &cmd_queue; 
 }
-U8 POP_FROM_CMD_QUEUE(VOID) {
+PS2_PACKET POP_FROM_CMD_QUEUE(VOID) {
+    CLI;
     if (IS_CMD_QUEUE_EMPTY()) {
-        return 0; // Queue is empty
+        STI;
+        return (PS2_PACKET){ 0, 0 }; // Queue is empty
     }
-    U8 byte = cmd_queue.buffer[cmd_queue.tail];
+    PS2_PACKET byte = cmd_queue.buffer[cmd_queue.tail];
     cmd_queue.tail = (cmd_queue.tail + 1) % CMD_QUEUE_SIZE;
+    STI;
     return byte;
 }
 BOOLEAN IS_CMD_QUEUE_FULL(VOID) {
@@ -64,22 +86,23 @@ U8 PS2_INB(U8 port) {
     return status;
 }
 
-
-
+void PS2_MOUSE_HANDLER(I32 num, U32 errcode) {
+    (void)num; (void)errcode;
+    U8 mouse_byte = PS2_INB(PS2_DATAPORT);
+    PUSH_TO_CMD_QUEUE((PS2_PACKET){MOUSE_PACKET, mouse_byte});
+    pic_send_eoi(12);
+}
 
 void PS2_KEYBOARD_HANDLER(I32 num, U32 errcode) {
     (void)num; (void)errcode; // not used
     U8 scancode = PS2_INB(PS2_DATAPORT);
-    PUSH_TO_CMD_QUEUE(scancode);
+    PUSH_TO_CMD_QUEUE((PS2_PACKET){KEYBOARD_PACKET, scancode});
     pic_send_eoi(1); // IRQ1 is for keyboard
 }
 
-
-
-
 BOOLEAN PS2_WAIT_FOR_INPUT_CLEAR(VOID) {
     int timeout = 10000;
-    while(PS2_INB(PS2_CMDPORT) & PS2_INPUT_BUFFER_FULL && --timeout);
+    while(PS2_INB(PS2_STATUSPORT) & PS2_INPUT_BUFFER_FULL && --timeout);
     if(timeout == 0) return FALSE;
     return TRUE;
 }
@@ -250,7 +273,6 @@ BOOLEAN PS2_KEYBOARD_INIT(VOID) {
         return FALSE;
     }
 
-    CLEAR_CMD_QUEUE();
     #endif // PS2_TEST
 
     ISR_REGISTER_HANDLER(PIC_REMAP_OFFSET + 1, PS2_KEYBOARD_HANDLER);
@@ -259,7 +281,7 @@ BOOLEAN PS2_KEYBOARD_INIT(VOID) {
     // enable scanning
     if(!PS2_EnableScanning()) return FALSE;
     #endif // PS2_TEST
-
+    CLEAR_CMD_QUEUE();
     modifiers.shift = FALSE;
     modifiers.ctrl = FALSE;
     modifiers.alt = FALSE;
@@ -271,7 +293,177 @@ BOOLEAN PS2_KEYBOARD_INIT(VOID) {
     return TRUE;
 }
 
+BOOLEAN PS2_MOUSE_INIT() {
+    PIC_Unmask(12);
+    return TRUE;
+}
 
+KEYPRESS *GET_LAST_KEY_PRESSED(VOID) {
+    return &last_key;
+}
+
+// Move these to static scope so they persist between calls
+static U32 scancode1 = 0, scancode2 = 0;
+static U8 scancode1_size = 0, scancode2_size = 0;
+
+PS2_INTERNAL_RETVAL GET_CURRENT_KEY_PRESSED(VOID) {
+    if(IS_CMD_QUEUE_EMPTY()) return (PS2_INTERNAL_RETVAL){0};
+    
+    PS2_INTERNAL_RETVAL retval = {0};
+    retval.type = 0;
+
+    // We process until we find a COMPLETE event (1 full key or 3 full mouse bytes)
+    while(!IS_CMD_QUEUE_EMPTY()) {
+        PS2_PACKET packet = POP_FROM_CMD_QUEUE();
+        
+        if(packet.device == KEYBOARD_PACKET) {
+            U8 scancode = packet.data;
+            
+            // Build the scancode buffers
+            if(scancode1_size < 4) {
+                scancode1 = (scancode1 << 8) | scancode;
+                scancode1_size++;
+            } else {
+                scancode2 = (scancode2 << 8) | scancode;
+                scancode2_size++;
+            }
+
+            KEYPRESS result = { 0 };
+            if(ps2_info.scancode_set == SCANCODESET1) {
+                result = ParsePS2_CS1(scancode1, scancode2);
+            } else {
+                // If it's a prefix byte in Set 2, we must wait for the next byte
+                if(scancode == 0xF0 || scancode == 0xE0) {
+                    continue; 
+                }
+                result = ParsePS2_CS2(scancode1, scancode2, scancode1_size, scancode2_size);
+            }
+
+            // Reset buffers for next key
+            scancode1 = 0; scancode2 = 0;
+            scancode1_size = 0; scancode2_size = 0;
+
+            if(result.keycode != KEY_UNKNOWN) {
+                retval.type = KEYBOARD_PACKET;
+                retval.data.kb = result;
+                // Update global state
+                PARSE_KEYPRESS(&retval.data.kb); // Handle modifiers
+                last_key = retval.data.kb;
+            }
+            return retval;
+        } 
+        else if(packet.device == MOUSE_PACKET) {
+            mouse_bytes[mouse_cycle++] = packet.data;
+            
+            // Sync check
+            if (mouse_cycle == 1 && !(mouse_bytes[0] & 0x08)) {
+                mouse_cycle = 0;
+                continue;
+            }
+
+            if (mouse_cycle == 3) {
+                mouse_cycle = 0;
+                
+                I32 rel_x = (I32)mouse_bytes[1];
+                I32 rel_y = (I32)mouse_bytes[2];
+                
+                // Sign extension for 9-bit relative movement
+                if (mouse_bytes[0] & 0x10) rel_x -= 256;
+                if (mouse_bytes[0] & 0x20) rel_y -= 256;
+
+                // Update absolute coordinates in last_mouse
+                // Assuming SCREEN_WIDTH and HEIGHT are defined
+                last_mouse.x = clampi(last_mouse.x + rel_x, 0, SCREEN_WIDTH);
+                last_mouse.y = clampi(last_mouse.y - rel_y, 0, SCREEN_HEIGHT); // Y is usually inverted
+                
+                last_mouse.mouse1 = (mouse_bytes[0] & 0x01) ? TRUE : FALSE;
+                last_mouse.mouse2 = (mouse_bytes[0] & 0x02) ? TRUE : FALSE;
+                last_mouse.mouse3 = (mouse_bytes[0] & 0x04) ? TRUE : FALSE;
+
+                retval.type = MOUSE_PACKET;
+                retval.data.mouse = last_mouse;
+                return retval;
+            }
+        }
+    }
+    return retval;
+}
+
+void PARSE_KEYPRESS(KEYPRESS *key) {
+    if (!key) return;
+    
+    if(key->pressed) {
+        switch(key->keycode) {
+            case KEY_CAPSLOCK:
+                modifiers.capslock = !modifiers.capslock;
+                return; // No further processing needed
+            case KEYPAD_NUMLOCK:
+                modifiers.numlock = !modifiers.numlock;
+                return; // No further processing needed
+            case KEY_SCROLLLOCK:
+                modifiers.scrolllock = !modifiers.scrolllock;
+                return; // No further processing needed
+            case KEY_RALT:
+            case KEY_LALT:
+                modifiers.alt = TRUE;
+                break; // No further processing needed
+            case KEY_LCTRL:
+            case KEY_RCTRL:
+                modifiers.ctrl = TRUE;
+                break; // No further processing needed
+            case KEY_LSHIFT:
+            case KEY_RSHIFT:
+                modifiers.shift = TRUE;
+                break; // No further processing needed
+            default:
+                break;
+        }
+    } else {
+        switch(key->keycode) {
+            case KEY_RALT:
+            case KEY_LALT:
+                modifiers.alt = FALSE;
+                break; // No further processing needed
+            case KEY_LCTRL:
+            case KEY_RCTRL:
+                modifiers.ctrl = FALSE;
+                break; // No further processing needed
+            case KEY_LSHIFT:
+            case KEY_RSHIFT:
+                modifiers.shift = FALSE;
+                break; // No further processing needed
+            default:
+                break;
+        }
+    }
+
+    if(modifiers.shift)
+        switch(key->keycode) {
+            case KEY_1: key->keycode = KEY_EXCLAMATION; break;
+            case KEY_2: key->keycode = KEY_AT; break;
+            case KEY_3: key->keycode = KEY_HASH; break;
+            case KEY_4: key->keycode = KEY_DOLLAR; break;
+            case KEY_5: key->keycode = KEY_PERCENT; break;
+            case KEY_6: key->keycode = KEY_CARET; break;
+            case KEY_7: key->keycode = KEY_AMPERSAND; break;
+            case KEY_8: key->keycode = KEY_ASTERISK; break;
+            case KEY_9: key->keycode = KEY_LEFT_PAREN; break;
+            case KEY_0: key->keycode = KEY_RIGHT_PAREN; break;
+            case KEY_MINUS: key->keycode = KEY_UNDERSCORE; break;
+            case KEY_EQUALS: key->keycode = KEY_PLUS; break;
+            case KEY_GRAVE: key->keycode = KEY_TILDE; break;
+            case KEY_LBRACKET: key->keycode = KEY_LEFT_CURLY; break;
+            case KEY_RBRACKET: key->keycode = KEY_RIGHT_CURLY; break;
+            case KEY_BACKSLASH: key->keycode = KEY_PIPE; break;
+            case KEY_SEMICOLON: key->keycode = KEY_COLON; break;
+            case KEY_APOSTROPHE: key->keycode = KEY_QUOTE; break;
+            case KEY_COMMA: key->keycode = KEY_LESS; break;
+            case KEY_DOT: key->keycode = KEY_GREATER; break;
+            case KEY_SLASH: key->keycode = KEY_QUESTION; break;
+            default:
+                break;
+        }
+}
 
 KEYPRESS ParsePS2_CS1(U32 scancode1, U32 scancode2) {
     return (KEYPRESS){0};
@@ -603,121 +795,7 @@ KEYPRESS ParsePS2_CS2(U32 scancode1, U32 scancode2, U8 scancode1_bytes, U8 scanc
     return keypress;
 }
 
-void PARSE_KEYPRESS(KEYPRESS *key) {
-    if (!key) return;
-    
-    if(key->pressed) {
-        switch(key->keycode) {
-            case KEY_CAPSLOCK:
-                modifiers.capslock = !modifiers.capslock;
-                return; // No further processing needed
-            case KEYPAD_NUMLOCK:
-                modifiers.numlock = !modifiers.numlock;
-                return; // No further processing needed
-            case KEY_SCROLLLOCK:
-                modifiers.scrolllock = !modifiers.scrolllock;
-                return; // No further processing needed
-            case KEY_RALT:
-            case KEY_LALT:
-                modifiers.alt = TRUE;
-                break; // No further processing needed
-            case KEY_LCTRL:
-            case KEY_RCTRL:
-                modifiers.ctrl = TRUE;
-                break; // No further processing needed
-            case KEY_LSHIFT:
-            case KEY_RSHIFT:
-                modifiers.shift = TRUE;
-                break; // No further processing needed
-            default:
-                break;
-        }
-    } else {
-        switch(key->keycode) {
-            case KEY_RALT:
-            case KEY_LALT:
-                modifiers.alt = FALSE;
-                break; // No further processing needed
-            case KEY_LCTRL:
-            case KEY_RCTRL:
-                modifiers.ctrl = FALSE;
-                break; // No further processing needed
-            case KEY_LSHIFT:
-            case KEY_RSHIFT:
-                modifiers.shift = FALSE;
-                break; // No further processing needed
-            default:
-                break;
-        }
-    }
 
-    if(modifiers.shift)
-        switch(key->keycode) {
-            case KEY_1: key->keycode = KEY_EXCLAMATION; break;
-            case KEY_2: key->keycode = KEY_AT; break;
-            case KEY_3: key->keycode = KEY_HASH; break;
-            case KEY_4: key->keycode = KEY_DOLLAR; break;
-            case KEY_5: key->keycode = KEY_PERCENT; break;
-            case KEY_6: key->keycode = KEY_CARET; break;
-            case KEY_7: key->keycode = KEY_AMPERSAND; break;
-            case KEY_8: key->keycode = KEY_ASTERISK; break;
-            case KEY_9: key->keycode = KEY_LEFT_PAREN; break;
-            case KEY_0: key->keycode = KEY_RIGHT_PAREN; break;
-            case KEY_MINUS: key->keycode = KEY_UNDERSCORE; break;
-            case KEY_EQUALS: key->keycode = KEY_PLUS; break;
-            case KEY_GRAVE: key->keycode = KEY_TILDE; break;
-            case KEY_LBRACKET: key->keycode = KEY_LEFT_CURLY; break;
-            case KEY_RBRACKET: key->keycode = KEY_RIGHT_CURLY; break;
-            case KEY_BACKSLASH: key->keycode = KEY_PIPE; break;
-            case KEY_SEMICOLON: key->keycode = KEY_COLON; break;
-            case KEY_APOSTROPHE: key->keycode = KEY_QUOTE; break;
-            case KEY_COMMA: key->keycode = KEY_LESS; break;
-            case KEY_DOT: key->keycode = KEY_GREATER; break;
-            case KEY_SLASH: key->keycode = KEY_QUESTION; break;
-            default:
-                break;
-        }
-}
-
-KEYPRESS *GET_LAST_KEY_PRESSED(VOID) {
-    return &last_key;
-}
-KEYPRESS GET_CURRENT_KEY_PRESSED(VOID) {
-    if(IS_CMD_QUEUE_EMPTY()) return (KEYPRESS){0};
-    U32 scancode1 = 0, scancode2 = 0;
-    U8 scancode1_size = 0, scancode2_size = 0;    
-    KEYPRESS keypress = {0};
-    while(!IS_CMD_QUEUE_EMPTY()) {
-        U8 scancode = POP_FROM_CMD_QUEUE();
-        if(scancode1_size == 4) {
-            if(scancode2_size++ == 0) {
-                scancode2 = scancode;
-            } else {
-                scancode2 = (scancode2 << 8) | scancode;
-            }
-        } else {
-            if(scancode1_size++ == 0) {
-                scancode1 = scancode;
-            } else {
-                scancode1 = (scancode1 << 8) | scancode;
-            }
-        }
-        if(ps2_info.scancode_set == SCANCODESET1) {
-            keypress = ParsePS2_CS1(scancode1, scancode2); // Assuming default scan code set 2
-        } else {
-            if(scancode1 == SC2_RELEASE_F0 || 
-                scancode1 == SC2_RELEASE_E0 || 
-                scancode1 == SC2_RELEASE_E0F0) {
-                continue; // Wait for more bytes
-            }
-            keypress = ParsePS2_CS2(scancode1, scancode2, scancode1_size, scancode2_size); // Assuming default scan code set 2
-        }
-    }
-    
-    PARSE_KEYPRESS(&keypress); // Handle special cases or modifiers if needed
-    last_key = keypress;
-    return keypress;
-}
 U8 KEYPRESS_TO_CHARS(U32 kcode) {
     static U8 str = 0;
     switch(kcode) {

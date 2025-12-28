@@ -208,7 +208,7 @@ All public functions are declared in the driver’s `.h` file.
 
 Let’s outline a simple **PS/2 Keyboard** driver structure.
 
-### Header (`DRIVERS/KEYBOARD/KEYBOARD.h`)
+### Header (`DRIVERS/KEYBOARD/KEYBOARD_MOUSE.h`)
 ```c
 #ifndef KEYBOARD_DRIVER_H
 #define KEYBOARD_DRIVER_H
@@ -223,9 +223,9 @@ U8 READ_KEYCODE(VOID);
 #endif
 ```
 
-### Source (`DRIVERS/KEYBOARD/KEYBOARD.c`)
+### Source (`DRIVERS/KEYBOARD/KEYBOARD_MOUSE.c`)
 ```c
-#include <DRIVERS/KEYBOARD/KEYBOARD.h>
+#include <DRIVERS/KEYBOARD/KEYBOARD_MOUSE.h>
 #include <CPU/ISR/ISR.h>
 #include <CPU/PIC/PIC.h>
 #include <STD/ASM.h>

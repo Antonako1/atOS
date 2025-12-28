@@ -8,7 +8,7 @@ and some not-so-important functions are here.
 #include <DRIVERS/ATAPI/ATAPI.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
 #include <DRIVERS/VIDEO/VBE.h>
-#include <DRIVERS/PS2/KEYBOARD.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <DRIVERS/AC97/AC97.h>
 
 #include <FS/ISO9660/ISO9660.h>
