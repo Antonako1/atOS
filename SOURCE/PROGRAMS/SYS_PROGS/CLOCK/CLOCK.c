@@ -126,14 +126,13 @@ U32 main(U32 argc, PPU8 argv) {
     
     BOOL8 running = TRUE;
     while (running) {
-        PS2_KB_MOUSE_DATA* kp = get_latest_keypress();
-        if (valid_kp(kp)) {
-            if (kp->kb.cur.pressed) {
-                if (kp->kb.cur.keycode == KEY_ESC) {
+        PS2_KB_DATA* kp = kb_poll();
+        if (kp) {
+            if (kp->cur.pressed) {
+                if (kp->cur.keycode == KEY_ESC) {
                     running = FALSE;
                 }
             }
-            update_kp_seq(kp);
         }
         UPDATE_CLOCK();
         cpu_relax();

@@ -91,6 +91,7 @@ U0 INITIALIZE_SHELL() {
     // --- DEBUG ---
     DEBUG_PRINTF("[SHELL %d] INITIALIZE_SHELL: Access granted. Initialization complete.\n", shndl->self_pid);
     // -------------
+    KB_MS_INIT();
 }
 
 U0 SWITCH_CMD_INTERFACE_MODE(VOID) {
