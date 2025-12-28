@@ -34,6 +34,7 @@ U32 main(U32 argc, PPU8 argv) {
             }
         }
         PS2_MOUSE_DATA *ms = mouse_poll();
+        // DEBUG_PRINTF("LOOP\n");
         if(ms) {
             DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(ms->cur.x, ms->cur.y, VBE_RED));
         }
