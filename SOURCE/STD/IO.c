@@ -48,63 +48,6 @@ VOID printf(PU8 fmt, ...) {
     va_end(args);
 }
 
-
-
-
-static U32 prev_seq_kb ATTRIB_DATA = 0;
-static U32 prev_seq_ms ATTRIB_DATA = 0;
-static PS2_KB_MOUSE_DATA *kp ATTRIB_DATA = NULLPTR;
-
-
-PS2_KB_MOUSE_DATA *get_KB_MOUSE_DATA() {
-    if(!kp) kp = SYSCALL0(SYSCALL_GET_KB_MOUSE_DATA);
-    return kp;
-}
-PS2_KB_DATA *get_KB_DATA() {
-    if(!kp) return NULLPTR;
-    return &kp->kb;
-}
-
-BOOLEAN KB_MS_INIT() {
-    kp = get_KB_MOUSE_DATA();
-}
-
-PS2_KB_DATA *get_last_keypress() {
-    PS2_KB_MOUSE_DATA *kp = get_KB_MOUSE_DATA();
-    if(!kp) return NULLPTR;
-    return &kp->kb.prev;
-}
-PS2_KB_DATA *get_latest_keypress() {
-    if(!kp) return NULLPTR;
-    kp->kb_event = FALSE;
-    if(prev_seq_kb != kp->kb.seq) {
-        prev_seq_kb = kp->kb.seq;
-        kp->kb_event = TRUE;
-        return &kp->kb.cur;
-    }
-    return NULLPTR;
-}
-PS2_KB_DATA *get_latest_keypress_unconsumed() {
-    PS2_KB_MOUSE_DATA *kp = get_KB_MOUSE_DATA();
-    if (!kp) return NULLPTR;
-    return &kp->kb.cur; // no seq check, always return latest
-}
-
-MODIFIERS *get_modifiers() {
-    PS2_KB_MOUSE_DATA *kp = get_KB_MOUSE_DATA();
-    if(!kp) return NULLPTR;
-    return &kp->kb.mods;
-}
-U32 get_kp_seq() {
-    PS2_KB_MOUSE_DATA *kp = get_KB_MOUSE_DATA();
-    if(!kp) return NULLPTR;
-    return kp->kb.seq;
-}
-U8 keypress_to_char(U32 kcode) {
-    U8 c = (U8)SYSCALL(SYSCALL_KEYPRESS_TO_CHARS, kcode, 0, 0, 0, 0);
-    return c;
-}
-
 void sys(PU8 cmd) {
     U32 parent = PROC_GETPPID();
     PU8 cmd_dup = STRDUP(cmd); // Duplicate command for string sending. Will be freed by receiver
@@ -113,67 +56,73 @@ void sys(PU8 cmd) {
     SEND_MESSAGE(&msg);
 }
 
-VOID update_kp_seq(PS2_KB_MOUSE_DATA *data) {
-    if (!kp) return;
-    data->kb.seq++;
+
+typedef struct {
+    PS2_KB_MOUSE_DATA *shared;
+    U32 last_kb_seq;
+    U32 last_ms_seq;
+} INPUT_CTX;
+
+static INPUT_CTX input ATTRIB_DATA = {0};
+
+
+PS2_KB_MOUSE_DATA *get_KB_MOUSE_DATA() {
+    return input.shared;
 }
 
-BOOLEAN valid_kp(PS2_KB_MOUSE_DATA *data) {
-    if(kp) return TRUE;
-    return FALSE;
+BOOLEAN KB_MS_INIT() {
+    if(!input.shared) 
+        input.shared = SYSCALL0(SYSCALL_GET_KB_MOUSE_DATA);
+    return input.shared != NULLPTR;
 }
 
+PS2_KB_DATA *kb_poll(void) {
+    if (!input.shared) return NULLPTR;
 
-PS2_MOUSE_DATA *get_MS_DATA() {
-    if(kp) return &kp->ms;
-    return NULLPTR;
-}
-BOOLEAN valid_ms(MOUSE_DATA *kp) {
-    if(kp) return TRUE;
-    return FALSE;
-}
-void update_ms_seq(PS2_MOUSE_DATA *kp) {
-    if(!kp) return;
-    kp->seq++;
-}
-U32 get_ms_seq() {
-    if(!kp) return 0;
-    return kp->ms.seq;
-}
-PS2_MOUSE_DATA *get_last_mousedata() {
-    if(!kp) return NULLPTR;
-    return &kp->ms.prev;
-}
-PS2_MOUSE_DATA *get_latest_mousedata() {
-    if(!kp) return NULLPTR;
-    kp->kb_event = TRUE;
-    if(kp->ms.seq != prev_seq_ms) {
-        prev_seq_ms = kp->ms.seq;
-        kp->ms_event = TRUE;
-        return &kp->ms.cur;
+    volatile PS2_KB_DATA *kb = &input.shared->kb;
+
+    if (kb->seq != input.last_kb_seq) {
+        input.last_kb_seq = kb->seq;
+        return (PS2_KB_DATA *)&kb->cur;
     }
     return NULLPTR;
 }
 
-BOOLEAN mouse_moved() {
-    if(!kp) return FALSE;
-    return kp->ms.prev.x != kp->ms.cur.x || kp->ms.prev.y != kp->ms.cur.y;
+PS2_KB_DATA *kb_peek(void) {
+    if (!input.shared) return NULLPTR;
+    return &input.shared->kb.cur;
 }
-BOOLEAN mouse1_pressed() {
-    if(!kp) return FALSE;
-    return kp->ms.cur.mouse1;
-}
-BOOLEAN mouse2_pressed() {
-    if(!kp) return FALSE;
-    return kp->ms.cur.mouse2;
 
+PS2_KB_DATA *kb_last(void) {
+    if (!input.shared) return NULLPTR;
+    return &input.shared->kb.prev;
 }
-BOOLEAN mouse3_pressed() {
-    if(!kp) return FALSE;
-    return kp->ms.cur.mouse3;
 
+MODIFIERS *kb_mods(void) {
+    if (!input.shared) return NULLPTR;
+    return &input.shared->kb.mods;
 }
-BOOLEAN scrollwheel_moved() {
-    if(!kp) return FALSE;
-    return kp->ms.cur.scroll_wheel != kp->ms.prev.scroll_wheel;
+
+PS2_MOUSE_DATA *mouse_poll(void) {
+    if (!input.shared) return NULLPTR;
+
+    if (input.shared->ms.seq != input.last_ms_seq) {
+        input.last_ms_seq = input.shared->ms.seq;
+        return &input.shared->ms.cur;
+    }
+    return NULLPTR;
+}
+
+PS2_MOUSE_DATA *mouse_peek(void) {
+    if(!input.shared) return NULLPTR;
+    return &input.shared->ms.cur;
+}
+PS2_MOUSE_DATA *mouse_last(void) {
+    if(!input.shared) return NULLPTR;
+    return &input.shared->ms.prev;
+}
+
+U8 keypress_to_char(U32 kcode) {
+    U8 c = (U8)SYSCALL(SYSCALL_KEYPRESS_TO_CHARS, kcode, 0, 0, 0, 0);
+    return c;
 }
