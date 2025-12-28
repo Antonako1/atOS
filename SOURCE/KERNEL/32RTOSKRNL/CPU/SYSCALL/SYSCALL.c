@@ -95,15 +95,6 @@ U32 SYS_KEYPRESS_TO_CHARS(U32 kcode, U32 unused2, U32 unused3, U32 unused4, U32 
 
     return (U32)chars;
 }
-U32 SYS_GET_KEYBOARD_MODIFIERS(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
-    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
-    MODIFIERS *mod = (MODIFIERS *)KMALLOC(sizeof(MODIFIERS));
-    if (!mod) return 0;
-    MODIFIERS *retval = GET_KEYBOARD_MODIFIERS();
-    MEMCPY(mod, retval, sizeof(MODIFIERS));
-    KFREE(retval);
-    return (U32)mod;
-}
 
 U32 SYS_GET_PIT_TICK(U32 unused1, U32 unusef2, U32 unused3, U32 unused4, U32 unused5) {
     return get_ticks();
