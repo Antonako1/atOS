@@ -4,11 +4,16 @@
     Part of atOS
 
     Licensed under the MIT License. See LICENSE file in the project root for full license information.
+
+    Notes:
+        - All drawing functions here write directly to the processes' VRAM buffer.
+        - calling FLUSH_VRAM() is optional, VRAM is flushed automatically at a set interval. 
 ---*/
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 #include <STD/TYPEDEF.h>
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
+
 void FLUSH_VRAM(VOID);
 BOOLEAN DRAW_8x8_CHARACTER(U32 x, U32 y, U8 ch, VBE_COLOUR fg, VBE_COLOUR bg);
 BOOLEAN DRAW_8x8_STRING(U32 x, U32 y, U8 *str, VBE_COLOUR fg, VBE_COLOUR bg);

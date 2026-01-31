@@ -4,7 +4,7 @@
 #include <STD/MEM.h>
 #include <MEMORY/HEAP/KHEAP.h>
 #include <DRIVERS/ATAPI/ATAPI.h>
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 
 static PrimaryVolumeDescriptor *pvd = NULLPTR;

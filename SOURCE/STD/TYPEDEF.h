@@ -46,17 +46,23 @@
 #define ASM          __asm__
 #define RETURN       return
 
-#define CONST        const
+#define CONST       const
 #define VOLATILE    volatile
-#define INLINE       inline
+#define INLINE      inline
 #define RESTRICT    restrict
-#define NULL         ((void*)0)
-#define NULLPTR      ((void*)0)
-#define NULLT     '\0'
-#define VOID         void
+#define NULL        ((void*)0)
+#define NULLPTR     ((void*)0)
+#define NULLT       '\0'
+#define VOID        void
 #define VOIDPTR     void*
 #define SET_NULL(x) (x = NULLPTR);
-// Integer definitions
+
+/*
+Integer definitions.
+
+U = Unsigned
+I/S = Signed
+*/ 
 typedef VOID            U0;
 typedef VOID            I0;
 typedef VOID            S0;
@@ -66,19 +72,47 @@ typedef signed short    I16;
 typedef unsigned short  U16;
 typedef signed int      I32;
 typedef unsigned int    U32;
+
 typedef I8              S8;
 typedef I16             S16;
 typedef I32             S32;
 
-typedef float         F32;
+typedef U8              CHAR; 
+typedef I8              ICHAR;
+typedef I16             SHORT;
+typedef U16             USHORT;
+typedef I32             INT;
+typedef U32             UINT;
+
+typedef U8              BYTE;
+typedef I8              SBYTE;
+typedef U16             WORD;
+typedef I16             SWORD;
+typedef U32             DWORD;
+typedef I32             SDWORD;
+
+typedef U8*             PU8;
+typedef U16*            PU16;
+typedef U32*            PU32;
+
+typedef PU8*            PPU8;
+typedef PU16*           PPU16;
+typedef PU32*           PPU32;
+
+typedef U32             SIZE_T;
+typedef U32             size_t;
+typedef U32             PTR;
+typedef U32             ADDR;
 
 // 64-bit integer definition... not nice...
 typedef struct {
     U32 Low;
     U32 High;
-} 
-__attribute__((packed))
-U64;
+} ATTRIB_PACKED U64;
+
+// Float definitions
+typedef float        F32;
+
 
 // Boolean definitions
 typedef U32          BOOL;
@@ -87,32 +121,6 @@ typedef U8           BOOL8;
 typedef U8           BOOLEAN8;
 #define TRUE         1
 #define FALSE        0
-
-#define CHAR         U8
-#define UCHAR        unsigned char
-#define CHARPTR      CHAR*
-#define STRING       CHAR*
-#define SHORT        I16
-#define USHORT       U16
-#define INT          I32
-#define UINT         U32
-
-typedef U8           BYTE;
-typedef U16          WORD;
-typedef U32          DWORD;
-
-typedef U8*          PU8;
-typedef U16*         PU16;
-typedef U32*         PU32;
-
-typedef PU8*         PPU8;
-typedef PU16*        PPU16;
-typedef PU32*        PPU32;
-
-typedef U32          SIZE_T;
-typedef U32          size_t;
-typedef U32          PTR;
-typedef U32          ADDR;
 
 // Min - Max value definitions
 #define MIN(a, b)    ((a) < (b) ? (a) : (b))

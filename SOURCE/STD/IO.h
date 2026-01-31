@@ -70,6 +70,16 @@ while(running){
         }
     }
 }
+
+Simple mouse example
+PS2_MOUSE_DATA *ms = mouse_poll();
+if(ms) {
+    U16 c = VBE_RED;
+    if(ms->cur.mouse1) c = VBE_YELLOW;
+    if(ms->cur.mouse2) VBE_GREEN;
+    if(ms->cur.mouse3) VBE_BLUE;
+    DRAW_FILLED_RECTANGLE(ms->cur.x, ms->cur.y, 3, 3, c);
+}
 */
 PS2_KB_DATA *kb_poll(void); // polls and returns latest keypress data
 PS2_KB_DATA *kb_peek(void); // returns keypress data gotten after last poll

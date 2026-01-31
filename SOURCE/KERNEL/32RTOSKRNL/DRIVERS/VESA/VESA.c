@@ -1,5 +1,5 @@
 /*+++
-    Source/KERNEL/32RTOSKRNL/DRIVERS/VIDEO/VESA.c - VESA implementation
+    Source/KERNEL/32RTOSKRNL/DRIVERS/VESA/VESA.c - VESA implementation
 
     Part of atOS
 

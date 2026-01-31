@@ -3,7 +3,7 @@
 
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 
 #include <MEMORY/PAGEFRAME/PAGEFRAME.h>

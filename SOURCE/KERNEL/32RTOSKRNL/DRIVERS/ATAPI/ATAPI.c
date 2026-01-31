@@ -1,5 +1,5 @@
 #include "./ATAPI.h"
-#include "../VIDEO/VBE.h"
+#include "../VESA/VBE.h"
 #include "../../../../STD/ASM.h"
 
 #ifndef KERNEL_ENTRY

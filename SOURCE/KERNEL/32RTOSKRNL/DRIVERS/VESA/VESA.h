@@ -1,5 +1,5 @@
 /*+++
-    Source/KERNEL/32RTOSKRNL/DRIVERS/VIDEO/VESA.h - VESA Definitions
+    Source/KERNEL/32RTOSKRNL/DRIVERS/VESA/VESA.h - VESA Definitions
 
     Part of atOS
 
@@ -43,6 +43,13 @@ REMARKS
 #ifndef VESA_H
 #define VESA_H
 #include "../../../../STD/TYPEDEF.h" // TYPE DEFINITIONS
+
+#define SCREEN_WIDTH 1024
+#define SCREEN_HEIGHT 768
+#define SCREEN_CENTER_X (SCREEN_WIDTH/2)
+#define SCREEN_CENTER_Y (SCREEN_HEIGHT/2)
+
+#if defined(__RTOS__) || defined(KERNEL_ENTRY)
 #include "../../MEMORY/MEMORY.h"
 
 #define RM2LA(seg, off)  (((U32)(seg) << 4) + (U32)(off))
@@ -56,11 +63,7 @@ external definitions
 
 // #define VIDEO_MEMORY ((volatile U16*)0x00F00000)
 #define VIDEO_MEMORY ((volatile U16*)0xB8000) // Text mode video memory address
-#define SCREEN_WIDTH 1024
-#define SCREEN_HEIGHT 768
 
-#define SCREEN_CENTER_X (SCREEN_WIDTH/2)
-#define SCREEN_CENTER_Y (SCREEN_HEIGHT/2)
 
 /* Foreground/Background colors */
 #define COLOR_GREEN_ON_BLACK 0x0A
@@ -99,5 +102,6 @@ typedef struct {
 #define GET_VESA_INFO() ((VESA_INFO*)VESA_LOAD_ADDRESS_PHYS)
 
 BOOL vesa_check(void);
+#endif // __RTOS || KERNEL_ENTRY
 
 #endif // VESA_H

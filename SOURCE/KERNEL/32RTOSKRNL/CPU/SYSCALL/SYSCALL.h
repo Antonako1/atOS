@@ -2,7 +2,7 @@
 #define SYSCALL_H
 
 #ifdef KERNEL_ENTRY
-#warning "Not to be used inside KERNEL.c"
+#error "Not to be used inside KERNEL.c"
 #endif // KERNEL_ENTRY
 
 #ifndef KERNEL_ENTRY

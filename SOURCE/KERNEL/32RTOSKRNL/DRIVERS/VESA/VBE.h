@@ -1,5 +1,5 @@
 /*+++
-    Source/KERNEL/32RTOSKRNL/DRIVERS/VIDEO/VBE.h - VESA BIOS Extensions (VBE) Definitions
+    Source/KERNEL/32RTOSKRNL/DRIVERS/VESA/VBE.h - VESA BIOS Extensions (VBE) Definitions
 
     Part of atOS
 
@@ -51,10 +51,10 @@ FUNCTIONS
 
 #include "./VESA.h"
 
+#if defined(__RTOS__) || defined(KERNEL_ENTRY)
 #define VBE_MODE_OFFSET (VESA_LOAD_ADDRESS_PHYS + VESA_CTRL_SIZE)
 #define VBE_MODE_LOAD_ADDRESS_PHYS (VBE_MODE_OFFSET)
 #define VBE_MODE_SIZE 256
-
 
 #define SCREEN_BPP 32
 
@@ -68,7 +68,6 @@ Video memory data is written into this location, and updated to the vbe framebuf
 #define FRAMEBUFFER_END MEM_FRAMEBUFFER_END
 #define FRAMEBUFFER_SIZE 3145728
 
-#ifdef __RTOS__
 void flush_focused_framebuffer();
 void update_current_framebuffer();
 
@@ -185,7 +184,7 @@ typedef struct {
 #define CREATE_VBE_PIXEL_INFO(x, y, colour) \
     ((VBE_PIXEL_INFO){(U32)(x), (U32)(y), (VBE_PIXEL_COLOUR)(colour)})
 
-
+#if defined(__RTOS__) || defined(KERNEL_ENTRY)
 /// @brief VESA BIOS Extensions (VBE) mode information
 typedef struct {
     U16 ModeAttributes;      // Mode attributes (bit flags)
@@ -245,7 +244,6 @@ typedef struct {
 
 #define GET_VBE_MODE() ((VBE_MODEINFO*)(VBE_MODE_LOAD_ADDRESS_PHYS))
 
-#if defined(__RTOS__) || defined(KERNEL_ENTRY)
 /*+++
 BOOL vbe_check(U0)
 

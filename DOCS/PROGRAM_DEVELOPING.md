@@ -7,6 +7,8 @@ There are two folders that should interest you:
  1. `SOURCES/PROGRAMS`
  2. `SOURCES/PROGRAMS/SYS_PROGS`
 
+Which one to choose? I recommend the second option as it is easier to setup, and COMPLETE control of the build sequence is not required.
+
 ### First option: Creating your own program folder
 
 The first option uses CMake to compile your program into its own folder inside `/PROGRAMS/<PROGNAME>/`
@@ -155,5 +157,7 @@ add_custom_target(clean_${ProgramName}
     COMMENT "Cleaning ${ProgramName} build outputs"
 )
 ```
+
+### Second option: Creating a new program in the SYS_PROGS folder
 
 The second option compiles executables into /ATOS folder. See `SOURCE/PROGRAMS/SYS_PROGS/README.md` for more information

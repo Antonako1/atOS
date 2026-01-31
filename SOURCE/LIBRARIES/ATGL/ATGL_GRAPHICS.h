@@ -1,5 +1,10 @@
 #ifndef ATGL_GRAPHICS_H
 #define ATGL_GRAPHICS_H
 #include <STD/TYPEDEF.h>
+#include <LIBRARIES/ATGL/ATGL_DEFS.h>
+#include <DRIVERS/VESA/VBE.h>
+
+VOID ATGL_FILL_RECT(ATGL_RECT rect, VBE_COLOUR colour);
+
 
 #endif // ATGL_GRAPHICS_H

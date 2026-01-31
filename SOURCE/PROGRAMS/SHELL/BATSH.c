@@ -1429,7 +1429,7 @@ VOID SETUP_BATSH_PROCESSER() {
     SET_VAR("PATH", 
         #include <ATOSH.PATH>
     );
-    #include <ENV.VARS>
+    #include <ATOSH.ENV_VARS>
 }
 
 

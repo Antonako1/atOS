@@ -5,7 +5,7 @@
 #include <RTOSKRNL_INTERNAL.h>
 #include <CPU/IDT/IDT.h>
 #include <STD/STRING.h>
-#include <VIDEO/VBE.h>
+#include <VESA/VBE.h>
 #include <PAGING/PAGING.h>
 #include <DEBUG/KDEBUG.h>
 
