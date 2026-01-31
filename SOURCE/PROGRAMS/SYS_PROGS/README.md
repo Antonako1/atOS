@@ -1,5 +1,10 @@
 # SYS_PROGS -- System programs found inside /ATOS
 
+Why SYS_PROGS instead of PROGRAMS?
+
+SYS_PROGS is a bit quicker to setup, so you don't have to spend too much time creating the CMake scripts.
+Also you don't have to modify the path everytime you create a new program since all of these are copied into /ATOS which is already in the user's path by default.
+
 ## Creating program:
 
  1. Create PROGNAME.SOURCES
