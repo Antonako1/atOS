@@ -28,7 +28,7 @@ REMARKS
 #define KERNEL_ENTRY
 #endif // KERNEL_ENTRY
 
-#include "./DRIVERS/VIDEO/VBE.h"
+#include "./DRIVERS/VESA/VBE.h"
 #include "./DRIVERS/ATAPI/ATAPI.h"
 #include "./CPU/INTERRUPTS/INTERRUPTS.h"
 

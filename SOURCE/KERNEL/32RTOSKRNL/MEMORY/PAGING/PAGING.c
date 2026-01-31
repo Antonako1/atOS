@@ -8,7 +8,7 @@ READ ME @ PAGING.H
 #include <MEMORY/MEMORY.h>
 #include <PAGING/PAGING.h>
 #include <STD/STRING.h>
-#include <VIDEO/VBE.h>
+#include <VESA/VBE.h>
 #include <ERROR/ERROR.h>
 #include <PROC/PROC.h>
 #include <E820/E820.h>

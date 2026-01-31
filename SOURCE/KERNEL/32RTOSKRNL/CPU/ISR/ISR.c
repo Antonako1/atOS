@@ -26,7 +26,7 @@ REMARKS
 #ifdef __RTOS__
 #include <CPU/SYSCALL/SYSCALL.h> // For SYSCALL_VECTOR
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <CPU/PIC/PIC.h>
 #include <CPU/YIELD/YIELD.h>
 #include <RTL8139/RTL8139.h>

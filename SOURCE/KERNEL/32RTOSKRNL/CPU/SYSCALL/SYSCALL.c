@@ -12,7 +12,7 @@
 #include <FS/ISO9660/ISO9660.h>
 #include <FS/FAT/FAT.h>
 
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
 #include <DRIVERS/AC97/AC97.h>

@@ -6,7 +6,7 @@
 #include <STD/BINARY.h>
 #include <STD/ASM.h>
 #include <MEMORY/BYTEMAP/BYTEMAP.h>
-#include <VIDEO/VBE.h>
+#include <VESA/VBE.h>
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <STD/MATH.h>
 

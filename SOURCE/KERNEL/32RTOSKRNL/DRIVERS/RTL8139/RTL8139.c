@@ -4,7 +4,7 @@
 #include <STD/ASM.h>
 #include <STD/MEM.h>
 #include <STD/STRING.h>
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <CPU/PIC/PIC.h>
 #include <CPU/ISR/ISR.h>
 #include <DRIVERS/PCI/PCI.h>

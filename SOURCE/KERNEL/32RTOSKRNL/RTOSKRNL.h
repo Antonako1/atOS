@@ -10,8 +10,8 @@
 #include <STD/STRING.h>
 #include <STD/MEM.h>
 
-#include <DRIVERS/VIDEO/VBE.h>
-#include <DRIVERS/VIDEO/VESA.h>
+#include <DRIVERS/VESA/VBE.h>
+#include <DRIVERS/VESA/VESA.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <DRIVERS/ATAPI/ATAPI.h>
 #include <DRIVERS/ATA_PIIX3/ATA_PIIX3.h>

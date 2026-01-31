@@ -1,5 +1,5 @@
 #include <MEMORY/E820/E820.h>
-#include <VIDEO/VBE.h>
+#include <VESA/VBE.h>
 #include <STD/MEM.h>
 #include <RTOSKRNL_INTERNAL.h>
 #include <STD/STRING.h>

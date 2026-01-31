@@ -4,7 +4,7 @@
 // in other programs.
 #ifndef VOUTPUT_H
 #define VOUTPUT_H
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <STD/TYPEDEF.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 
