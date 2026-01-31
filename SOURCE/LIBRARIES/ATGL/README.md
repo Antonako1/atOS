@@ -12,4 +12,13 @@ ATGL (atOS Graphical Library) is a lightweight and efficient graphical library d
 
 ## In-Depth
 
-ATGL_WINDOW - Master element
+ - ATGL_SCREEN
+ - This is the main instance of ATGL
+    - ATGL_WINDOW
+        - This is the window that graphics are drawn onto.
+        - ATGL_SCREEN contains one main window.
+        - Windows can have child windows which are simply just pop-up windows
+    - ATGL_NODES
+        - Elements like text, images, buttons, etc.     
+    - ATGL_INPUT
+        - Input handler

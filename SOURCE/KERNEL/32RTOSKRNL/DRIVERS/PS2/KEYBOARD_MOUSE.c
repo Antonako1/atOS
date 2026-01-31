@@ -2,7 +2,7 @@
 #include <CPU/PIC/PIC.h>
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <CPU/ISR/ISR.h>
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <STD/BINARY.h>
 #include <STD/MATH.h>
 #include <STD/MEM.h>
@@ -380,9 +380,9 @@ static PS2_EVENT ps2_decode_next(void) {
                 
                 U8 status = dec.mouse_bytes[0];
 
-                ev.mouse.mouse1 = (status & 0x01) ? TRUE : FALSE; // Left
-                ev.mouse.mouse2 = (status & 0x02) ? TRUE : FALSE; // Right
-                ev.mouse.mouse3 = (status & 0x04) ? TRUE : FALSE; // Middle
+                ev.mouse.mouse1 = (status & 0x1) ? TRUE : FALSE; // Left
+                ev.mouse.mouse2 = (status & 0x2) ? TRUE : FALSE; // Right
+                ev.mouse.mouse3 = (status & 0x4) ? TRUE : FALSE; // Middle
 
                 I32 rel_x = (status & 0x10) ? (I32)((I8)dec.mouse_bytes[1]) : (I32)dec.mouse_bytes[1];
                 I32 rel_y = (status & 0x20) ? (I32)((I8)dec.mouse_bytes[2]) : (I32)dec.mouse_bytes[2];
