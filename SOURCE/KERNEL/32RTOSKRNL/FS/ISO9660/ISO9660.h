@@ -170,7 +170,7 @@ BOOLEAN ISO9660_READ_PVD(PrimaryVolumeDescriptor *descriptor, U32 size);
 /// @return Pointer to the normalized path string, or NULLPTR on failure.
 /// @note About the return value: If the function is called by kernel, free via KFREE.
 ///       If called by user program, free via free().
-STRING ISO9660_NORMALIZE_PATH(CHAR *path);
+PU8 ISO9660_NORMALIZE_PATH(CHAR *path);
 
 /// @brief Extract the root directory record from the primary volume descriptor.
 /// @param pvd Pointer to the PrimaryVolumeDescriptor.

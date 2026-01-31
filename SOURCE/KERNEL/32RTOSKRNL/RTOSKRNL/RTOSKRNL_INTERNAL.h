@@ -61,8 +61,8 @@ void DUMP_REGS(regs *r);
 void DUMP_ERRCODE(U32 errcode);
 void DUMP_INTNO(U32 int_no);
 void DUMP_MEMORY(U32 addr, U32 length);
-void DUMP_STRING(STRING buf);
-void DUMP_STRINGN(STRING buf, U32 n);
+void DUMP_STRING(PU8 buf);
+void DUMP_STRINGN(PU8 buf, U32 n);
 
 // Kernel internal functions
 void set_rki_row(U32 rki_row);

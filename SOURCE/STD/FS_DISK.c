@@ -11,7 +11,7 @@ U32 CDROM_READ(U32 lba, U32 sectors, U8 *buf) {
 }
 
 IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path) {
-    CHARPTR p = MAlloc(ISO9660_MAX_PATH);
+    PU8 p = MAlloc(ISO9660_MAX_PATH);
     if (!p) return NULLPTR;
     MEMSET(p, 0, ISO9660_MAX_PATH);
     U32 path_len = STRLEN(path);

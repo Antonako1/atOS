@@ -7,7 +7,7 @@ and some not-so-important functions are here.
 #include <MEMORY/PAGING/PAGING.h>
 #include <DRIVERS/ATAPI/ATAPI.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
-#include <DRIVERS/VIDEO/VBE.h>
+#include <DRIVERS/VESA/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <DRIVERS/AC97/AC97.h>
 
@@ -207,19 +207,19 @@ void DUMP_MEMORY(U32 addr, U32 length) {
 
 
 
-void DUMP_STRING(STRING buf) {
+void DUMP_STRING(PU8 buf) {
     VBE_DRAW_STRING(0, rki_row, buf, PANIC_COLOUR);
     INC_rki_row(rki_row);
     VBE_UPDATE_VRAM();
 }
-void DUMP_STRINGN(STRING buf, U32 n) {
+void DUMP_STRINGN(PU8 buf, U32 n) {
     for(U32 i = 0; i < n; i++) {
         VBE_DRAW_CHARACTER(i * VBE_CHAR_WIDTH, rki_row, buf[i], PANIC_COLOUR);
     }
     INC_rki_row(rki_row);
     VBE_UPDATE_VRAM();
 }
-void DUMP_STRING_U32(STRING str, U32 num) {
+void DUMP_STRING_U32(PU8 str, U32 num) {
     U8 buf[16];
     ITOA_U(num, buf, 16);
     VBE_DRAW_STRING(0, rki_row, buf, PANIC_COLOUR);
