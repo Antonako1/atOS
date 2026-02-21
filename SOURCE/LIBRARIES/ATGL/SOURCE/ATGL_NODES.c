@@ -3,6 +3,8 @@
 #include <STD/MEM.h>
 #include <STD/STRING.h>
 #include <STD/BINARY.h>
+#include <STD/IO.h>
+#include <STD/FS_DISK.h>
 
 WINHNDL _ATGL_CREATE_WINDOW_HANDLE(void) {
     static WINHNDL current_handle = 1;
@@ -194,4 +196,22 @@ VOID ATGL_DESTROY_NODE(PATGL_NODE node) {
 VOID ATGL_MARK_DIRTY(PATGL_NODE node){
     if(!node) return;
     node->is_dirty=TRUE;
+}
+
+
+VOID ATGL_POLL_EVENT(ATGL_EVENT *ev) {
+    PS2_KB_DATA *kp = kb_poll();
+    if(kp) {
+        ev->type = ATGL_EV_KEYBOARD;
+        ev->data.keyboard = kp;
+        return;
+    }
+    PS2_MOUSE_DATA *ms = mouse_poll();
+    if(ms) {
+        ev->type = ATGL_EV_MOUSE;
+        ev->data.mouse = ms;
+        return;
+    }
+    ev->type = ATGL_EV_NONE;
+    return;
 }

@@ -2,6 +2,7 @@
 #define ATGL_SCREEN_H
 
 #include <STD/TYPEDEF.h>
+#include <STD/FS_DISK.h>
 #include <LIBRARIES/ATGL/ATGL_INPUT.h>
 #include <LIBRARIES/ATGL/ATGL_GRAPHICS.h>
 #include <LIBRARIES/ATGL/ATGL_DEFS.h>
@@ -12,8 +13,10 @@ typedef enum {
 } ATGL_SCREEN_ARGS;
 
 typedef struct {
+    FILE *file;
     VOIDPTR font_data;
     U32 font_data_sz;
+
     U8 font_width;
     U8 font_height; 
     U8 char_spacing;
