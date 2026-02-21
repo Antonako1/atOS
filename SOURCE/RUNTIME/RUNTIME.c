@@ -10,15 +10,16 @@
 #include <STD/PROC_COM.h>
 #include <STD/DEBUG.h>
 #include <STD/IO.h>
-
 static exit_func_t exit_funcs[MAX_ON_EXIT_FUNCTIONS] ATTRIB_DATA = { 0 };
 static U32 exit_func_count ATTRIB_DATA = 0;
 
 BOOL ON_EXIT(exit_func_t fn);
 static void call_exit_functions(void);
-U32 main(U32 argc, PPU8 argv);
 
-void _start(U32 argc, PPU8 argv) {
+#ifndef RUNTIME_ATGL
+U32 main(U32 argc, PPU8 argv);
+void _start(U32 argc, PPU8 argv) 
+{
     DEBUG_PRINTF("[RUNTIME] Entered _start with argc:%d\n", argc);
 
     #ifdef RUNTIME_GUI
@@ -28,11 +29,14 @@ void _start(U32 argc, PPU8 argv) {
     #endif
     U32 timeout = U32_MAX;
     #ifdef RUNTIME_GUI
-    while(!IS_PROC_GUI_INITIALIZED()) {
+    while(!IS_PROC_GUI_INITIALIZED()) 
+    {
     #else
-    while (!IS_PROC_INITIALIZED()) {
+    while (!IS_PROC_INITIALIZED()) 
+    {
     #endif
-        if(timeout-- == 0) {
+        if(timeout-- == 0) 
+        {
             DEBUG_PRINTF("[RUNTIME] Process initialization timed out!\n");
             EXIT(-1);
         };
@@ -42,9 +46,49 @@ void _start(U32 argc, PPU8 argv) {
     U32 code = main(argc, argv);
 
     call_exit_functions();
-
+    DEBUG_PRINTF("[RUNTIME] Exiting with code %d\n", code);
     EXIT(code);
 }
+
+#else // RUNTIME_ATGL
+#include <LIBRARIES/ATGL/ATGL.h>
+U32 ATGL_MAIN(U32 argc, PPU8 argv);
+VOID ATGL_GRAPHICS_LOOP();
+VOID ATGL_EVENT_LOOP(ATGL_EVENT *ev);
+
+void _start(U32 argc, PPU8 argv) 
+{
+    DEBUG_PRINTF("[RUNTIME_ATGL] Entered _start with argc:%d\n",argc);
+    PRIC_INIT_GRAPHICAL();
+    U32 timeout = U32_MAX;
+    while(!IS_PROC_GUI_INITIALIZED()) 
+    {
+        if(timeout-- == 0) 
+        {
+            DEBUG_PRINTF("[RUNTIME_ATGL] Process initialization timed out!\n");
+            EXIT(-1);
+        };
+    }
+    DEBUG_PRINTF("[RUNTIME_ATGL] Entering ATGL_MAIN!\n");
+    KB_MS_INIT();
+    U32 code = ATGL_MAIN(argc, argv);
+    if(code != 0) {
+        DEBUG_PRINTF("[RUNTIME_ATGL] ATGL_MAIN returned error code %d, exiting immediately.\n", code);
+        EXIT(code);
+    }
+    while(ATGL_IS_SCREEN_RUNNING()) 
+    {
+        ATGL_EVENT ev;
+        //ATGL_POLL_EVENT(&ev);
+        ATGL_EVENT_LOOP(&ev);
+        ATGL_GRAPHICS_LOOP();
+    }
+    call_exit_functions();
+    DEBUG_PRINTF("[RUNTIME_ATGL] Exiting with code %d\n", code);
+    EXIT(code);
+}
+#endif // RUNTIME_ATGL
+
 
 static void call_exit_functions(void) {
     while (exit_func_count > 0) {
