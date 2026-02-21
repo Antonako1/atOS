@@ -576,7 +576,7 @@ void assert(BOOL condition) {
 
 
 #define SHELL_PATH "PROGRAMS/ATOSHELL/ATOSHELL.BIN"
-
+#define STR(x, y) x y 
 
 void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     KDEBUG_PUTS("[atOS] Enter LOAD_AND_RUN_KERNEL_SHELL\n");
@@ -593,7 +593,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     U8 *shell_argv[] = { SHELL_PATH , "-test", NULLPTR };
     panic_if(
         !RUN_BINARY(
-            "atOShell", 
+            STR("/", SHELL_PATH), 
             file, 
             sz, 
             USER_HEAP_SIZE, 

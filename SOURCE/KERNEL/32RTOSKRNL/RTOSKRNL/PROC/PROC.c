@@ -104,7 +104,7 @@ static void init_master_tcb(void) {
     master_tcb.info.state = TCB_STATE_IMMORTAL;
     master_tcb.info.cpu_time = 0;
     master_tcb.info.num_switches = 0;
-    STRNCPY((char *)master_tcb.info.name, "32RTOSKRNL", TASK_NAME_MAX_LEN - 1);
+    STRNCPY((char *)master_tcb.info.name, "/ATOS/32RTOSKR.BIN", TASK_NAME_MAX_LEN - 1);
     
     master_tcb.next  = &master_tcb;        // circular list
 
