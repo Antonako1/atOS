@@ -85,6 +85,5 @@ PATGL_NODE ATGL_GET_SCREEN_ROOT_NODE() {
 }
 
 BOOLEAN8 ATGL_IS_SCREEN_RUNNING() {
-    g_screen.root_node->children[0]->on_render(g_screen.root_node->children[0], g_screen.root_node->area);
     return g_screen_initialized;
 }

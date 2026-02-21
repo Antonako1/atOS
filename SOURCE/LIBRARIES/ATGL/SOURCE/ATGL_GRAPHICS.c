@@ -12,13 +12,5 @@ VOID ATGL_FILL_RECT(ATGL_RECT rect, VBE_COLOUR colour) {
     if(rect.x + rect.width > SCREEN_WIDTH) rect.width = SCREEN_WIDTH - rect.x;
     if(rect.y + rect.height > SCREEN_HEIGHT) rect.height = SCREEN_HEIGHT - rect.y;
 
-    for(I32 y = rect.y; y < rect.y + rect.height; y++) {
-        for(I32 x = rect.x; x < rect.x + rect.width; x++) {
-            DRAW_PIXEL((VBE_PIXEL_INFO){
-                .Colour = colour,
-                .X = x,
-                .Y = y,
-            });
-        }
-    }
+    DRAW_FILLED_RECTANGLE(rect.x, rect.y, rect.width, rect.height, colour);
 }

@@ -1,0 +1,42 @@
+/*
+
+    Included inside PROGRAMS/SHELL/BATSH.c:
+
+    static const ShellCommand shell_commands[] ATTRIB_RODATA = {
+        #include <ATOSH.HELP>
+    };
+
+
+    Definition is:
+    typedef struct {
+        const CHAR *name;
+        ShellCommandHandler handler;
+        const CHAR *help;
+    } ShellCommand;
+
+    ShellCommandHandler is of type "VOID func(PU8)", where PU8 is the whole cmd line
+
+    CMD_NONE tells that the command is an external binary and not part of the shell.
+    CMD_[NAME] is a function defined inside PROGRAMS/SHELL/BATSH.c
+*/
+    { "help",     CMD_HELP,     "Show this help message" },
+    { "clear",    CMD_CLEAR,    "Clear the screen" },
+    { "cls",      CMD_CLEAR,    "Clear the screen" },
+    { "version",  CMD_VERSION,  "Show shell version" },
+    { "exit",     CMD_EXIT,     "Exit the shell" },
+    { "echo",     CMD_ECHO,     "Echo text back to screen" },
+    { "tone",     CMD_TONE,     "Play tone: tone <freqHz> <ms> [amp] [rate]" },
+    { "soundoff", CMD_SOUNDOFF, "Stop AC97 playback" },
+    { "cd",       CMD_CD,       "Change directory" },
+    { "cd..",     CMD_CD_BACKWARDS, "Change directory backwards" },
+    { "dir",      CMD_DIR,      "List directory contents" },
+    { "mkdir",    CMD_MKDIR,    "Create a directory" },
+    { "rmdir",    CMD_RMDIR,    "Remove a directory" },
+    { "type",     CMD_TYPE,    "Print file contents" },
+    { "tail",     CMD_TAIL,    "Print tail of file contents" },
+    { "colour",   CMD_COLOUR,    "Change console colour: colour <fg> <bg> [-h]" },
+
+    { "time",     CMD_NONE,    "Print system time. -h for help" },
+    { "pinfo",    CMD_NONE,    "Print process information. -h for help" },
+    { "clock",    CMD_NONE,    "Display graphical clock" },
+    

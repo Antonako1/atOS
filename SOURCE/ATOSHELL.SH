@@ -2,6 +2,8 @@ echo atOShell v0.1 Type 'help' for a list of commands.
 # time
 # clock
 # sandbox
+# pinfo
+colour green black
 # @@tmp=type tmp/00.asm
 # ASTRAC.BIN -A @{DOCS}/ASM/TEST.ASM
 # dir @{q}

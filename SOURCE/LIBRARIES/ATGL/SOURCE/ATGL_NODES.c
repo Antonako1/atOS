@@ -11,13 +11,13 @@ WINHNDL _ATGL_CREATE_WINDOW_HANDLE(void) {
 
 // --- Forward Declarations of Default Renderers ---
 VOID ATGL_DEFAULT_WINDOW_RENDER(PATGL_NODE self, ATGL_RECT clip) {
+    if(!self||!self->is_dirty) return;
     ATGL_WIN_DATA* data = (ATGL_WIN_DATA*)self->priv_data;
     if(!data) return;
 
     // Draw window background
-
     ATGL_FILL_RECT(self->area, VBE_NOTEPAD_PAPER2);
-
+    self->is_dirty = FALSE;
     for(U16 i = 0; i< self->child_count; i++) {
         PATGL_NODE child = self->children[i];
         if(child->is_visible && child->on_render && child->is_dirty) {
@@ -33,24 +33,23 @@ VOID ATGL_DEFAULT_BUTTON_RENDER(PATGL_NODE self, ATGL_RECT clip) {
     return;
 }
 
-VOID ATGL_DEFAULT_RENDER(PATGL_NODE self, ATGL_RECT clip) {
-
-    switch(self->type) {
-        case ATGL_NT_WINDOW:
-            ATGL_DEFAULT_WINDOW_RENDER(self, clip);
-            break;
-        case ATGL_NT_BUTTON:
-            ATGL_DEFAULT_BUTTON_RENDER(self, clip);
-            break;
-        case ATGL_NT_TEXT:
-            ATGL_DEFAULT_TEXT_RENDER(self, clip);
-            break;
-        default:
-            break;
-    }
-
-    return;
-}
+// VOID ATGL_DEFAULT_RENDER(PATGL_NODE self, ATGL_RECT clip) {
+//     if(!self || !self->is_dirty) return;
+//     switch(self->type) {
+//         case ATGL_NT_WINDOW:
+//             ATGL_DEFAULT_WINDOW_RENDER(self, clip);
+//             break;
+//         case ATGL_NT_BUTTON:
+//             ATGL_DEFAULT_BUTTON_RENDER(self, clip);
+//             break;
+//         case ATGL_NT_TEXT:
+//             ATGL_DEFAULT_TEXT_RENDER(self, clip);
+//             break;
+//         default:
+//             break;
+//     }
+//     return;
+// }
 
 // Frees priv_data automatically
 VOID ATGL_DEFAULT_DESTROY(PATGL_NODE self);
@@ -83,7 +82,7 @@ PATGL_NODE ATGL_CREATE_TEXT(PATGL_NODE parent, ATGL_RECT area, PU8 text, VBE_COL
     PATGL_NODE node = ATGL_CREATE_NODE(parent, area);
     if(!node) return NULLPTR;
     node->type = ATGL_NT_TEXT;
-    node->on_render = ATGL_DEFAULT_RENDER;
+    node->on_render = ATGL_DEFAULT_TEXT_RENDER;
     ATGL_TEXT_DATA* data = (ATGL_TEXT_DATA*)MAlloc(sizeof(ATGL_TEXT_DATA));
     data->text = STRDUP(text);
     data->bg_colour = bg;
@@ -102,7 +101,7 @@ PATGL_NODE ATGL_CREATE_WINDOW(PATGL_NODE parent, ATGL_RECT area, PU8 title, ATGL
 
     // 2. Customize for Window
     node->type = ATGL_NT_WINDOW;
-    node->on_render = ATGL_DEFAULT_RENDER;
+    node->on_render = ATGL_DEFAULT_WINDOW_RENDER;
 
     // 3. Allocate Private Data
     ATGL_WIN_DATA* data = (ATGL_WIN_DATA*)MAlloc(sizeof(ATGL_WIN_DATA));
@@ -121,7 +120,7 @@ PATGL_NODE ATGL_CREATE_WINDOW(PATGL_NODE parent, ATGL_RECT area, PU8 title, ATGL
     if(IS_FLAG_UNSET(flags,ATGL_WF_NO_MINIMIZE)) {
 
     }
-    #define CENTER_TEXT(parent, title) \
+    // #define CENTER_TEXT(parent, title) \
         (parent->area.x + (parent->area.width / 2) - (STRLEN(title) * (g_screen.font.font_width + g_screen.font.char_spacing) / 2))
     if(IS_FLAG_UNSET(flags,ATGL_WF_NO_TITLE)) {
         PATGL_NODE title_node = ATGL_CREATE_TEXT(node, (ATGL_RECT) {
@@ -144,11 +143,11 @@ PATGL_NODE ATGL_CREATE_BUTTON(PATGL_NODE parent, ATGL_RECT area, PU8 label) {
     if (!node) return NULLPTR;
 
     node->type = ATGL_NT_BUTTON;
-    node->on_render = ATGL_DEFAULT_RENDER;
+    node->on_render = ATGL_DEFAULT_BUTTON_RENDER;
 
     ATGL_BTN_DATA* data = (ATGL_BTN_DATA*)MAlloc(sizeof(ATGL_BTN_DATA));
     data->label = STRDUP(label);
-    data->bg_color = 0x888888; // Default gray
+    data->bg_color = VBE_GRAY;
     data->is_pressed = FALSE;
 
     node->priv_data = data;

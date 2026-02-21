@@ -13,7 +13,7 @@
 
 #define LEND "\r\n"
 
-
+#define MAX_ARGS 12
 
 
 // ===================================================
@@ -56,7 +56,225 @@ CMD_FUNC(MKDIR);
 CMD_FUNC(TYPE);
 CMD_FUNC(TAIL);
 CMD_FUNC(RMDIR);
+CMD_FUNC(COLOUR);
+#define CMD_NONE NULLPTR
 
+
+
+
+// =====================================
+//
+// Batsh tokenizer and parser
+// Raw commands can be at `Command Implementations`
+// Command tables defined below
+//
+// =====================================
+
+typedef enum {
+    TOK_UNKNOWN,
+
+    // Keywords
+    TOK_CMD, // built-in commands
+    TOK_WORD,
+    TOK_STRING,
+    TOK_AND,  // AND
+    TOK_OR,   // OR
+    TOK_EQU, // EQU
+    TOK_NEQ, // NEQ
+    TOK_LSS, // LSS
+    TOK_LEQ, // LEQ
+    TOK_GTR, // GTR
+    TOK_GEQ, // GEQ
+    TOK_IF, // IF
+    TOK_THEN, // THEN
+    TOK_ELSE, // ELSE
+    TOK_FI, // FI
+    TOK_LOOP, // LOOP
+    TOK_END, // END
+    TOK_EXISTS, // EXISTS
+    TOK_COMMENT,    // rem, #
+
+    // Other tokens
+    TOK_PIPE, // |
+    TOK_PLUS, // +
+    TOK_MINUS, // -
+    TOK_MUL, // *
+    TOK_DIV, // /
+    TOK_LPAREN, // (
+    TOK_RPAREN, // )
+    TOK_LBRACE, // {
+    TOK_RBRACE, // }
+    TOK_ASSIGN, // =
+    TOK_VAR, // @
+    TOK_VAR_GLOBAL, // @@
+    TOK_REDIR_OUT,   // >
+    TOK_REDIR_IN,    // <
+
+
+    /**
+     * About TOK_SEMI:
+     * 
+     * When lexing line dir a;
+     * 
+     * It is parsed as
+     *   dir
+     *   ;
+     *   a
+     * 
+     * Semi is placed before the token it affects!
+     * 
+     */
+    TOK_SEMI, // ;
+    TOK_ESCAPE, // \ 
+
+    
+    TOK_EOL,         // end of line
+} BATSH_TOKEN_TYPE;
+
+typedef struct {
+    const CHAR *keyword;
+    BATSH_TOKEN_TYPE type;
+} KEYWORD;
+
+static const KEYWORD KEYWORDS[] ATTRIB_RODATA = {
+    // built-in
+    { "cd", TOK_CMD },
+    { "cd..", TOK_CMD },
+    { "help", TOK_CMD },
+    { "clear", TOK_CMD },
+    { "cls", TOK_CMD },
+    { "version", TOK_CMD },
+    { "exit", TOK_CMD },
+    { "echo", TOK_CMD },
+    { "tone", TOK_CMD },
+    { "soundoff", TOK_CMD },
+    { "dir", TOK_CMD },
+    { "mkdir", TOK_CMD },
+    { "rmdir", TOK_CMD },
+    { "colour", TOK_CMD },
+
+    // Logic & conditionals
+    { "and",    TOK_AND },
+    { "or",     TOK_OR },
+    { "equ",    TOK_EQU },
+    { "neq",    TOK_NEQ },
+    { "lss",    TOK_LSS },
+    { "leq",    TOK_LEQ },
+    { "gtr",    TOK_GTR },
+    { "geq",    TOK_GEQ },
+
+    // Flow control
+    { "if",     TOK_IF },
+    { "then",   TOK_THEN },
+    { "else",   TOK_ELSE },
+    { "fi",     TOK_FI },
+    { "loop",   TOK_LOOP },
+    { "end",    TOK_END },
+    { "exists", TOK_EXISTS },
+
+    // Misc
+    { "rem",    TOK_COMMENT },
+
+    // Single character
+    { "\"", TOK_STRING },
+    { "|", TOK_PIPE },
+    { "+", TOK_PLUS },
+    { "-", TOK_MINUS },
+    { "*", TOK_MUL },
+    { "/", TOK_DIV },
+    { "(", TOK_LPAREN },
+    { ")", TOK_RPAREN },
+    { "{", TOK_LBRACE },
+    { "}", TOK_RBRACE },
+    { "=", TOK_ASSIGN },
+    { "@", TOK_VAR },
+    { "@@", TOK_VAR_GLOBAL },
+    { ">", TOK_REDIR_OUT },
+    { "<", TOK_REDIR_IN },
+    { ";", TOK_SEMI },
+    { "\\", TOK_ESCAPE },
+    { "#", TOK_COMMENT },
+};
+#define KEYWORDS_COUNT (sizeof(KEYWORDS) / sizeof(KEYWORDS[0]))
+
+
+static const ShellCommand shell_commands[] ATTRIB_RODATA = {
+    #include <ATOSH.HELP>
+    // Any commands added here must be added 
+    //   into the KEYWORDS array above as TOK_CMD in built-ins section!
+};
+
+#define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
+
+
+
+typedef struct _ARG_ARRAY {
+    U32 argc;
+    PPU8 argv;
+} ARG_ARRAY;
+
+VOID RAW_LINE_TO_ARG_ARRAY(PU8 raw_line, ARG_ARRAY *out) {
+    out->argc = 0;
+    out->argv = NULLPTR;
+    if(!raw_line) return;
+    PU8 first_space = STRCHR(raw_line, ' ');
+
+    out->argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
+
+    out->argv[out->argc++] = STRDUP(raw_line);  // argv[0] = program path
+
+    // Now parse only arguments:
+    PU8 args_start = first_space ? first_space + 1 : NULL;
+
+    if (args_start && *args_start) {
+        PU8 p = args_start;
+
+        while (*p && out->argc < MAX_ARGS) {
+            // skip leading whitespace
+            while (*p == ' ' || *p == '\t') p++;
+            if (!*p) break;
+
+            BOOL in_quotes = FALSE;
+            PU8 ArgBegin;
+
+            if (*p == '"') {
+                in_quotes = TRUE;
+                p++;                 // skip opening quote
+                ArgBegin = p;
+
+                while (*p && *p != '"') p++;
+            } else {
+                ArgBegin = p;
+                while (*p && *p != ' ' && *p != '\t') p++;
+            }
+
+            U32 len = p - ArgBegin;
+
+            PU8 arg = MAlloc(len + 1);
+            STRNCPY(arg, ArgBegin, len);
+            arg[len] = 0;
+
+            out->argv[out->argc++] = arg;
+
+            if (in_quotes && *p == '"')
+                p++; // skip closing quote
+
+            // skip trailing whitespace before next argument
+            while (*p == ' ' || *p == '\t') p++;
+        }
+    }
+}
+
+VOID DELETE_ARG_ARRAY(ARG_ARRAY *arr) {
+    if(!arr) return;
+    for(U32 i = 0; i < arr->argc; i++) {
+        if(arr->argv[i]) MFree(arr->argv[i]);
+        arr->argv[i] = NULLPTR;
+    }
+    if(arr->argv) MFree(arr->argv);
+    arr->argv = NULLPTR;
+    arr->argc = 0;
+}
 
 VOID BATSH_SET_MODE(U8 mode) {
     batsh_mode = mode;
@@ -190,9 +408,6 @@ static S32 FIND_INST_VAR(PU8 name, BATSH_INSTANCE *inst) {
     return -1;
 }
 
-
-
-
 BOOLEAN SET_INST_VAR(PU8 name, PU8 value, BATSH_INSTANCE *inst) {
     if(!inst) return FALSE;
     if(inst->shell_var_count + 1 > MAX_VARS) return FALSE;
@@ -217,141 +432,6 @@ PU8 GET_INST_ARG(U32 index, BATSH_INSTANCE *inst) {
     return inst->args[index];
 }
 
-
-// =====================================
-//
-// Batsh tokenizer and parser
-// Raw commands can be at `Command Implementations`
-// Command tables defined below
-//
-// =====================================
-
-typedef enum {
-    TOK_UNKNOWN,
-
-    // Keywords
-    TOK_CMD, // built-in commands
-    TOK_WORD,
-    TOK_STRING,
-    TOK_AND,  // AND
-    TOK_OR,   // OR
-    TOK_EQU, // EQU
-    TOK_NEQ, // NEQ
-    TOK_LSS, // LSS
-    TOK_LEQ, // LEQ
-    TOK_GTR, // GTR
-    TOK_GEQ, // GEQ
-    TOK_IF, // IF
-    TOK_THEN, // THEN
-    TOK_ELSE, // ELSE
-    TOK_FI, // FI
-    TOK_LOOP, // LOOP
-    TOK_END, // END
-    TOK_EXISTS, // EXISTS
-    TOK_COMMENT,    // rem, #
-
-    // Other tokens
-    TOK_PIPE, // |
-    TOK_PLUS, // +
-    TOK_MINUS, // -
-    TOK_MUL, // *
-    TOK_DIV, // /
-    TOK_LPAREN, // (
-    TOK_RPAREN, // )
-    TOK_LBRACE, // {
-    TOK_RBRACE, // }
-    TOK_ASSIGN, // =
-    TOK_VAR, // @
-    TOK_VAR_GLOBAL, // @@
-    TOK_REDIR_OUT,   // >
-    TOK_REDIR_IN,    // <
-
-
-    /**
-     * About TOK_SEMI:
-     * 
-     * When lexing line dir a;
-     * 
-     * It is parsed as
-     *   dir
-     *   ;
-     *   a
-     * 
-     * Semi is placed before the token it affects!
-     * 
-     */
-    TOK_SEMI, // ;
-    TOK_ESCAPE, // \ 
-
-    
-    TOK_EOL,         // end of line
-} BATSH_TOKEN_TYPE;
-
-typedef struct {
-    const CHAR *keyword;
-    BATSH_TOKEN_TYPE type;
-} KEYWORD;
-
-static const KEYWORD KEYWORDS[] ATTRIB_RODATA = {
-    // built-in
-    { "cd", TOK_CMD },
-    { "cd..", TOK_CMD },
-    { "help", TOK_CMD },
-    { "clear", TOK_CMD },
-    { "cls", TOK_CMD },
-    { "version", TOK_CMD },
-    { "exit", TOK_CMD },
-    { "echo", TOK_CMD },
-    { "tone", TOK_CMD },
-    { "soundoff", TOK_CMD },
-    { "dir", TOK_CMD },
-    { "mkdir", TOK_CMD },
-    { "rmdir", TOK_CMD },
-
-    // Logic & conditionals
-    { "and",    TOK_AND },
-    { "or",     TOK_OR },
-    { "equ",    TOK_EQU },
-    { "neq",    TOK_NEQ },
-    { "lss",    TOK_LSS },
-    { "leq",    TOK_LEQ },
-    { "gtr",    TOK_GTR },
-    { "geq",    TOK_GEQ },
-
-    // Flow control
-    { "if",     TOK_IF },
-    { "then",   TOK_THEN },
-    { "else",   TOK_ELSE },
-    { "fi",     TOK_FI },
-    { "loop",   TOK_LOOP },
-    { "end",    TOK_END },
-    { "exists", TOK_EXISTS },
-
-    // Misc
-    { "rem",    TOK_COMMENT },
-
-    // Single character
-    { "\"", TOK_STRING },
-    { "|", TOK_PIPE },
-    { "+", TOK_PLUS },
-    { "-", TOK_MINUS },
-    { "*", TOK_MUL },
-    { "/", TOK_DIV },
-    { "(", TOK_LPAREN },
-    { ")", TOK_RPAREN },
-    { "{", TOK_LBRACE },
-    { "}", TOK_RBRACE },
-    { "=", TOK_ASSIGN },
-    { "@", TOK_VAR },
-    { "@@", TOK_VAR_GLOBAL },
-    { ">", TOK_REDIR_OUT },
-    { "<", TOK_REDIR_IN },
-    { ";", TOK_SEMI },
-    { "\\", TOK_ESCAPE },
-    { "#", TOK_COMMENT },
-};
-#define KEYWORDS_COUNT (sizeof(KEYWORDS) / sizeof(KEYWORDS[0]))
-
 KEYWORD *GET_KEYWORD_S(PU8 keyword) {
     for(U32 i = 0; i<KEYWORDS_COUNT;i++) {
         if(STRICMP(keyword, KEYWORDS[i].keyword) == 0) return &KEYWORDS[i];
@@ -367,28 +447,15 @@ KEYWORD *GET_KEYWORD_C(CHAR c) {
     }
     return NULLPTR;
 }
-static const ShellCommand shell_commands[] ATTRIB_RODATA = {
-    { "help",     CMD_HELP,     "Show this help message" },
-    { "clear",    CMD_CLEAR,    "Clear the screen" },
-    { "cls",      CMD_CLEAR,    "Clear the screen" },
-    { "version",  CMD_VERSION,  "Show shell version" },
-    { "exit",     CMD_EXIT,     "Exit the shell" },
-    { "echo",     CMD_ECHO,     "Echo text back to screen" },
-    { "tone",     CMD_TONE,     "Play tone: tone <freqHz> <ms> [amp] [rate]" },
-    { "soundoff", CMD_SOUNDOFF, "Stop AC97 playback" },
-    { "cd",       CMD_CD,       "Change directory" },
-    { "cd..",     CMD_CD_BACKWARDS, "Change directory backwards" },
-    { "dir",      CMD_DIR,      "List directory contents" },
-    { "mkdir",    CMD_MKDIR,    "Create a directory" },
-    { "rmdir",    CMD_RMDIR,    "Remove a directory" },
-    { "type",     CMD_TYPE,    "Print file contents" },
-    { "tail",     CMD_TAIL,    "Print tail of file contents" },
 
-    // Any commands added here must be added 
-    //   into the KEYWORDS array above as TOK_CMD in built-ins section!
-};
 
-#define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
+
+
+
+
+
+
+
 
 struct pos {
     U32 line;
@@ -425,6 +492,14 @@ typedef struct BATSH_COMMAND {
 
     struct pos;
 } BATSH_COMMAND, *PBATSH_CMD;
+
+
+
+
+
+
+
+
 
 BATSH_COMMAND *parse_if(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_INSTANCE *inst) {
 
@@ -1114,8 +1189,10 @@ VOID HANDLE_COMMAND(U8 *line) {
     BOOLEAN found = FALSE;
     for (U32 j = 0; j < shell_command_count; j++) {
         if (STRICMP((CHAR*)command, shell_commands[j].name) == 0) {
-            shell_commands[j].handler(line);
-            found = TRUE;
+            if(shell_commands[j].handler != NULLPTR) {
+                shell_commands[j].handler(line);
+                found = TRUE;
+            }
             break;
         }
     }
@@ -1218,211 +1295,27 @@ VOID DESTROY_BATSH_INSTANCE(BATSH_INSTANCE *inst) {
 
 
 
-// ===================================================
-// Command Implementations
-// ===================================================
-VOID CMD_HELP(U8 *line) {
-    (void)line;
-    PRINTNEWLINE();
-    PUTS((U8*)"Available commands:" LEND);
-    for (U32 i = 0; i < shell_command_count; i++) {
-        PUTS((U8*)shell_commands[i].name);
-        PUTS((U8*)" - ");
-        PUTS((U8*)shell_commands[i].help);
-        PRINTNEWLINE();
-    }
-}
 
-VOID CMD_CLEAR(U8 *line) { (void)line; LE_CLS(); }
-VOID CMD_VERSION(U8 *line) { (void)line; PRINTNEWLINE(); PUTS((U8*)"atOS Shell version 1.0.0" LEND); }
-VOID CMD_EXIT(U8 *line) { (void)line; PRINTNEWLINE(); PUTS((U8*)"Exiting shell..." LEND); }
 
-VOID CMD_ECHO(U8 *line) {
-    PRINTNEWLINE();
-    if (STRLEN(line) > 5) PUTS(line + 5);
-    PRINTNEWLINE();
-}
 
-VOID CMD_TONE(U8 *line) {
-    U8 *s = line + STRLEN("tone ");
-    U32 freq = ATOI(s);
-    while (*s && *s != ' ') s++;
-    if (*s == ' ') s++;
-    U32 ms = ATOI(s);
-    while (*s && *s != ' ') s++;
 
-    U32 amp = 8000;
-    if (*s == ' ') { s++; amp = ATOI(s); }
-    while (*s && *s != ' ') s++;
 
-    U32 rate = 48000;
-    if (*s == ' ') { s++; rate = ATOI(s); }
 
-    PRINTNEWLINE();
-    if (freq == 0 || ms == 0) {
-        PUTS((U8*)"Usage: tone <freqHz> <ms> [amp] [rate]" LEND);
-        return;
-    }
 
-    U32 res = AUDIO_TONE(freq, ms, amp, rate);
-    PUTS(res ? (U8*)"tone: playing..." LEND : (U8*)"tone: AC97 not available" LEND);
-}
 
-VOID CMD_SOUNDOFF(U8 *line) { (void)line; AUDIO_STOP(); PUTS((U8*)"AC97: stopped" LEND); }
 
-VOID CMD_UNKNOWN(U8 *line) {
-    if(!RUN_PROCESS(line)) {
-        PRINTNEWLINE();
-        PUTS((U8*)"Unknown command or file type: ");
-        PUTS(line);
-        PRINTNEWLINE();
-    }
-}
 
-// Directory-related
-VOID CMD_CD(PU8 raw_line) {
-    MEMZERO(tmp_line, sizeof(tmp_line));
-    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
-
-    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 2);
-    if (STRCMP(path_arg, "-") == 0) CD_PREV();
-    else if (STRCMP(path_arg, "~") == 0) CD_INTO((PU8)"/HOME");
-    else if (!path_arg || *path_arg == '\0') CD_INTO((PU8)"/");
-    else CD_INTO(path_arg);
-    SET_VAR("CD", GET_PATH());
-}
-
-VOID CMD_CD_BACKWARDS(PU8 line) { 
-    (void)line; CD_BACKWARDS_DIR(); PRINTNEWLINE(); 
-    SET_VAR("CD", GET_PATH());
-}
-
-VOID CMD_DIR(PU8 raw_line) {
-    MEMZERO(tmp_line, sizeof(tmp_line));
-    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
-
-    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 3);
-    if (STRCMP(path_arg, "-") == 0) path_arg = GET_PREV_PATH();
-    else if (STRCMP(path_arg, "~") == 0) path_arg = (PU8)"/HOME";
-    else if (!path_arg || *path_arg == '\0') path_arg = (PU8)".";
-    PRINT_CONTENTS_PATH(path_arg);
-    PRINTNEWLINE();
-}
-
-VOID CMD_MKDIR(PU8 raw_line) {
-    MEMZERO(tmp_line, sizeof(tmp_line));
-    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
-    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 5);
-    MAKE_DIR(path_arg);
-}
-
-VOID CMD_RMDIR(PU8 raw_line) {
-    MEMZERO(tmp_line, sizeof(tmp_line));
-    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
-    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 5);
-    if (!REMOVE_DIR(path_arg)) return;
-}
 
 #define TAIL_LINE_COUNT 10
-
-VOID CMD_TYPE(PU8 raw_line) {
-    MEMZERO(tmp_line, sizeof(tmp_line));
-    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
-    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 4);
-    if (!path_arg || !*path_arg) {
-        PUTS("\ntype: missing file path.\n");
-        return;
-    }
-
-    FAT_LFN_ENTRY entry;
-    if (!FAT32_PATH_RESOLVE_ENTRY(path_arg, &entry)) {
-        PUTS("\ntype: file not found.\n");
-        return;
-    }
-
-    if (entry.entry.ATTRIB & FAT_ATTRB_DIR) {
-        PUTS("\ntype: cannot display a directory.\n");
-        return;
-    }
-
-    U32 file_size = entry.entry.FILE_SIZE;
-    if (file_size == 0) {
-        PUTS("\n(empty file)\n");
-        return;
-    }
-
-    U8 *buffer = FAT32_READ_FILE_CONTENTS(&file_size, &entry.entry);
-    if (!buffer) {
-        PUTS("\ntype: failed to read file.\n");
-        MFree(buffer);
-        return;
-    }
-
-    buffer[file_size] = '\0';
-    PUTS("\n");
-    PUTS(buffer);
-    PUTS("\n");
-
-    MFree(buffer);
-}
-
-VOID CMD_TAIL(PU8 raw_line) {
-    MEMZERO(tmp_line, sizeof(tmp_line));
-    STRNCPY(tmp_line, raw_line, sizeof(tmp_line) - 1);
-    PU8 path_arg = PARSE_CD_RAW_LINE(tmp_line, 4);
-    if (!path_arg || !*path_arg) {
-        PUTS("\ntail: missing file path.\n");
-        return;
-    }
-
-    FAT_LFN_ENTRY entry;
-    if (!FAT32_PATH_RESOLVE_ENTRY(path_arg, &entry)) {
-        PUTS("\ntail: file not found.\n");
-        return;
-    }
-
-    if (entry.entry.ATTRIB & FAT_ATTRB_DIR) {
-        PUTS("\ntail: cannot read a directory.\n");
-        return;
-    }
-
-    U32 file_size = entry.entry.FILE_SIZE;
-    if (file_size == 0) {
-        PUTS("\n(empty file)\n");
-        return;
-    }
-    U8 *buffer = FAT32_READ_FILE_CONTENTS(&file_size, &entry.entry);
-    if (!buffer) {
-        PUTS("\ntype: failed to read file.\n");
-        MFree(buffer);
-        return;
-    }
-
-    buffer[file_size] = '\0';
-
-    // Find start of last N lines
-    U32 line_count = 0;
-    for (U32 i = file_size; i > 0; i--) {
-        if (buffer[i - 1] == '\n') {
-            line_count++;
-            if (line_count > TAIL_LINE_COUNT) {
-                buffer[i] = '\0';
-                PUTS("\n");
-                PUTS(&buffer[i]);
-                PUTS("\n");
-                MFree(buffer);
-                return;
-            }
-        }
-    }
-
-    // If fewer than N lines, print all
-    PUTS("\n");
-    PUTS(buffer);
-    PUTS("\n");
-
-    MFree(buffer);
-}
+#include <PROGRAMS/SHELL/CMD/MISC.c>
+#include <PROGRAMS/SHELL/CMD/AC97.c>
+#include <PROGRAMS/SHELL/CMD/CD.c>
+#include <PROGRAMS/SHELL/CMD/DIR.c>
+#include <PROGRAMS/SHELL/CMD/MKDIR.c>
+#include <PROGRAMS/SHELL/CMD/RMDIR.c>
+#include <PROGRAMS/SHELL/CMD/TYPE.c>
+#include <PROGRAMS/SHELL/CMD/TAIL.c>
+#include <PROGRAMS/SHELL/CMD/COLOUR.c>
 
 
 VOID SETUP_BATSH_PROCESSER() {
@@ -1583,7 +1476,6 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     // ---------------------------------------------------------------------
     // Parse arguments (from original_line)
     // ---------------------------------------------------------------------
-    #define MAX_ARGS 12
     PU8* argv = MAlloc(sizeof(PU8*) * MAX_ARGS);
     U32 argc = 0;
 
