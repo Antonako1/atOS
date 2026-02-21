@@ -856,7 +856,7 @@ void early_debug_tcb(U32 pid) {
     // for early task debugging
     TCB *t = get_master_tcb();
     U32 rki_row = 0;
-    VBE_DRAW_STRING(0, rki_row, "TCB Dump:", VBE_GREEN, VBE_BLACK);
+    VBE_DRAW_STRING(0, rki_row, "32RTOSKRNL TCB Dump:", VBE_GREEN, VBE_BLACK);
     INC_rki_row(&rki_row);
     U8 buf[20];
     ITOA_U(proc_amount, buf, 10);
@@ -1125,6 +1125,10 @@ void handle_kernel_messages(void) {
                 KDEBUG_HEX32(msg->signal);
                 KDEBUG_PUTS("\n");
                 focused_task = get_tcb_by_pid(msg->signal);
+                if(!focused_task) {
+                    KDEBUG_PUTS("[proc_msg] Invalid PID for focus switch\n");
+                    focused_task = &master_tcb;
+                }
                 break;
             case PROC_MSG_TERMINATE_SELF:
                 KILL_PROCESS(msg->sender_pid);
@@ -1253,6 +1257,12 @@ void handle_kernel_messages(void) {
                 }
                 break;
             case PROC_MSG_KILL_PROCESS:
+                if(msg->signal == current_shell->info.pid) {
+                    KDEBUG_PUTS("[proc_msg] Current shell killed. Resetting focus to master...\n");
+                    focused_task = &master_tcb;
+                    current_tcb = &master_tcb;
+                    write_cr3((U32)master_tcb.pagedir);                    
+                }
                 KILL_PROCESS(msg->signal);
                 break;
             case PROC_MSG_NONE:
@@ -1274,7 +1284,7 @@ void handle_kernel_messages(void) {
 
         if (data->kb.cur.pressed &&
             data->kb.mods.alt &&
-            data->kb.mods.shift &&
+            data->kb.mods.ctrl &&
             data->kb.cur.keycode == KEY_DELETE) {
             system_reboot();
         }

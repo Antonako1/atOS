@@ -165,6 +165,12 @@ VOID EXIT(U32 n) {
     SEND_MESSAGE(&msg);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_TERMINATE_SELF, NULL, 0, n);
     SEND_MESSAGE(&msg);
+
+    U32 poll = 10000000;
+    while(poll-- > 0);
+
+    // If we are still here, something went wrong.
+    KILL_PROCESS_INSTANCE(PROC_GETPID()); // as a last resort, force kill the process in case the above messages were not handled for some reason. This is a bit hacky, but it works without needing a new message type.
     for(;;); // Loop here until safe to continue
 }
 
@@ -362,4 +368,13 @@ VOID START_HALT() {
 }
 VOID SYS_RESTART() {
     SYSCALL0(SYSCALL_RESTART_MACHINE);
+}
+
+VOID KILL_PROCESS_INSTANCE(U32 pid) {
+    PROC_MESSAGE msg;
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_ENDED_MYSELF, NULL, 0, U32_MAX);
+    msg.sender_pid = pid; // Override sender PID to target process, so shell will free its resources. This is a bit hacky, but it works without needing a new message type.
+    SEND_MESSAGE(&msg);
+    msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, NULL, 0, pid);
+    SEND_MESSAGE(&msg); 
 }
