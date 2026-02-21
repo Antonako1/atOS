@@ -103,6 +103,9 @@ VOID NEW_ROW(VOID);
 // Draws the shell line start (current path and "> ")
 VOID PUT_SHELL_START(VOID);
 
+// Redraws console buffer
+VOID REDRAW_CONSOLE();
+
 // Outputs the current working directory path to the screen
 VOID PUT_CURRENT_PATH(VOID);
 
