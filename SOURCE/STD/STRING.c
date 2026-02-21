@@ -760,7 +760,6 @@ PU8 STRISTR(PU8 a, PU8 b) {
     return NULLPTR;
 }
 
-
 VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
     while (*fmt) {
         if (*fmt != '%') {
@@ -768,102 +767,84 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
             continue;
         }
 
-        fmt++; // skip '%'
+        fmt++;
         if (!*fmt) break;
 
         I32 width = 0;
         BOOL pad_zero = FALSE;
+        BOOL left_align = FALSE;
+        BOOL is_negative = FALSE;
 
-        // Parse optional zero-padding
-        if (*fmt == '0') {
-            pad_zero = TRUE;
-            fmt++;
-        }
-
-        // Parse width
+        if (*fmt == '-') { left_align = TRUE; fmt++; }
+        if (*fmt == '0') { pad_zero = TRUE; fmt++; }
         while (*fmt >= '0' && *fmt <= '9') {
             width = width * 10 + (*fmt - '0');
             fmt++;
         }
 
         switch (*fmt) {
-            case 'c': {
-                CHAR c = (CHAR)va_arg(args, I32);
-                putch(c, ctx);
-                break;
-            }
-
             case 's': {
                 CHAR *s = va_arg(args, CHAR*);
                 if (!s) s = "(null)";
                 I32 len = STRLEN(s);
-                for (I32 i = len; i < width; i++)
-                    putch(' ', ctx);
+                if (!left_align) for (I32 i = len; i < width; i++) putch(' ', ctx);
                 while (*s) putch(*s++, ctx);
+                if (left_align) for (I32 i = len; i < width; i++) putch(' ', ctx);
                 break;
             }
 
-            case 'd': {
-                I32 val = va_arg(args, I32);
-                CHAR buf[32];
-                ITOA(val, buf, 10);
-
-                I32 len = STRLEN(buf);
-                for (I32 i = len; i < width; i++)
-                    putch(pad_zero ? '0' : ' ', ctx);
-                for (CHAR *p = buf; *p; p++)
-                    putch(*p, ctx);
-                break;
-            }
-
-            case 'u': {
-                U32 val = va_arg(args, U32);
-                CHAR buf[32];
-                ITOA_U(val, buf, 10);
-
-                I32 len = STRLEN(buf);
-                for (I32 i = len; i < width; i++)
-                    putch(pad_zero ? '0' : ' ', ctx);
-                for (CHAR *p = buf; *p; p++)
-                    putch(*p, ctx);
-                break;
-            }
-
+            case 'd':
+            case 'u':
             case 'x':
             case 'X': {
-                U32 val = va_arg(args, U32);
                 CHAR buf[32];
-                ITOA_U(val, buf, 16);
+                if (*fmt == 'd') {
+                    I32 val = va_arg(args, I32);
+                    if (val < 0) {
+                        is_negative = TRUE;
+                        val = -val;
+                    }
+                    ITOA_U((U32)val, buf, 10);
+                } else {
+                    ITOA_U(va_arg(args, U32), buf, (*fmt == 'u' ? 10 : 16));
+                    if (*fmt == 'X') { // Manual uppercase transform
+                        for (CHAR *p = buf; *p; p++) if (*p >= 'a' && *p <= 'f') *p -= 32;
+                    }
+                }
 
-                I32 len = STRLEN(buf);
-                for (I32 i = len; i < width; i++)
-                    putch(pad_zero ? '0' : ' ', ctx);
-                for (CHAR *p = buf; *p; p++)
-                    putch(*p, ctx);
+                I32 len = STRLEN(buf) + (is_negative ? 1 : 0);
+
+                // Right-align padding
+                if (!left_align) {
+                    // If zero-padding, the sign comes BEFORE the zeros
+                    if (pad_zero && is_negative) putch('-', ctx);
+                    for (I32 i = len; i < width; i++) putch(pad_zero ? '0' : ' ', ctx);
+                    // If space-padding, the sign comes AFTER the spaces
+                    if (!pad_zero && is_negative) putch('-', ctx);
+                } else if (is_negative) {
+                    putch('-', ctx);
+                }
+
+                for (CHAR *p = buf; *p; p++) putch(*p, ctx);
+
+                // Left-align padding
+                if (left_align) for (I32 i = len; i < width; i++) putch(' ', ctx);
                 break;
             }
 
-            case 'p': {  // pointer type
+            case 'p': {
                 U32 ptr = (U32)va_arg(args, VOID*);
                 CHAR buf[32];
                 ITOA_U(ptr, buf, 16);
-                putch('0', ctx);
-                putch('x', ctx);
-                CHAR *p = buf;
-                while (*p) putch(*p++, ctx);
+                I32 len = STRLEN(buf) + 2;
+                if (!left_align) for (I32 i = len; i < width; i++) putch(' ', ctx);
+                putch('0', ctx); putch('x', ctx);
+                for (CHAR *p = buf; *p; p++) putch(*p, ctx);
+                if (left_align) for (I32 i = len; i < width; i++) putch(' ', ctx);
                 break;
             }
-
-            case '%':
-                putch('%', ctx);
-                break;
-
-            default:
-                putch('%', ctx);
-                putch(*fmt, ctx);
-                break;
+            default: putch('%', ctx); putch(*fmt, ctx); break;
         }
-
         fmt++;
     }
 }
