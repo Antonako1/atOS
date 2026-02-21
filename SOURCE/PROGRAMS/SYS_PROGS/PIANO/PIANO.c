@@ -21,18 +21,22 @@ typedef struct {
 /* drawing helpers (top-level, not nested) */
 static void draw_white_key(KEY_DEF *k){
     DRAW_FILLED_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)k->default_col);
+    DRAW_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)0x000000);
 }
 
 static void draw_white_key_active(KEY_DEF *k){
     DRAW_FILLED_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)k->active_col);
+    DRAW_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)0x000000);
 }
 
 static void draw_black_key(KEY_DEF *k){
     DRAW_FILLED_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)k->default_col);
+    DRAW_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)0x444444);
 }
 
 static void draw_black_key_active(KEY_DEF *k){
     DRAW_FILLED_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)k->active_col);
+    DRAW_RECTANGLE(k->x, k->y, k->w, k->h, (VBE_COLOUR)0x444444);
 }
 
 /* redraw all keys in correct order (whites then blacks) so blacks stay on top */
@@ -71,10 +75,10 @@ U32 main(U32 argc, PPU8 argv) {
         white[i].keycode = white_codes[i];
         white[i].x = start_x + i * key_w;
         white[i].y = key_y;
-        white[i].w = key_w;
+        white[i].w = key_w - 2;
         white[i].h = key_h;
-        white[i].default_col = VBE_WHITE; /* white */
-        white[i].active_col = VBE_LIGHT_BLUE;  /* light blue when active */
+        white[i].default_col = 0xFFFFFF; /* white */
+        white[i].active_col = 0xA0D0FF;  /* light blue when active */
         white[i].pressed = FALSE;
     }
 
@@ -89,13 +93,13 @@ U32 main(U32 argc, PPU8 argv) {
         black[i].h = key_h * 2 / 3;
         black[i].x = white[wi].x + white[wi].w - (black[i].w/2);
         black[i].y = key_y;
-        black[i].default_col = VBE_BLACK; /* black */
-        black[i].active_col = VBE_LIGHT_YELLOW;   /* bright yellow when active */
+        black[i].default_col = 0x000000; /* black */
+        black[i].active_col = 0xFFFF00;   /* bright yellow when active */
         black[i].pressed = FALSE;
     }
 
     /* initial draw */
-    CLEAR_SCREEN_COLOUR(VBE_DARK_GRAY);
+    CLEAR_SCREEN_COLOUR((VBE_COLOUR)0x202020);
     for(U32 i=0;i<NUM_WHITE;i++) draw_white_key(&white[i]);
     for(U32 i=0;i<NUM_BLACK;i++) draw_black_key(&black[i]);
     FLUSH_VRAM();
