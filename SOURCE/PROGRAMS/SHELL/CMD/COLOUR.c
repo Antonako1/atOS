@@ -52,19 +52,26 @@ VOID CMD_COLOUR(PU8 raw_line) {
     RAW_LINE_TO_ARG_ARRAY(tmp_line, &arr);
 
     BOOL8 show_help = FALSE;
-    if (arr.argc < 3) {
-        show_help = TRUE;
-    } else {
+    BOOL8 be_quiet = FALSE;
+    if(arr.argc <= 1) show_help = TRUE;
+    else {
         for (U32 i = 0; i < arr.argc; i++) {
+            if(!arr.argv[i]) break;
+            DEBUG_PRINTF("'%d', '%s'\n", i, arr.argv[i]);
             if (STRCMP(arr.argv[i], "-h") == 0 || STRCMP(arr.argv[i], "--help") == 0) {
                 show_help = TRUE;
+                break;
+            }
+            if (STRCMP(arr.argv[i], "-q") == 0 || STRCMP(arr.argv[i], "--quiet") == 0) {
+                DEBUG_PRINTF("BE QUIET!\n");
+                be_quiet = TRUE;
                 break;
             }
         }
     }
 
     if (show_help) {
-        PUTS("\nUsage: colour <fg> <bg> [-h]\n");
+        PUTS("\nUsage: colour <fg> <bg> [-h] [-q (q for quiet)]\n");
         PUTS("Example: 'colour red black' or 'colour 2 0'\n\n");
         PUTS("ID   NAME          ID   NAME\n");
         PUTS("----------------------------\n");
@@ -90,7 +97,8 @@ VOID CMD_COLOUR(PU8 raw_line) {
         inst->cursor->bgColor = FIND_VBE_COLOUR(arr.argv[2], inst->cursor->bgColor);
         
         REDRAW_CONSOLE();
-        PUTS("\nConsole colours updated.\n");
+        if(be_quiet) PUTS("\n");
+        else PUTS("\nConsole colours updated.\n");
     }
 
     DELETE_ARG_ARRAY(&arr);

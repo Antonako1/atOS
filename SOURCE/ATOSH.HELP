@@ -34,7 +34,7 @@
     { "rmdir",    CMD_RMDIR,    "Remove a directory" },
     { "type",     CMD_TYPE,    "Print file contents" },
     { "tail",     CMD_TAIL,    "Print tail of file contents" },
-    { "colour",   CMD_COLOUR,    "Change console colour: colour <fg> <bg> [-h]" },
+    { "colour",   CMD_COLOUR,    "Change console colour: colour <fg> <bg> [-h] [-q (q for quiet)]" },
 
     { "time",     CMD_NONE,    "Print system time. -h for help" },
     { "pinfo",    CMD_NONE,    "Print process information. -h for help" },
