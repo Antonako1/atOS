@@ -6,7 +6,10 @@
 __attribute__((noreturn))
 void rtos_kernel(U0) {
     CLI;
-    KDEBUG_INIT();
+    
+    SERIAL_INIT();
+    KDEBUG_PUTS("[atOS] Serial ports initialized\n");
+    
     KDEBUG_PUTS("[atOS] rtos_kernel start\n");
     debug_vram_start(); // Start in early mode, using direct framebuffer access
     // These are called here, to fix address issues and to set up new values
