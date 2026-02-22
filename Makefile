@@ -140,8 +140,9 @@ kernel:
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/RTL8139/RTL8139.c -o $(OUTPUT_KERNEL_DIR)/RTL8139.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/AC97/AC97.c -o $(OUTPUT_KERNEL_DIR)/AC97.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/BEEPER/BEEPER.c -o $(OUTPUT_KERNEL_DIR)/BEEPER.o
-	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DEBUG/KDEBUG.c -o $(OUTPUT_KERNEL_DIR)/KDEBUG.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/PCI/PCI.c -o $(OUTPUT_KERNEL_DIR)/PCI.o
+	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/SERIAL/SERIAL.c -o $(OUTPUT_KERNEL_DIR)/SERIAL.o
+	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DEBUG/KDEBUG.c -o $(OUTPUT_KERNEL_DIR)/KDEBUG.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/PIT/PIT.c -o $(OUTPUT_KERNEL_DIR)/PIT.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/GDT/GDT.c -o $(OUTPUT_KERNEL_DIR)/GDT.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/IDT/IDT.c -o $(OUTPUT_KERNEL_DIR)/IDT.o
@@ -190,6 +191,7 @@ kernel:
 		$(OUTPUT_KERNEL_DIR)/MEM.o \
 		$(OUTPUT_KERNEL_DIR)/BYTEMAP.o \
 		$(OUTPUT_KERNEL_DIR)/RTOSKRNL_INTERNAL.o \
+		$(OUTPUT_KERNEL_DIR)/SERIAL.o \
 		$(OUTPUT_KERNEL_DIR)/ATA_ATAPI.o \
 		$(OUTPUT_KERNEL_DIR)/ACPI.o \
 		$(OUTPUT_KERNEL_DIR)/MATH.o \
@@ -256,26 +258,47 @@ iso: bootloader kernel programs diskvbr
 
 
 
-# Run ISO in QEMU
-run: 
-	@echo "Running ISO in QEMU (user-mode net, GUI+audio)..."
-	qemu-img create -f raw hdd.img 256M
+run:
+	@echo "Running ISO in QEMU..."
+	# Make sure disk exists
+	[ -f hdd.img ] || qemu-img create -f raw hdd.img 256M
 	mkdir -p OUTPUT/DEBUG
-	qemu-system-i386 -vga std \
-	-m 1024 \
-	-boot order=d \
-	-cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) \
-	-drive id=cdrom,file=$(OUTPUT_ISO_DIR)/$(ISO_NAME),format=raw,if=none \
-	-drive id=hd0,file=hdd.img,format=raw,if=none \
-	-device piix3-ide,id=ide \
-	-device ide-hd,drive=hd0,bus=ide.0 \
-	-device ide-cd,drive=cdrom,bus=ide.1 \
-	-device ac97,audiodev=snd0 \
-	-debugcon file:OUTPUT/DEBUG/debug.log \
+	mkdir -p OUTPUT/SERIAL
+
+	# Remove old FIFOs if they exist
+	rm -f OUTPUT/SERIAL/SERIAL2.in 
+	rm -f OUTPUT/SERIAL/SERIAL2.out
+	rm -f OUTPUT/SERIAL/SERIAL3.in 
+	rm -f OUTPUT/SERIAL/SERIAL3.out
+	rm -f OUTPUT/SERIAL/SERIAL4.in 
+	rm -f OUTPUT/SERIAL/SERIAL4.out
+
+	# Create FIFOs for COM2-COM4
+	mkfifo OUTPUT/SERIAL/SERIAL2.in OUTPUT/SERIAL/SERIAL2.out
+	mkfifo OUTPUT/SERIAL/SERIAL3.in OUTPUT/SERIAL/SERIAL3.out
+	mkfifo OUTPUT/SERIAL/SERIAL4.in OUTPUT/SERIAL/SERIAL4.out
+
+	# Run QEMU
+	qemu-system-i386 \
+		-vga std \
+		-m 1024 \
+		-boot order=d \
+		-cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) \
+		-drive id=cdrom,file=$(OUTPUT_ISO_DIR)/$(ISO_NAME),format=raw,if=none \
+		-drive id=hd0,file=hdd.img,format=raw,if=none \
+		-device piix3-ide,id=ide \
+		-device ide-hd,drive=hd0,bus=ide.0 \
+		-device ide-cd,drive=cdrom,bus=ide.1 \
+		-device ac97,audiodev=snd0 \
+		-debugcon file:OUTPUT/DEBUG/DEBUG.log \
 		-global isa-debugcon.iobase=0xe9 \
 		-audiodev sdl,id=snd0 \
 		-nic user,model=rtl8139,mac=52:54:00:12:34:56 \
-	
+		-serial stdio \
+		-serial pipe:OUTPUT/SERIAL/SERIAL2 \
+		-serial pipe:OUTPUT/SERIAL/SERIAL3 \
+		-serial pipe:OUTPUT/SERIAL/SERIAL4
+
 # remove tap device
 clean_tap:
 	@if ip link show tap0 >/dev/null 2>&1; then \
