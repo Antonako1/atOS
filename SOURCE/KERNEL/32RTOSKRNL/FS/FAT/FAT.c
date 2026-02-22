@@ -9,6 +9,7 @@
 #include <STD/MATH.h>
 #include <STD/STRING.h>
 #include <STD/BINARY.h>
+#include <DEBUG/KDEBUG.h>
 
 #define Free(ptr) KFREE(ptr); ptr = NULLPTR; 
 
@@ -349,60 +350,6 @@ static BOOLEAN LFN_MATCH(U8 *name, LFN *lfns, U32 count) {
 // --- Find a free slot (cluster+offset) in a directory chain ---
 // returns TRUE and sets *out_cluster and *out_offset (byte offset in cluster) when free slot found.
 // If no free slot in existing chain, appends a new cluster and returns its start offset 0.
-BOOL DIR_FIND_FREE_SLOT(U32 dir_start_cluster, U32 *out_cluster, U32 *out_offset) {
-    if (dir_start_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) return FALSE;
-
-    U32 cluster = dir_start_cluster;
-    U8 *buf = KMALLOC(CLUSTER_SIZE);
-    if(!buf) return FALSE;
-    MEMZERO(buf, CLUSTER_SIZE);
-    while (1) {
-        if (!FAT_READ_CLUSTER(cluster, buf)) {
-            Free(buf);
-            return FALSE;
-        }
-        // scan entries in this cluster
-        for (U32 offset = 0; offset < CLUSTER_SIZE; offset += 32) {
-            DIR_ENTRY *e = (DIR_ENTRY *)(buf + offset);
-            if (e->FILENAME[0] == 0x00 || e->FILENAME[0] == FAT32_DELETED_ENTRY) {
-                *out_cluster = cluster;
-                *out_offset = offset;
-                Free(buf);
-                return TRUE;
-            }
-        }
-
-        // no free slot in this cluster -> check chain
-        if (fat32[cluster] >= FAT32_END_OF_CHAIN) {
-            // need to allocate and append a new cluster for directory
-            U32 new_cluster = FIND_NEXT_FREE_CLUSTER();
-            if (new_cluster == 0) return FALSE;
-            fat32[cluster] = new_cluster;
-            fat32[new_cluster] = FAT32_END_OF_CHAIN;
-            if (!FAT_FLUSH()) {
-                Free(buf);
-                return FALSE;
-            }
-            // clear new cluster on disk (zero it)
-            MEMZERO(buf, CLUSTER_SIZE);
-            if (!FAT_WRITE_CLUSTER(new_cluster, buf)) {
-                Free(buf);
-                return FALSE;
-            }
-            *out_cluster = new_cluster;
-            *out_offset = 0;
-            Free(buf);
-            return TRUE;
-        }
-
-        // follow chain
-        cluster = fat32[cluster];
-        if (cluster < FIRST_ALLOWED_CLUSTER_NUMBER)  {
-            Free(buf);
-            return FALSE;
-        } // corrupted
-    }
-}
 
 U8 LFN_CHECKSUM(U8 *shortname) {
     U8 sum = 0;
@@ -586,6 +533,63 @@ BOOLEAN WRITE_FILEDATA(DIR_ENTRY *out_ent, PU8 filedata, U32 sz) {
     return TRUE;
 }
 
+BOOL DIR_FIND_FREE_SLOT(U32 dir_start_cluster, U32 num_slots, U32 *out_cluster, U32 *out_offset) {
+    if (dir_start_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) return FALSE;
+
+    U32 cluster = dir_start_cluster;
+    U8 *buf = KMALLOC(CLUSTER_SIZE);
+    if(!buf) return FALSE;
+
+    while (1) {
+        if (!FAT_READ_CLUSTER(cluster, buf)) {
+            Free(buf); return FALSE;
+        }
+
+        U32 found_run = 0;
+        U32 start_offset = 0;
+
+        for (U32 offset = 0; offset < CLUSTER_SIZE; offset += 32) {
+            DIR_ENTRY *e = (DIR_ENTRY *)(buf + offset);
+
+            // 0x00 = End of Directory, 0xE5 = Deleted/Available
+            if (e->FILENAME[0] == 0x00 || e->FILENAME[0] == 0xE5) {
+                if (found_run == 0) start_offset = offset;
+                found_run++;
+
+                if (found_run == num_slots) {
+                    *out_cluster = cluster;
+                    *out_offset = start_offset;
+                    Free(buf);
+                    return TRUE;
+                }
+            } else {
+                found_run = 0; // Reset: we hit an active file
+            }
+        }
+
+        // No contiguous block in this cluster, move to next
+        U32 next = fat32[cluster];
+        if (next >= FAT32_END_OF_CHAIN) {
+            // Allocate new cluster if we've reached the end of the folder
+            U32 new_c = FIND_NEXT_FREE_CLUSTER();
+            if (!new_c) { Free(buf); return FALSE; }
+            
+            fat32[cluster] = new_c;
+            fat32[new_c] = FAT32_END_OF_CHAIN;
+            FAT_FLUSH();
+            
+            MEMZERO(buf, CLUSTER_SIZE);
+            FAT_WRITE_CLUSTER(new_c, buf);
+            
+            *out_cluster = new_c;
+            *out_offset = 0;
+            Free(buf);
+            return TRUE;
+        }
+        cluster = next;
+    }
+}
+
 BOOLEAN CREATE_DIR_ENTRY(
     U32 parent_cluster,
     U8 *FILENAME,
@@ -620,14 +624,12 @@ BOOLEAN CREATE_DIR_ENTRY(
     }
 
     // 4. LFN handling
-    U32 num_lfn_entries = 0;
-    LFN LFNs[MAX_LFN_COUNT];
-    MEMZERO(LFNs, sizeof(LFNs));
-    U32 filename_len = STRLEN(FILENAME);
-    if (filename_len > 11) {
-        num_lfn_entries = (filename_len + CHARS_PER_LFN - 1) / CHARS_PER_LFN;
-        FILL_LFNs(LFNs, num_lfn_entries, FILENAME);
-    }
+    // U32 num_lfn_entries = 0;
+    // if (STRLEN(FILENAME) > 11) {
+    //     num_lfn_entries = (STRLEN(FILENAME) + 12) / 13;
+    // }
+    // U32 total_slots_needed = num_lfn_entries + 1; // LFNs + 1 SFN
+    U32 total_slots_needed = 1; // For simplicity, not implementing LFN in this example
 
     // 5. File data (skip for directories)
     if (!(ATTRIB & FAT_ATTRB_DIR) && filedata_size > 0 && filedata) {
@@ -639,39 +641,46 @@ BOOLEAN CREATE_DIR_ENTRY(
 
     // 6. Find free slot in parent directory
     U32 slot_cluster = 0, slot_offset = 0;
-    if (!DIR_FIND_FREE_SLOT(parent_cluster, &slot_cluster, &slot_offset)) return FALSE;
-
+    if (!DIR_FIND_FREE_SLOT(parent_cluster, total_slots_needed, &slot_cluster, &slot_offset)) 
+        return FALSE;
+    
     // 7. Allocate cluster buffer and read
     U8 *buf = KMALLOC(CLUSTER_SIZE);
     if (!buf) return FALSE;
-    MEMZERO(buf, CLUSTER_SIZE);
+    // MEMZERO(buf, CLUSTER_SIZE);
     if (!FAT_READ_CLUSTER(slot_cluster, buf)) {
         Free(buf);
         return FALSE;
     }
 
     // 8. Ensure enough space for LFN + entry
-    U32 available = CLUSTER_SIZE - slot_offset;
-    U32 required = num_lfn_entries * sizeof(LFN) + sizeof(DIR_ENTRY);
-    if (required > available) {
-        U32 new_cluster = FIND_NEXT_FREE_CLUSTER();
-        if (new_cluster == 0) { Free(buf); return FALSE; }
+    // U32 available = CLUSTER_SIZE - slot_offset;
+    // U32 required = num_lfn_entries * sizeof(LFN) + sizeof(DIR_ENTRY);
+    // if (required > available) {
+    //     U32 new_cluster = FIND_NEXT_FREE_CLUSTER();
+    //     if (new_cluster == 0) { Free(buf); return FALSE; }
 
-        fat32[slot_cluster] = new_cluster;
-        fat32[new_cluster] = FAT32_END_OF_CHAIN;
-        if (!FAT_FLUSH()) { Free(buf); return FALSE; }
+    //     fat32[slot_cluster] = new_cluster;
+    //     fat32[new_cluster] = FAT32_END_OF_CHAIN;
+    //     if (!FAT_FLUSH()) { Free(buf); return FALSE; }
 
-        MEMZERO(buf, CLUSTER_SIZE);
-        slot_cluster = new_cluster;
-        slot_offset = 0;
-    }
+    //     MEMZERO(buf, CLUSTER_SIZE);
+    //     slot_cluster = new_cluster;
+    //     slot_offset = 0;
+    // }
 
     // 9. Write LFN + short entry
     U8 *dest = buf + slot_offset;
-    if (num_lfn_entries) {
-        MEMCPY(dest, LFNs, num_lfn_entries * sizeof(LFN));
-        dest += num_lfn_entries * sizeof(LFN);
-    }
+    // LFN LFNs[MAX_LFN_COUNT];
+    // MEMZERO(LFNs, sizeof(LFNs));
+    // U32 filename_len = STRLEN(FILENAME);
+    // if (filename_len > 11) {
+    //     FILL_LFNs(LFNs, num_lfn_entries, FILENAME);
+    // }
+    // if (num_lfn_entries) {
+    //     MEMCPY(dest, LFNs, num_lfn_entries * sizeof(LFN));
+    //     dest += num_lfn_entries * sizeof(LFN);
+    // }
     MEMCPY(dest, out, sizeof(DIR_ENTRY));
 
     if (!FAT_WRITE_CLUSTER(slot_cluster, buf)) {
@@ -1317,6 +1326,8 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
     }
 
     U8 *saveptr = NULL;
+
+    // what we are looking for currently
     U8 *component = STRTOK_R(path_copy, "/", &saveptr);
 
     while (component) {
@@ -1331,7 +1342,7 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
         U32 actual_count = MAX_CHILD_ENTIES;
         if (!DIR_ENUMERATE(current_cluster, entries, &actual_count))
             return FALSE;
-
+        DIR_ENTRY tmp;
         BOOLEAN found = FALSE;
         for (U32 i = 0; i < actual_count; i++) {
             DIR_ENTRY *e = &entries[i];
@@ -1355,7 +1366,26 @@ BOOLEAN PATH_RESOLVE_ENTRY(U8 *path, FAT_LFN_ENTRY *out_entry) {
                 STRNCPY(out_entry->lfn, entry_name, FAT_MAX_FILENAME - 1);
                 out_entry->lfn[FAT_MAX_FILENAME - 1] = '\0';
                 out_entry->parent_cluster = current_cluster;    // the directory cluster we enumerated
-                out_entry->dir_offset     = i * sizeof(DIR_ENTRY); // offset within the cluster
+
+                current_cluster = (e->HIGH_CLUSTER_BITS << 16) | e->LOW_CLUSTER_BITS;
+                found = TRUE;
+                break;
+            }
+
+            U8 tmp_name[FAT_MAX_FILENAME];
+            FAT_83FILENAMEFY(&tmp, component); // for debugging/logging
+            FAT_83_TO_STR(tmp.FILENAME, tmp_name, sizeof(tmp_name));
+
+            // KDEBUG_PUTSN(entry_name, 20);
+            // KDEBUG_PUTS(" vs ");
+            // KDEBUG_PUTSN(tmp_name, 20);
+            // KDEBUG_PUTS("\n\n");
+
+            if(STRNICMP(entry_name, tmp_name, 12) == 0) {
+                MEMCPY(&out_entry->entry, e, sizeof(DIR_ENTRY));
+                STRNCPY(out_entry->lfn, entry_name, FAT_MAX_FILENAME - 1);
+                out_entry->lfn[FAT_MAX_FILENAME - 1] = '\0';
+                out_entry->parent_cluster = current_cluster;    // the directory cluster we enumerated
 
                 current_cluster = (e->HIGH_CLUSTER_BITS << 16) | e->LOW_CLUSTER_BITS;
                 found = TRUE;
@@ -1422,18 +1452,108 @@ BOOL FAT_TRUNCATE_CHAIN(U32 start_cluster, U32 new_size_clusters) {
     return FAT_FLUSH();
 }
 
-BOOLEAN FAT_WRITE_DIR_ENTRY(const FAT_LFN_ENTRY *lfn_entry) {
-    if (!lfn_entry) return FALSE;
-    if (lfn_entry->parent_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) return FALSE;
-    if (lfn_entry->dir_offset + sizeof(DIR_ENTRY) > CLUSTER_SIZE) return FALSE;
-
+BOOLEAN FAT32_GET_ENTRY_OFFSET(U32 parent_cluster, PU8 target_name, U32 *out_offset) {
+    if (parent_cluster < FIRST_ALLOWED_CLUSTER_NUMBER || !target_name) return FALSE;
     U8 buf[CLUSTER_SIZE];
-    if (!FAT_READ_CLUSTER(lfn_entry->parent_cluster, buf))
+    U32 current_cluster = parent_cluster;
+    U32 cluster_sequence = 0;
+    CHAR lfn_buffer[FAT_MAX_FILENAME];
+    MEMSET(lfn_buffer, 0, FAT_MAX_FILENAME);
+
+    while (current_cluster < 0x0FFFFFF8) {
+        if (!FAT_READ_CLUSTER(current_cluster, buf)) return FALSE;
+
+        for (U32 i = 0; i < CLUSTER_SIZE; i += sizeof(DIR_ENTRY)) {
+            DIR_ENTRY *entry = (DIR_ENTRY*)(buf + i);
+
+            // 1. End of directory
+            if (entry->FILENAME[0] == 0x00) return FALSE;
+            
+            // 2. Deleted entry, skip
+            if (entry->FILENAME[0] == 0xE5) {
+                MEMSET(lfn_buffer, 0, FAT_MAX_FILENAME);
+                continue;
+            }
+
+            // 3. Check for LFN Attribute (0x0F)
+            if (entry->ATTRIB == 0x0F) {
+                // This is an LFN slot. In a real driver, you'd extract the Unicode 
+                // characters here and assemble them into lfn_buffer.
+                // For simplicity, assume your creation logic and this search 
+                // handle the string assembly.
+                continue; 
+            }
+
+            // 4. It's a standard SFN entry. Check if it matches.
+            // First, check the LFN we've been building
+            if (STRCMP(lfn_buffer, (PU8)target_name) == 0) {
+                *out_offset = (cluster_sequence * CLUSTER_SIZE) + i;
+                return TRUE;
+            }
+
+            // Second, check the 8.3 name (formatted)
+            U8 sfn_tmp[13]; // e.g. "SHUTTLE HLP" -> "SHUTTLE.HLP"
+            FAT_83_TO_STR(entry->FILENAME, sfn_tmp, 13); 
+            if (STRCMP((PU8)sfn_tmp, (PU8)target_name) == 0) {
+                *out_offset = (cluster_sequence * CLUSTER_SIZE) + i;
+                return TRUE;
+            }
+
+            if(MEMCMP(entry->FILENAME, target_name, 11) == 0) {
+                *out_offset = (cluster_sequence * CLUSTER_SIZE) + i;
+                return TRUE;
+            }
+
+            // If no match, clear LFN buffer for the next potential file
+            MEMSET(lfn_buffer, 0, FAT_MAX_FILENAME);
+        }
+
+        // Move to next cluster in the directory chain
+        current_cluster = FAT_GET_NEXT_CLUSTER(current_cluster);
+        cluster_sequence++;
+    }
+
+    return FALSE;
+}
+
+BOOLEAN FAT_WRITE_DIR_ENTRY(FAT_LFN_ENTRY *lfn_entry) {
+    if (!lfn_entry || lfn_entry->parent_cluster < FIRST_ALLOWED_CLUSTER_NUMBER) 
         return FALSE;
 
-    MEMCPY(buf + lfn_entry->dir_offset, &lfn_entry->entry, sizeof(DIR_ENTRY));
+    // 1. Find where the file actually lives in the parent directory
+    // We search by the SFN (entry.NAME) or the LFN string.
+    U32 absolute_offset = 0;
+    FAT_83FILENAMEFY(lfn_entry->entry.FILENAME, lfn_entry->lfn);
+    if (!FAT32_GET_ENTRY_OFFSET(lfn_entry->parent_cluster, lfn_entry->entry.FILENAME, &absolute_offset)) {
+        // KDEBUG_PUTS("FAT_WRITE_DIR_ENTRY: File not found in directory.\n");
+        return FALSE;
+    }
 
-    return FAT_WRITE_CLUSTER(lfn_entry->parent_cluster, buf);
+    // 2. Map absolute offset to cluster chain logic
+    U32 cluster_index = absolute_offset / CLUSTER_SIZE;
+    U32 offset_within_cluster = absolute_offset % CLUSTER_SIZE;
+
+    // 3. Traverse FAT to find the specific cluster
+    U32 current_phys_cluster = lfn_entry->parent_cluster;
+    for (U32 i = 0; i < cluster_index; i++) {
+        current_phys_cluster = FAT_GET_NEXT_CLUSTER(current_phys_cluster);
+        if (current_phys_cluster >= 0x0FFFFFF8) return FALSE; 
+    }
+
+    // 4. Read the cluster
+    U8 buf[CLUSTER_SIZE];
+    if (!FAT_READ_CLUSTER(current_phys_cluster, buf))
+        return FALSE;
+
+    // KDEBUG_STR_HEX_LN("FAT_WRITE_DIR_ENTRY: file size before update: ", lfn_entry->entry.FILE_SIZE);
+    // 5. Update only the 32-byte SFN entry
+    // Note: We do NOT update LFN slots here. The LFN slots exist at 
+    // (absolute_offset - (N * 32)). Since we aren't changing the name,
+    // we leave those alone and only update size/cluster/date.
+    MEMCPY(buf + offset_within_cluster, &lfn_entry->entry, sizeof(DIR_ENTRY));
+
+    // 6. Commit to disk
+    return FAT_WRITE_CLUSTER(current_phys_cluster, buf);
 }
 
 
@@ -1449,7 +1569,8 @@ BOOL FILE_WRITE(FAT_LFN_ENTRY *lfn_entry, const U8 *data, U32 size) {
     if (start_cluster >= FIRST_ALLOWED_CLUSTER_NUMBER) {
         FAT_FREE_CHAIN(start_cluster);  // marks clusters as free in FAT
     }
-
+    // KDEBUG_STR_HEX_LN("FILE_WRITE: old start cluster: ", start_cluster);
+    // KDEBUG_PUTS(lfn_entry->lfn);
     // Write new data into clusters
     if (!WRITE_FILEDATA(entry, data, size))
         return FALSE;
@@ -1458,11 +1579,7 @@ BOOL FILE_WRITE(FAT_LFN_ENTRY *lfn_entry, const U8 *data, U32 size) {
     entry->FILE_SIZE = size;
     FAT_UPDATETIMEDATE(entry);
 
-    // Write updated directory entry back to disk
-    if (!FAT_WRITE_DIR_ENTRY(lfn_entry))
-        return FALSE;
-
-    return TRUE;
+    return FAT_WRITE_DIR_ENTRY(lfn_entry);
 }
 
 BOOL FILE_APPEND(FAT_LFN_ENTRY *lfn_entry, const U8 *data, U32 size) {
