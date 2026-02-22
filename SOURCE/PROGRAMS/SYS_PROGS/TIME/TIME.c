@@ -26,16 +26,16 @@ typedef struct {
 
 #define CONFS_LEN 10
 static conf_line CONFS[CONFS_LEN] ATTRIB_DATA = {
-    {"Seconds", 's', FALSE},
-    {"Minutes", 'm', FALSE},
-    {"Hours", 'h', FALSE},
-    {"Weekday (1=Sunday)", 'w', FALSE},
-    {"Day of month", 'd', FALSE},
-    {"Month", 'M', FALSE},
-    {"Year", 'a', FALSE},
-    {"Century", 'c', FALSE},
-    {"Weekday name", 'W', FALSE},
-    {"Month name", 'O', FALSE},
+    {"Seconds",             's', FALSE},
+    {"Minutes",             'm', FALSE},
+    {"Hours",               'h', FALSE},
+    {"Weekday (1=Sunday)",  'w', FALSE},
+    {"Day of month",        'd', FALSE},
+    {"Month",               'M', FALSE},
+    {"Year",                'a', FALSE},
+    {"Century",             'c', FALSE},
+    {"Weekday name",        'W', FALSE},
+    {"Month name",          'O', FALSE},
 };
 
 #define FORMAT_DEF "%*8%, %*4%/%*5%/%*6%, %*2%:%*1%.%*0%"
@@ -101,18 +101,22 @@ U0 PARSE_ARG(PU8 arg) {
 
 U32 main(U32 argc, PPU8 argv) {
     // Parse args
-    for(U32 i = 1; i < argc; i++) {
+for(U32 i = 1; i < argc; i++) {
         if(STRCMP(argv[i], "-h") == 0 || STRCMP(argv[i], "--help") == 0) {
             printf("Usage: %s [FORMAT STRING|ARGS] [-g N | --gmt N]\n", argv[0]);
             for(U32 j = 0; j < CONFS_LEN; j++)
-            printf("\t%c: %s\n", CONFS[j].option, CONFS[j].desc);
+                printf("\t%c: %s\n", CONFS[j].option, CONFS[j].desc);
             printf("\t-h, --help: Show this help\n");
             printf("\t-g, --gmt N: Set timezone offset in hours\n");
-            EXIT(0);
-        } else if(STRCMP(argv[i], "-g") == 0 || STRCMP(argv[i], "--gmt") == 0) {
+            return 0; // Use return instead of EXIT to be safe
+        }
+    }
+
+    // 2. Parse remaining logic
+    for(U32 i = 1; i < argc; i++) {
+        if(STRCMP(argv[i], "-g") == 0 || STRCMP(argv[i], "--gmt") == 0) {
             if(i + 1 < argc) {
-                TIMEZONE = ATOI_I32(argv[i + 1]);
-                i++;
+                TIMEZONE = ATOI_I32(argv[++i]);
             }
         } else {
             PARSE_ARG(argv[i]);

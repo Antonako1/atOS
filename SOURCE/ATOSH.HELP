@@ -39,4 +39,6 @@
     { "time",     CMD_NONE,    "Print system time. -h for help" },
     { "pinfo",    CMD_NONE,    "Print process information. -h for help" },
     { "clock",    CMD_NONE,    "Display graphical clock" },
+    { "shuttle",    CMD_NONE,    "Serial port communication in and out of the OS. -h for help" },
+    { "kill",    CMD_NONE,    "Kills a process with the given pid. -h for help"},
     

@@ -41,12 +41,19 @@ U0 *MEMCPY_OPT(U0* dest, CONST U0* src, U32 size) {
     return dest;
 }
 
-BOOLEAN MEMCMP(CONST U0* ptr1, CONST U0* ptr2, U32 size) {
+I32 MEMCMP(CONST VOID* ptr1, CONST VOID* ptr2, U32 size) {
+    CONST U8* p1 = (CONST U8*)ptr1;
+    CONST U8* p2 = (CONST U8*)ptr2;
+
     for (U32 i = 0; i < size; i++) {
-        if (((U8*)ptr1)[i] != ((U8*)ptr2)[i])
-            return TRUE;
+        if (p1[i] < p2[i]) {
+            return -1;
+        } else if (p1[i] > p2[i]) {
+            return 1;
+        }
     }
-    return FALSE;
+
+    return 0; // Both are identical for 'size' bytes
 }
 
 U0 *MEMMOVE(U0* dest, CONST U0* src, U32 size) {

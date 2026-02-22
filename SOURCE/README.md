@@ -17,7 +17,8 @@ SOURCE/
 ├── FILES/              # Points to /HOME/DOCS/ directory
 ├── ATOSH.PATH/         # atOShell default path values 
 ├── ATOSHELL.SH/        # atOShell default startup script
-├── ATOSH.ENV_VARS/           # Default environment variables for atOShell
+├── ATOSH.ENV_VARS/     # Default environment variables for atOShell
+├── ATOSH.HELP/         # atOShell help message structure
 └── USER_PROGRAMS       # File list of programs to be compiled and included. See DOCS\DEVELOPING.md
 ```
 

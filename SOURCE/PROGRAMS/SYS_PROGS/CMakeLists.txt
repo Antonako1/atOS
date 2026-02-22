@@ -104,6 +104,7 @@ function(add_system_program PROGNAME PROGDIR)
         ${PROGDIR}
         ${CUR_DIR}
         ${CUR_DIR}/../../
+        ${CUR_DIR}/../../LIBRARIES
         ${SOURCE_KERNEL_DIR}/32RTOSKRNL/DRIVERS/
         ${SOURCE_KERNEL_DIR}/32RTOSKRNL/
         ${SOURCE_KERNEL_DIR}/32RTOSKRNL/CPU/

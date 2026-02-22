@@ -20,7 +20,7 @@ IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path) {
         return NULLPTR;
     }
     STRCPY(p, path);
-    return (IsoDirectoryRecord *)SYSCALL1(SYSCALL_ISO9660_READ_ENTRY, (U32)path);
+    return (IsoDirectoryRecord *)SYSCALL1(SYSCALL_ISO9660_READ_ENTRY, (U32)p);
 }
 VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr) {
     if (!dir_ptr) return NULLPTR;
@@ -101,12 +101,12 @@ BOOLEAN FAT32_READ_LFNS(DIR_ENTRY *ent, LFN *out, U32 out_size, U32 *size_out) {
     U32 res = SYSCALL3(SYSCALL_READ_LFNS, ent_tmp, lfn_tmp, size_out_tmp);
     if(res) {
         MEMCPY(ent, ent_tmp, sizeof(DIR_ENTRY));
-        MEMCPY(out, lfn_tmp, sizeof(DIR_ENTRY) * MAX_LFN_COUNT);
+        MEMCPY(out, lfn_tmp, sizeof(LFN) * MAX_LFN_COUNT);
         MEMCPY(size_out, size_out_tmp, sizeof(U32));
     }
     MFree(size_out_tmp);
     MFree(ent_tmp);
-    MFree(size_out_tmp);
+    MFree(lfn_tmp);
     return res;
 }
 BOOLEAN FAT32_CREATE_CHILD_DIR(U32 parent_cluster, U8 *name, U8 attrib, U32 *cluster_out) {
@@ -141,19 +141,14 @@ BOOLEAN FAT32_CREATE_CHILD_FILE(U32 parent_cluster, U8 *name, U8 attrib, PU8 fil
     MEMZERO(ent_tmp, len);
     STRCPY(ent_tmp, name);
 
-    PU32 cluster_out_temp = MAlloc(sizeof(U32));
-    if (!cluster_out_temp) {
-        MFree(ent_tmp);
-        return FALSE;
-    }
 
     U32 res = SYSCALL5(SYSCALL_CREATE_CHILD_FILE, parent_cluster, ent_tmp, (U32)attrib, filedata, filedata_size);
+    // cluster_out comes back in the attrib parameter due to syscall arg limit, so we need to copy it back to the output parameter
     if (res) {
-        *cluster_out = *cluster_out_temp;
+        *cluster_out = (U32)attrib;
     }
 
     MFree(ent_tmp);
-    MFree(cluster_out_temp);
     return res;
 }
 
@@ -506,7 +501,7 @@ BOOLEAN FILE_EXISTS(PU8 path) {
     if (!path) return FALSE;
 
     // check ISO9660
-    IsoDirectoryRecord *iso_ent = READ_ISO9660_FILERECORD((CHAR*)path);
+    IsoDirectoryRecord *iso_ent = READ_ISO9660_FILERECORD(path);
     if (iso_ent) {
         MFree(iso_ent);
         return TRUE;
@@ -563,14 +558,16 @@ BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force) {
     const U8 *basename = GET_BASENAME(path);
     if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
 
-    if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
-
     return FALSE;
 }
 
 BOOLEAN FILE_CREATE(PU8 path) {
     if (!path) {
         DEBUG_PUTS_LN("FILE_CREATE: path is NULL");
+        return FALSE;
+    }
+    if(FILE_EXISTS(path)) {
+        DEBUG_PUTS_LN("FILE_CREATE: file already exists");
         return FALSE;
     }
 

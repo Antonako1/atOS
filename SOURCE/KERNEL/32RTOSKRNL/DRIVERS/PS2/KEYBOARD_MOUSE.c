@@ -210,6 +210,23 @@ static void PS2_MOUSE_WRITE(U8 data) {
     PS2_ACKNOWLEDGED();
 }
 
+BOOLEAN PS2_SetTypematic(U8 delay, U8 rate) {
+    /* Configuration Byte Bitmask:
+       [7]   Always 0
+       [6:5] Delay (00=250ms, 01=500ms, 10=750ms, 11=1000ms)
+       [4:0] Rate (00000=30Hz, 11111=2Hz)
+    */
+    U8 config = ((delay & 0x03) << 5) | (rate & 0x1F);
+
+    // Send the command byte
+    if (!PS2_OUTB(PS2_DATAPORT, PS2_SET_TYPEMATIC_RATE_AND_DELAY)) return FALSE;
+    
+    // Send the configuration byte
+    if (!PS2_OUTB(PS2_DATAPORT, config)) return FALSE;
+
+    return TRUE;
+}
+
 BOOLEAN PS2_KEYBOARD_INIT(VOID) {
     // Disable scanning first
     if(!PS2_DisableScanning()) return FALSE;
@@ -267,6 +284,9 @@ BOOLEAN PS2_KEYBOARD_INIT(VOID) {
 
     // Reset keyboard
     if(!PS2_KEYBOARD_RESET()) return FALSE;
+
+    // Set Delay to 250ms (0) and Rate to 30Hz (0)
+    PS2_SetTypematic(0, 0);
 
     // Set scan code set
     if(!PS2_SET_SCAN_CODE_SET(DEFAULT_SCANCODESET)) {
@@ -586,6 +606,7 @@ KEYPRESS ParsePS2_CS2(U32 scancode1, U32 scancode2, U8 scancode1_bytes, U8 scanc
                 case SC2_RELEASED_PART2_Y: keypress.keycode = KEY_Y; break;
                 case SC2_RELEASED_PART2_6: keypress.keycode = KEY_6; break;
                 case SC2_RELEASED_PART2_M: keypress.keycode = KEY_M; break;
+                case SC2_RELEASED_PART2_J: keypress.keycode = KEY_J; break;
                 case SC2_RELEASED_PART2_U: keypress.keycode = KEY_U; break;
                 case SC2_RELEASED_PART2_7: keypress.keycode = KEY_7; break;
                 case SC2_RELEASED_PART2_8: keypress.keycode = KEY_8; break;

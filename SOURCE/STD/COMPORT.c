@@ -1,0 +1,24 @@
+#include <STD/COMPORT.h>
+#include <CPU/SYSCALL/SYSCALL.h>
+
+VOID COM_PORT_WRITE_BYTE(U16 port, U8 data) {
+    SYSCALL2(SYSCALL_SERIAL_WRITE_BYTE, port, data);
+} 
+VOID COM_PORT_WRITE_DATA(U16 port, PU8 data, U32 len) {
+    SYSCALL3(SYSCALL_SERIAL_WRITE_DATA, port, data, len);
+} 
+VOID COM_PORT_READ_BYTE(U16 port, U8 data) {
+    SYSCALL2(SYSCALL_SERIAL_READ_BYTE, port, data);
+} 
+VOID COM_PORT_READ_STRING(U16 port, PU8 data, U32 max_len) {
+    SYSCALL3(SYSCALL_SERIAL_READ_STRING, port, data, max_len);
+} 
+VOID COM_PORT_READ_BUFFER(U16 port, PU8 data, U32 max_len) {
+    SYSCALL3(SYSCALL_SERIAL_READ_BUFFER, port, data, max_len);
+} 
+PU8 COM_PORT_READ_BUFFER_HEAP(U16 port, U32 *out_len) {
+    SYSCALL2(SYSCALL_SERIAL_READ_WHOLE_BUFFER_HEAP, port, out_len);
+} 
+PU8 COM_PORT_READ_STRING_HEAP(U16 port, U32 *out_len) {
+    SYSCALL2(SYSCALL_SERIAL_READ_WHOLE_STRING_HEAP, port, out_len);
+}

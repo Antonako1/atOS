@@ -56,3 +56,21 @@ VOID KDEBUG_HEX32(U32 v) {
         _outb(DBG_PORT, hex_nibble(nib));
     }
 }
+
+VOID KDEBUG_PUTSN(const U8 *s, U32 len) {
+    if (!s) return;
+    for (U32 i = 0; i < len && s[i]; i++) {
+        if (s[i] == '\n') {
+            _outb(DBG_PORT, '\r');
+        }
+        _outb(DBG_PORT, s[i]);
+        // mirror to COM1
+        U8 c = s[i];
+        if (c == '\n') {
+            while ((com1_lsr() & 0x20) == 0) { }
+            com1_out('\r');
+        }
+        while ((com1_lsr() & 0x20) == 0) { }
+        com1_out(c);
+    }
+}

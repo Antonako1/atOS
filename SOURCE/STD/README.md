@@ -12,6 +12,8 @@
     - Binary macros
 - BITMAP
     - Bitmap (not the image format) functions
+- COMPORT
+    - COM port functions (COM2-COM4). COM1 used for debugging. See DEBUG.h
 - DEBUG
     - COM1 debug log functions
 - FS_DISK

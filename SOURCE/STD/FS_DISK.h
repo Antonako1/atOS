@@ -4,6 +4,8 @@
     Part of atOS
 
     Licensed under the MIT License. See LICENSE file in the project root for full license information.
+
+    NOTE: Max filename supported is 8.3 for FAT32 and 255 for ISO9660. Paths must be absolute and use '/' as separator.
 ---*/
 #ifndef STD_FS_DISK_H
 #define STD_FS_DISK_H

@@ -35,17 +35,17 @@ U32 ATGL_MAIN(U32 argc, PPU8 argv) {
 }
 
 VOID ATGL_EVENT_LOOP(ATGL_EVENT *ev) {
-
+    DEBUG_PRINTF("EVENT\n");
+    switch (ev->type)
+    {
+    case ATGL_EV_KEYBOARD:
+        if(ev->data.keyboard->cur.pressed && ev->data.keyboard->cur.keycode == KEY_ESC) {
+            ATGL_DESTROY_SCREEN();
+        }
+        break;
+    }
 }
 
 VOID ATGL_GRAPHICS_LOOP() {
-    PS2_KB_DATA *kp = kb_poll();
-    if(kp && kp->cur.pressed) {
-        switch (kp->cur.keycode)
-        {
-        case KEY_ESC:
-            ATGL_DESTROY_SCREEN();
-            break;
-        }
-    }
+
 }

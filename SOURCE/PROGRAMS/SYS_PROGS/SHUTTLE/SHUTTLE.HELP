@@ -1,0 +1,25 @@
+"shuttle - Serial COM port data transfer tool\n\n"
+
+"USAGE:\n"
+"  shuttle -p <port> -s (-S <string> | -f <file>)\n"
+"  shuttle -p <port> -r -f <file>\n\n"
+"  shuttle -p <port> -c\n\n"
+
+"DESCRIPTION:\n"
+"  Sends or receives data through COM2-COM4 UART ports.\n"
+"  COM1 is reserved for debug logging.\n\n"
+
+"OPTIONS:\n"
+"  -h, --help.                  Show this help message\n"
+
+"  -p, --port <n>.              Select COM port number (2, 3, or 4)\n"
+
+"  -s, --send.                  Send data to the selected COM port\n"
+
+"  -r, --receive.               Receive data from the selected COM port\n"
+
+"  -f, --file <path>.           File to send or destination file when receiving\n"
+
+"  -S, --string <text>.         String data to send\n"
+
+"  -c, --console.               Sends any data logged from keyboard\n"

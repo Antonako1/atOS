@@ -62,6 +62,9 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     PROC_MESSAGE msg;
     SHELL_INSTANCE *shndl = GET_SHNDL();
     U32 self_pid = shndl->self_pid;
+    if(GET_TCB_BY_PID(pid)->info.state == TCB_STATE_INFO_CHILD_PROC_HANDLER) {
+        return;
+    }
     STDOUT*std = GET_STDOUT(pid);
     // flush framebuffer
     if(std) {

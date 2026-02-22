@@ -117,7 +117,6 @@ typedef struct {
     DIR_ENTRY entry;             ///< Standard directory entry
     CHAR lfn[FAT_MAX_FILENAME];  ///< Full long file name (ASCII, null-terminated)
     U32 parent_cluster;  // not stored on disk — runtime info
-    U32 dir_offset;      // offset within the parent directory cluster
 } FAT_LFN_ENTRY;
 
 

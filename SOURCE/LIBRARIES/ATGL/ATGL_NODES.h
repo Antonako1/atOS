@@ -4,6 +4,7 @@
 #include <STD/TYPEDEF.h>
 #include <LIBRARIES/ATGL/ATGL_DEFS.h>
 #include <DRIVERS/VESA/VBE.h>
+#include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 
 #define ATGL_MAX_CHILDREN 16
 
@@ -43,16 +44,16 @@ typedef enum {
 } ATGL_TEXT_RECT_FLAGS;
 
 typedef enum {
-    ATGL_EV_MOUSE_MOVE,
-    ATGL_EV_MOUSE_DOWN,
-    ATGL_EV_KEY_DOWN,
+    ATGL_EV_NONE,
+    ATGL_EV_MOUSE,
+    ATGL_EV_KEYBOARD,
 } ATGL_EV_TYPE;
 
 typedef struct _ATGL_EVENT {
     ATGL_EV_TYPE type;
     union {
-        struct { I32 x, y; U8 button; } mouse;
-        struct { U32 scancode; U16 unicode; } key;
+        PS2_KB_DATA *keyboard;
+        PS2_MOUSE_DATA *mouse;
     } data;
 } ATGL_EVENT;
 
@@ -110,5 +111,7 @@ PATGL_NODE ATGL_CREATE_TEXT(PATGL_NODE parent, ATGL_RECT area, PU8 text, VBE_COL
 // --- Core Utils ---
 VOID ATGL_DESTROY_NODE(PATGL_NODE node);
 VOID ATGL_MARK_DIRTY(PATGL_NODE node);
+
+VOID ATGL_POLL_EVENT(ATGL_EVENT *ev);
 
 #endif // ATGL_ELEMENTS_H

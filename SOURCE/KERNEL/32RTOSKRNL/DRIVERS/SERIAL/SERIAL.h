@@ -1,0 +1,27 @@
+#ifndef SERIAL_H
+#define SERIAL_H
+#include <STD/TYPEDEF.h>
+
+#define COM1_PORT 0x3F8
+#define COM2_PORT 0x2F8
+#define COM3_PORT 0x3E8
+#define COM4_PORT 0x2E8
+
+#ifdef __RTOS__
+
+VOID SERIAL_INIT();
+I32 IS_SERIAL_TRANSIT_EMPTY(U16 port);
+
+VOID SERIAL_WRITE_BYTE(U16 port, U8 data);
+VOID SERIAL_WRITE_DATA(U16 port, PU8 data, U32 len);
+
+VOID SERIAL_READ_BYTE(U16 port, PU8 data);
+VOID SERIAL_READ_STRING(U16 port, PU8 buffer, U32 max_len);
+VOID SERIAL_READ_BUFFER(U16 port, PU8 buffer, U32 max_len);
+
+PU8 SERIAL_READ_WHOLE_BUFFER_HEAP(U16 port, U32* out_len);
+PU8 SERIAL_READ_WHOLE_STRING_HEAP(U16 port, U32* out_len);
+
+#endif // __RTOS__
+
+#endif // SERIAL_H

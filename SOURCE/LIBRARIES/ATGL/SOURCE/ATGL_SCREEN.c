@@ -39,6 +39,8 @@ PATGL_SCREEN ATGL_CREATE_SCREEN(ATGL_SCREEN_ARGS args) {
         return NULLPTR;
     }
 
+    FILE *fnt = FOPEN("/HOME/FONTS/SYS_FONT.FNT", MODE_FR);
+
     FAT_LFN_ENTRY font_entry;
     FAT32_PATH_RESOLVE_ENTRY("/HOME/FONTS/SYS_FONT.FNT", &font_entry);
     g_screen.font.font_data = FAT32_READ_FILE_CONTENTS(&g_screen.font.font_data_sz, &font_entry.entry);
@@ -47,6 +49,7 @@ PATGL_SCREEN ATGL_CREATE_SCREEN(ATGL_SCREEN_ARGS args) {
         ATGL_DESTROY_SCREEN();
         return NULLPTR;
     }
+    g_screen.font.file = fnt;
     g_screen.font.font_height = g_screen.font.font_width = 16;
     g_screen.font.char_spacing = 1;
     g_screen.font.line_spacing = 2;
@@ -71,6 +74,7 @@ VOID ATGL_DESTROY_SCREEN() {
         MFree(g_screen.back_buffer);
         g_screen.back_buffer = NULLPTR;
     }
+    FCLOSE(g_screen.font.file);
     MEMSET_OPT(&g_screen, 0, sizeof(ATGL_SCREEN));
 }
 

@@ -20,6 +20,8 @@
 #define COM1_BASE  0x3F8
 
 // Initialize serial output (COM1)
+// Note: COM1 is used for debugging. COM2-4 are used for other purposes. See STD/COMPORT.h
+/// @warning Not necessary to call this function
 void DEBUG_INIT(void);
 
 // Write a single character

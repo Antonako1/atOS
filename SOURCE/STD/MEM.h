@@ -7,7 +7,7 @@ U0 *MEMCPY(U0* dest, CONST U0* src, U32 size);
 U0 *MEMSET(U0* dest, U8 value, U32 size);
 U0 *MEMZERO(U0* dest, U32 size);
 U0 *MEMMOVE(U0* dest, CONST U0* src, U32 size);
-BOOLEAN MEMCMP(CONST U0* ptr1, CONST U0* ptr2, U32 size);
+I32 MEMCMP(CONST U0* ptr1, CONST U0* ptr2, U32 size);
 
 U0 *MEMCPY_OPT(U0* dest, CONST U0* src, U32 size);
 U0 *MEMSET_OPT(U0* dest, U8 value, U32 size);

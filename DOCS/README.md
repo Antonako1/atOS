@@ -27,3 +27,7 @@ Process communication and task handling
 ## PROGRAM_DEVELOPING.md
 
 How to create your own programs
+
+## SERIAL_PORTS.md
+
+Serial port usage and programming
