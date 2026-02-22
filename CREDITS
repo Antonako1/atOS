@@ -14,4 +14,6 @@
    - Serial port debugging
    - Production worthy shell text rendering
       Thanks to retroaalto for his atOS contributions!
-      
+  - Jooapa (https://github.com/jooapa)
+     - PIANO program (SOURCE/PROGRAMS/SYS_PROGS/PIANO)
+        Thanks to jooapa for his piano program!
