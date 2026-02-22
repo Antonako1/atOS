@@ -17,8 +17,11 @@
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
 #include <DRIVERS/AC97/AC97.h>
 #include <DRIVERS/CMOS/CMOS.h>
+#include <DRIVERS/SERIAL/SERIAL.h>
 
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
+
+#include <DEBUG/KDEBUG.h>
 
 #define SYSCALL_ENTRY(id, fn) [id] = fn,
 static SYSCALL_HANDLER syscall_table[SYSCALL_MAX] = {
@@ -379,6 +382,61 @@ U32 SYS_RESTART_MACHINE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 
     (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
     system_reboot();
 }   
+
+
+U32 SYS_SERIAL_WRITE_BYTE(U32 port, U32 data, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    SERIAL_WRITE_BYTE((U16)port, (U8)data);
+    return 0;
+} // VOID SERIAL_WRITE_BYTE(U16 port, U8 data);
+
+U32 SYS_SERIAL_WRITE_DATA(U32 port, U32 data, U32 len, U32 unused4, U32 unused5) {
+    (void)unused4;(void)unused5;
+    SERIAL_WRITE_DATA((U16)port, (PU8)data, len);
+    return 0;
+} // VOID SERIAL_WRITE_DATA(U16 port, PU8 data, U32 len);
+
+U32 SYS_SERIAL_READ_BYTE(U32 port, U32 data, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    SERIAL_READ_BYTE((U16)port, (PU8)data);
+    return 0;
+} // VOID SERIAL_READ_BYTE(U16 port, PU8 data);
+
+U32 SYS_SERIAL_READ_STRING(U32 port, U32 data, U32 len, U32 unused4, U32 unused5) {
+    (void)unused4;(void)unused5;
+    SERIAL_READ_STRING((U16)port, (PU8)data, len);
+    return 0;
+} // VOID SERIAL_READ_STRING(U16 port, PU8 buffer, U32 max_len);
+
+U32 SYS_SERIAL_READ_BUFFER(U32 port, U32 data, U32 len, U32 unused4, U32 unused5) {
+    (void)unused4;(void)unused5;
+    SERIAL_READ_BUFFER((U16)port, (PU8)data, len);
+    return 0;
+} // VOID SERIAL_READ_BUFFER(U16 port, PU8 buffer, U32 max_len);
+
+U32 SYS_ERIAL_READ_WHOLE_BUFFER_HEAP(U32 port, U32 out_len, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    U32 actual_len = 0;
+    PU8 buffer = SERIAL_READ_WHOLE_BUFFER_HEAP((U16)port, &actual_len);
+    if (!buffer) return 0;
+    if (out_len) {
+        *(U32*)out_len = actual_len; // Write length back to user space
+    }
+    return (U32)buffer;
+} // PU8 SERIAL_READ_WHOLE_BUFFER_HEAP(U16 port, U32* out_len);
+
+U32 SYS_ERIAL_READ_WHOLE_STRING_HEAP(U32 port, U32 data, U32 out_len, U32 unused4, U32 unused5) {
+    (void)unused4;(void)unused5;
+    U32 actual_len = 0;
+    PU8 buffer = SERIAL_READ_WHOLE_STRING_HEAP((U16)port, &actual_len);
+    if (!buffer) return 0;
+    if (out_len) {
+        *(U32*)out_len = actual_len; // Write length back to user space
+    }
+    return (U32)buffer;
+} // PU8 SERIAL_READ_WHOLE_STRING_HEAP(U16 port, U32* out_len);
+
+
 
 U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5) {
     if (num >= SYSCALL_MAX) return (U32)-1;
