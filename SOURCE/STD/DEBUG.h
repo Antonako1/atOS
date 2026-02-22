@@ -22,7 +22,7 @@
 // Initialize serial output (COM1)
 // Note: COM1 is used for debugging. COM2-4 are used for other purposes. See STD/COMPORT.h
 /// @warning Not necessary to call this function
-void DEBUG_INIT(void);
+// void DEBUG_INIT(void);
 
 // Write a single character
 void DEBUG_PUTC(U8 c);
@@ -39,8 +39,8 @@ void DEBUG_HEX32(U32 value);
 // Dump memory (simple hex view)
 void MEMORY_DUMP(const void *addr, U32 length);
 
-DEBUG_PRINTF(PU8 fmt, ...);
+void DEBUG_PRINTF(PU8 fmt, ...);
 
 // Put line end
-void DEBUG_NL();
+// void DEBUG_NL();
 #endif // STD_DEBUG_H
