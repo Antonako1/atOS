@@ -116,7 +116,10 @@ U32 main(U32 argc, PPU8 argv)
             if(!stringData)
                 FAIL("Error: Missing string after -S.");
 
-            COM_PORT_WRITE_DATA(portBase, stringData, STRLEN(stringData)); 
+            U32 len = STRLEN(stringData);
+            if(len == 0)                FAIL("Error: String after -S cannot be empty.");
+            COM_PORT_WRITE_DATA(portBase, stringData, len); 
+            printf("String with length %u sent successfully.\n", len);
         }
 
         if(hasFile)
@@ -128,6 +131,7 @@ U32 main(U32 argc, PPU8 argv)
             if(!file) 
                 FAIL("Error: Failed to open file.");
             COM_PORT_WRITE_DATA(portBase, file->data, file->sz);
+            printf("File '%s' with size %u bytes sent successfully.\n", filePath, file->sz);
             FCLOSE(file);
         }
     }
@@ -162,6 +166,7 @@ U32 main(U32 argc, PPU8 argv)
             }
         }
         FWRITE(file, buffer, outLen);
+        printf("Data with length %u bytes received and written to '%s' successfully.\n", outLen, filePath);
         MFree(buffer);
         FCLOSE(file);
     }
