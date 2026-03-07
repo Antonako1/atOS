@@ -168,14 +168,9 @@ Use `SOURCE/STD/DEBUG.h` or `SOURCE/KERNEL/32RTOSKRNL/DEBUG/KDEBUG.h`
 
 Planned and in-progress features for atOS:
 
-* [X] Basic drivers (keyboard, screen, disk I/O, audio, ethernet)
-* [X] FAT32 filesystem support
-* [X] Multitasking and scheduling
-* [X] Shell environment for interacting with the system
-* [X] Running custom processes via shell
-* [X] Conf file libary
 * [ ] Text editor
-* [X] Hex editor/viewer (Only viewer as of now)
+* [ ] Dynamic libraries
+* [ ] GUI and TUI libraries
 * [ ] Assembler
 * [ ] Dissasembler
 * [ ] Compiler
