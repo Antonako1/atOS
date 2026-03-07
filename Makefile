@@ -243,7 +243,6 @@ iso: bootloader kernel programs diskvbr
 	cp -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN $(INPUT_ISO_DIR_SYSTEM)/DISK_VBR.BIN
 
 	cp -rf $(SOURCE_DIR)/../HOME/* $(INPUT_ISO_DIR_HOME)/
-	cp -rf $(SOURCE_DIR)/FILES/* $(INPUT_ISO_DIR_HOME)/DOCS
 	cp -rf $(SOURCE_DIR)/SYS_SRC/* $(INPUT_ISO_DIR_SYSTEM)/SYS_SRC
 	cp -f $(OUTPUT_KERNEL_DIR)/KERNEL.BIN $(INPUT_ISO_DIR)/KERNEL.BIN
 	cp -f $(OUTPUT_KERNEL_DIR)/32RTOSKRNL.BIN $(INPUT_ISO_DIR_SYSTEM)/32RTOSKRNL.BIN
@@ -359,7 +358,10 @@ runlh:
 # Clean
 clean:
 	@echo "Cleaning output directories..."
-	rm -rf $(OUTPUT_DIR) $(INPUT_ISO_DIR)
+	rm -rf $(OUTPUT_DIR)
+	@echo "Output directories cleaned."
+	SCRIPTS/CLEAN.sh from_make
+	@echo "Clean complete."
 
 # Help
 help:
