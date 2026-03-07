@@ -450,15 +450,20 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
     U32 count = 0;
     while (offset < size) {
         IsoDirectoryRecord *record = (IsoDirectoryRecord *)(buffer + offset);
-        if (record->length == 0) break;
+        if (record->length == 0) {
+            offset = ((offset / ISO9660_SECTOR_SIZE) + 1) * ISO9660_SECTOR_SIZE;
+            continue;
+        }
         if (offset + record->length > size) {
             break; 
         }
-        if (record->fileNameLength >= ISO9660_MAX_PATH) {
+        if (record->fileNameLength >= ISO9660_MAX_PATH) 
+        {
             ISO9660_FREE_MEMORY_INTERNAL(&buffer);
             return FALSE;
         }
-        if(record->fileNameLength > 2 && record->fileIdentifier[0] != '.' && record->fileIdentifier[1] != '.') {
+        if(record->fileNameLength > 2 && record->fileIdentifier[0] != '.' && record->fileIdentifier[1] != '.') 
+        {
             // DUMP_STRINGN(record->fileIdentifier, record->fileNameLength);
             IsoDirectoryRecord *copy = KMALLOC(record->length);
             if (!copy) {
