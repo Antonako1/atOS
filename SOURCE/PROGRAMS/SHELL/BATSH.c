@@ -41,6 +41,7 @@ typedef struct {
 // === Command function prototypes ===
 #define CMD_FUNC(CMD) void CMD_##CMD(U8 *line)
 
+// Add new functions to /SOURCE/ATOSH.HELP!
 CMD_FUNC(HELP);
 CMD_FUNC(CLEAR);
 CMD_FUNC(VERSION);
@@ -57,6 +58,7 @@ CMD_FUNC(TYPE);
 CMD_FUNC(TAIL);
 CMD_FUNC(RMDIR);
 CMD_FUNC(COLOUR);
+CMD_FUNC(SHELL);
 #define CMD_NONE NULLPTR
 
 
@@ -206,12 +208,6 @@ static const ShellCommand shell_commands[] ATTRIB_RODATA = {
 
 #define shell_command_count (sizeof(shell_commands) / sizeof(shell_commands[0]))
 
-
-
-typedef struct _ARG_ARRAY {
-    U32 argc;
-    PPU8 argv;
-} ARG_ARRAY;
 
 VOID RAW_LINE_TO_ARG_ARRAY(PU8 raw_line, ARG_ARRAY *out) {
     out->argc = 0;
@@ -1240,8 +1236,10 @@ BOOLEAN RUN_BATSH_SCRIPT(PU8 path, U32 argc, PPU8 argv) {
     if (!dot || STRNICMP(dot, ".SH", 3) != 0) return FALSE;
     BATSH_INSTANCE *inst = CREATE_BATSH_INSTANCE(path, argc, argv);
     if(!inst) return FALSE;
+    batsh_mode = TRUE;
     BOOLEAN res = RUN_BATSH_FILE(inst);
     DESTROY_BATSH_INSTANCE(inst);
+    batsh_mode = FALSE;
     return res;
 }
 

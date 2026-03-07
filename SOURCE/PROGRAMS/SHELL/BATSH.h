@@ -57,6 +57,14 @@ BOOLEAN RUN_PROCESS(PU8 line);
 
 VOID SET_VAR(PU8 name, PU8 value);
 PU8 GET_VAR(PU8 name);
+
+typedef struct _ARG_ARRAY {
+    U32 argc;
+    PPU8 argv;
+} ARG_ARRAY;
+
+VOID RAW_LINE_TO_ARG_ARRAY(PU8 raw_line, ARG_ARRAY *out);
+
 #endif // __SHELL__
 
 #endif // BATSH_H

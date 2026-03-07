@@ -117,6 +117,10 @@ U0 EDIT_LINE_MSG_LOOP() {
                 SEND_MESSAGE(&res);
             } break;
             
+            case PROC_KILL_SHELL_KRNL: {
+                EXIT_SHELL();
+                for(;;) YIELD();; // 
+            } break;
             case SHELL_CMD_CREATE_STDOUT: {
                 PROC_MESSAGE res;
                 if (CREATE_STDOUT(msg->sender_pid)) {

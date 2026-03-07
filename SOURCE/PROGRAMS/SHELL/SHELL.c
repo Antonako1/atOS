@@ -22,6 +22,9 @@ U0 SHELL_LOOP(U0);
 U0 INITIALIZE_SHELL();
 
 U0 _start(U32 argc, PU8 argv[]) {
+    if(argc < 2 && STRCMP(argv[1], "--legitemate-run") != 0) {
+        KILL_SELF();
+    }
     draw_access_granted = FALSE;
     keyboard_access_granted = FALSE;
     shndl = MAlloc(sizeof(SHELL_INSTANCE));
@@ -76,6 +79,7 @@ U0 INITIALIZE_SHELL() {
     shndl->focused_pid = shndl->self_pid;
     shndl->previously_focused_pid = shndl->focused_pid;
     shndl->aborted = FALSE;
+    shndl->active_kb = TRUE;
     SWITCH_LINE_EDIT_MODE();
 
     // --- DEBUG ---
@@ -235,4 +239,18 @@ STDOUT* GET_STDOUT(U32 borrowers_pid) {
             return shndl->stdouts[i];
     }
     return NULLPTR;
+}
+
+VOID EXIT_SHELL() {
+    for(U32 i = 0; i < shndl->stdout_count; i++) {
+        if(shndl->stdouts[i]) {
+            MFreeNull(shndl->stdouts[i]);
+        }
+    }
+    MFreeNull(shndl);
+    PROC_MESSAGE msg;
+    msg = CREATE_PROC_MSG(0, PROC_KILL_SHELL_PROC, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+    KILL_SELF();
+    for(;;) YIELD();
 }

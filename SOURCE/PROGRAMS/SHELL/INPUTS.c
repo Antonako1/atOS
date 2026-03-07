@@ -36,6 +36,7 @@ VOID HANDLE_KB_CMDI(KEYPRESS *kp, MODIFIERS *mod) {
 VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
     if (!kp->pressed) return;
     SHELL_INSTANCE *shndl = GET_SHNDL();
+    if(!shndl->active_kb) return;
     // DEBUG_PRINTF("Pressed: %d. \nMods: \n\tALT:%d\n\tCTRL:%d\n\tSHIFT:%d\n", kp->keycode, mod->alt, mod->ctrl, mod->shift);
     switch (kp->keycode) {
         case KEY_INSERT: TOGGLE_INSERT_MODE(); break;
