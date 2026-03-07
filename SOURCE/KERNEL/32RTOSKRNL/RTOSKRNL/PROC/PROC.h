@@ -16,6 +16,9 @@ and message passing between processes and the kernel.
 
 #define USER_BINARY_VADDR MEM_USER_SPACE_BASE
 #define MAX_PROC_AMOUNT 30 // max amount of processes including master
+
+// Minus 1 shell and krnl
+#define MAX_CHILD_PROC_COUNT (MAX_PROC_AMOUNT - 2)
 // 4 KB. NOTE: Just a padding between binary and stack. Actual HEAP size is defined on the fly
 #define USER_HEAP_SIZE (1024 * 4 * 4) 
 
@@ -262,7 +265,8 @@ typedef struct TCB {
     U32 msg_queue_tail; // Index of the tail of the queue
     
     U32 child_count; // Number of child processes
-    VOIDPTR children[MAX_PROC_AMOUNT - 2]; // List of pointers to child TCBs (excluding master and self)
+
+    VOIDPTR children[MAX_CHILD_PROC_COUNT]; // List of pointers to child TCBs (excluding master and self)
 
     FPUState fpu;
 
@@ -291,6 +295,7 @@ void uninitialize_multitasking(void);
 U32 get_current_pid(void);
 U32 get_next_pid(void);
 U32 get_last_pid(void);
+U32 get_active_task_pid();
 TCB *get_current_tcb(void);
 TCB *get_last_fpu_user(void);
 TCB *get_focused_task(void);

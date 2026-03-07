@@ -3,6 +3,7 @@
 #include <STD/PROC_COM.h>
 #include <STD/TIME.h>
 #include <LIBRARIES/ARGHAND/ARGHAND.h>
+#include <RTOSKRNL/PROC/PROC.h>
 
 VOID PRINT_HELP() {
     printf("Usage: pinfo [options]\n"
@@ -71,7 +72,11 @@ U32 main(U32 argc, PPU8 argv) {
                 i->pid, i->name, i->state, ppid, i->cpu_time, i->num_switches, total_pages);
         } else {
             printf("%-5d | %-15s | %-8d | %-10s\n", 
-                i->pid, i->name, i->state, (i->pid == current->info.pid) ? "<SELF>" : "");
+                i->pid, i->name, i->state, 
+                (i->pid == current->info.pid) ? "<SELF>" : 
+                (i->pid == 0) ? "<KERNEL>" :
+                (i->state_info == TCB_STATE_INFO_CHILD_PROC_HANDLER) ? "<SHELL>" :
+                "");
         }
 
         last_pid = i->pid;
