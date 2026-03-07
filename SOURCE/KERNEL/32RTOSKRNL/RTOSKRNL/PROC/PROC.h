@@ -39,8 +39,8 @@ and message passing between processes and the kernel.
 #define TCB_STATE_ZOMBIE        0x0010  // Dead, waiting for parent to reap
 #define TCB_STATE_SLEEPING      0x0020  // Sleeping, can be woken up
 #define TCB_STATE_KERNEL_WAIT   0x0040  // Waiting for kernel event (e.g. I/O)
-#define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0020 // Handles and informs kernel of child process
-#define TCB_KILL                0x40000000 // Mark for kill
+#define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0020 // Handles and informs kernel of child process. AKA Shell
+#define TCB_STATE_KILL                0x40000000 // Mark for kill on next cycle
 
 /*
 Trap frame is pushed automatically by the PIT interrupt handler and used for context switching.
@@ -182,7 +182,7 @@ typedef enum {
 
     // Release keyboard events
     // Data, signal and message are ignored
-    PROC_RELEASE_KEYBOARD_EVENTS = 0x00000101,
+    PROC_RELEASE_KEYBOARD_EVENTS = 0x00000102,
     
     // Request mouse events
     // Data, signal and message are ignored
@@ -192,7 +192,11 @@ typedef enum {
 
     // Release mouse events
     // Data, signal and message are ignored
-    PROC_RELEASE_MOUSE_EVENTS = 0x00000201,
+    PROC_RELEASE_MOUSE_EVENTS = 0x00000202,
+
+    // Send to shell process
+    PROC_KILL_SHELL_PROC, // Send by procs
+    PROC_KILL_SHELL_KRNL, // Send by kernel
 
     // 0x100000 is limit number. User defined types start from there!
 } PROC_MESSAGE_TYPE;

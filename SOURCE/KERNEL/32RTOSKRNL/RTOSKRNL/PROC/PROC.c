@@ -728,6 +728,14 @@ void KILL_PROCESS(U32 pid) {
     }
     if(target == last_fpu_user) 
         last_fpu_user = NULL;
+
+    if(target->info.state == TCB_STATE_INFO_CHILD_PROC_HANDLER) {
+        target->info.state = TCB_STATE_KILL;
+        return;
+    }
+    else if(target->info.state == TCB_STATE_KILL) {
+
+    }
     // Remove from scheduler (this adjusts proc_amount automatically)
     remove_tcb_from_scheduler(target);
 
@@ -1222,6 +1230,9 @@ void handle_kernel_messages(void) {
                     FLAG_UNSET(t->info.event_types, PROC_EVENT_INFORM_ON_MOUSE_EVENTS);
                 }
                 break;
+            case PROC_KILL_SHELL_PROC: {
+                KILL_PROCESS(msg->sender_pid);
+            } break;
             case PROC_MSG_CREATE_PROCESS: 
                 {
                     if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) {
