@@ -303,8 +303,18 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
         if (f->FILENAME[0] == 0x00 || f->FILENAME[0] == 0xE5 || (f->ATTRIB & FAT_ATTRIB_VOL_ID) || (f->ATTRIB == FAT_ATTRIB_LFN)) continue;
 
         // Type
-        if (f->ATTRIB & FAT_ATTRB_DIR)
+        if (f->ATTRIB & FAT_ATTRB_DIR) {
+            U16 prev_fg = GET_SHNDL()->cursor->fgColor;
+            U16 prev_bg = GET_SHNDL()->cursor->bgColor;
+
+            GET_SHNDL()->cursor->fgColor = prev_bg;
+            GET_SHNDL()->cursor->bgColor = prev_fg;
+
             PUTS("dir   ");
+
+            GET_SHNDL()->cursor->fgColor = prev_fg;
+            GET_SHNDL()->cursor->bgColor = prev_bg;
+        }
         else
             PUTS("file  ");
 
