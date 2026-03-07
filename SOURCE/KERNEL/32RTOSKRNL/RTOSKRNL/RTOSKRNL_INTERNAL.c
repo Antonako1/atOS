@@ -69,7 +69,10 @@ static inline regs ASM_READ_REGS(void) {
 
 #define PANIC_COLOUR VBE_WHITE, VBE_BLUE
 #define PANIC_DEBUG_COLOUR VBE_RED, VBE_LIGHT_CYAN
-
+#define PANIC_SOUND() do { \
+    AC97_TONE(300, 2000, 14400, 8000); \
+    AC97_TONE(200, 2000, 14400, 8000); \
+} while(0)
 void DUMP_CALLER_STACK(U32 count) {
     U8 buf[20];
     VBE_DRAW_STRING(0, rki_row, "Caller stack dump:", PANIC_COLOUR);
@@ -232,8 +235,7 @@ void DUMP_STRING_U32(PU8 str, U32 num) {
 void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
     CLI;
     debug_vram_start();
-    AC97_TONE(300, 150, 14400, 8000);
-    AC97_TONE(200, 200, 14400, 8000);
+    PANIC_SOUND();
     VBE_COLOUR fg = VBE_WHITE;
     VBE_COLOUR bg = VBE_BLUE;
     VBE_CLEAR_SCREEN(bg);
@@ -360,8 +362,7 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     CLI;
     debug_vram_start();
     VBE_UPDATE_VRAM();
-    AC97_TONE(300, 150, 14400, 8000);
-    AC97_TONE(200, 200, 14400, 8000);
+    PANIC_SOUND();
     rki_row = 0;
     VBE_CLEAR_SCREEN(bg);
     U8 buf[16];
@@ -590,7 +591,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     if(!file) {
         panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
-    U8 *shell_argv[] = { SHELL_PATH , "-test", NULLPTR };
+    U8 *shell_argv[] = { SHELL_PATH , "--legitemate-run", NULLPTR };
     panic_if(
         !RUN_BINARY(
             STR("/", SHELL_PATH), 
@@ -639,7 +640,7 @@ BOOL initialize_filestructure(VOID) {
 void RTOSKRNL_LOOP(VOID) {
     kernel_loop_init();
     while(1) {
-        early_debug_tcb(get_last_pid());
+        early_debug_tcb(get_current_pid());
         handle_kernel_messages();
     }
 }
