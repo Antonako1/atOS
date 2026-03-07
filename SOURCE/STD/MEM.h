@@ -22,4 +22,9 @@ U0 *CAlloc(U32 num, U32 size);
 U0 *ReAlloc(U0* ptr, U32 newSize);
 VOID MFree(U0* ptr);
 
+#define MFreeNull(x) do { \
+    MFree(x); \
+    x = NULLPTR; \
+} while(0)
+
 #endif // STD_MEM_H
