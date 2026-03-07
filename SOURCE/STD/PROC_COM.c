@@ -14,6 +14,11 @@ static TCB *parent ATTRIB_DATA = NULL;
 static BOOLEAN parent_fetched ATTRIB_DATA = FALSE;
 static U32 pid ATTRIB_DATA = 0;
 static U32 ppid ATTRIB_DATA = 0;
+static U8 ___keyboard_access_granted = FALSE;
+static U8 ___draw_access_granted = FALSE;
+static U8 ___STDOUT_CREATED = FALSE;
+static U8 ___INFO_ARR = FALSE;
+static SHELL_INSTANCE *SHNDL;
 
 STDOUT *GET_PROC_STDOUT() {
     return stdout;
@@ -155,6 +160,13 @@ U32 CPU_SLEEP(U32 ms) {
     return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
 }
 
+VOID DISABLE_SHELL_KEYBOARD() {
+    SHNDL->active_kb = FALSE;
+}
+VOID ENABLE_SHELL_KEYBOARD() {
+    SHNDL->active_kb = TRUE;
+}
+
 VOID EXIT(U32 n) {
     PROC_MESSAGE msg;
 
@@ -174,11 +186,7 @@ VOID EXIT(U32 n) {
     for(;;); // Loop here until safe to continue
 }
 
-static U8 ___keyboard_access_granted = FALSE;
-static U8 ___draw_access_granted = FALSE;
-static U8 ___STDOUT_CREATED = FALSE;
-static U8 ___INFO_ARR = FALSE;
-static SHELL_INSTANCE *SHNDL;
+
 
 void PRIC_INIT_GRAPHICAL() {
     PROC_MESSAGE msg;
