@@ -798,7 +798,13 @@ void KILL_PROCESS(U32 pid) {
         KFREE_PAGE(target->stack_phys_base);
         target->stack_phys_base = NULL;
     }
-
+    if(focused_task == target) {
+        if(current_shell == target) {
+            focused_task = &master_tcb;
+        } else {
+            focused_task = current_shell;
+        }
+    }
     // Finally free the TCB itself
     KFREE(target);
 

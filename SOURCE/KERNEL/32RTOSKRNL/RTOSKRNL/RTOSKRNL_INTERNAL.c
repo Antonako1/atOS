@@ -368,6 +368,8 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     U8 buf[16];
     // Error code
     ITOA_U(errmsg, buf, 16);
+    // VBE_DRAW_STRING(0, rki_row, "PRESS CTRL+ALT+DEL TO RESTART", fg, bg);
+    // INC_rki_row(rki_row);
     VBE_DRAW_STRING(0, rki_row, "ERRORCODE: 0x", fg, bg);
     VBE_DRAW_STRING(VBE_CHAR_WIDTH*13, rki_row, buf, fg, bg);
     INC_rki_row(rki_row);
@@ -433,7 +435,7 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
 
     VBE_DRAW_STRING(0, rki_row, "Memory dump at error code.", fg, bg);
     INC_rki_row(rki_row);
-    DUMP_MEMORY(errmsg, 256);
+    DUMP_MEMORY(errmsg, 256-16);
 
     // 🔍 Kernel Heap Info
     INC_rki_row(rki_row);
