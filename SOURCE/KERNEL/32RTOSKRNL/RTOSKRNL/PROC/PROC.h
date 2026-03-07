@@ -16,6 +16,9 @@ and message passing between processes and the kernel.
 
 #define USER_BINARY_VADDR MEM_USER_SPACE_BASE
 #define MAX_PROC_AMOUNT 30 // max amount of processes including master
+
+// Minus 1 shell and krnl
+#define MAX_CHILD_PROC_COUNT (MAX_PROC_AMOUNT - 2)
 // 4 KB. NOTE: Just a padding between binary and stack. Actual HEAP size is defined on the fly
 #define USER_HEAP_SIZE (1024 * 4 * 4) 
 
@@ -39,8 +42,8 @@ and message passing between processes and the kernel.
 #define TCB_STATE_ZOMBIE        0x0010  // Dead, waiting for parent to reap
 #define TCB_STATE_SLEEPING      0x0020  // Sleeping, can be woken up
 #define TCB_STATE_KERNEL_WAIT   0x0040  // Waiting for kernel event (e.g. I/O)
-#define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0020 // Handles and informs kernel of child process
-#define TCB_KILL                0x40000000 // Mark for kill
+#define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0020 // Handles and informs kernel of child process. AKA Shell
+#define TCB_STATE_KILL                0x40000000 // Mark for kill on next cycle
 
 /*
 Trap frame is pushed automatically by the PIT interrupt handler and used for context switching.
@@ -182,7 +185,7 @@ typedef enum {
 
     // Release keyboard events
     // Data, signal and message are ignored
-    PROC_RELEASE_KEYBOARD_EVENTS = 0x00000101,
+    PROC_RELEASE_KEYBOARD_EVENTS = 0x00000102,
     
     // Request mouse events
     // Data, signal and message are ignored
@@ -192,7 +195,11 @@ typedef enum {
 
     // Release mouse events
     // Data, signal and message are ignored
-    PROC_RELEASE_MOUSE_EVENTS = 0x00000201,
+    PROC_RELEASE_MOUSE_EVENTS = 0x00000202,
+
+    // Send to shell process
+    PROC_KILL_SHELL_PROC, // Send by procs
+    PROC_KILL_SHELL_KRNL, // Send by kernel
 
     // 0x100000 is limit number. User defined types start from there!
 } PROC_MESSAGE_TYPE;
@@ -258,7 +265,8 @@ typedef struct TCB {
     U32 msg_queue_tail; // Index of the tail of the queue
     
     U32 child_count; // Number of child processes
-    VOIDPTR children[MAX_PROC_AMOUNT - 2]; // List of pointers to child TCBs (excluding master and self)
+
+    VOIDPTR children[MAX_CHILD_PROC_COUNT]; // List of pointers to child TCBs (excluding master and self)
 
     FPUState fpu;
 
@@ -287,6 +295,7 @@ void uninitialize_multitasking(void);
 U32 get_current_pid(void);
 U32 get_next_pid(void);
 U32 get_last_pid(void);
+U32 get_active_task_pid();
 TCB *get_current_tcb(void);
 TCB *get_last_fpu_user(void);
 TCB *get_focused_task(void);

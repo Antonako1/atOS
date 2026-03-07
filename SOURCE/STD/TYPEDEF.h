@@ -17,7 +17,7 @@
  * 
  * It is recommended to add ATTRIB_DATA so it will be included inside the .data section,
  * otherwise it can appear in the .bss section, which might point to some location outside the binary bounds and corrupt memory!
- */
+ */ 
 #define ATTRIB_DATA __attribute__((section(".data")))
 #define ATTRIB_RODATA __attribute__((section(".rodata")))
 #define ATTRIB_CODE __attribute__((section(".text")))
@@ -139,5 +139,7 @@ typedef U8           BOOLEAN8;
 #define U32_MAX   (4294967295U)
 #define F32_MIN   (-3.402823466e+38F)
 #define F32_MAX   (3.402823466e+38F)
+
+#define CMAIN() U32 main(U32 argc, PPU8 argv) 
 
 #endif // TYPEDEF_H

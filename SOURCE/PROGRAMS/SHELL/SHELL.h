@@ -56,6 +56,7 @@ typedef struct {
     } fat_info;
     STDOUT *stdouts[MAX_STDOUT_BUFFS];
     U32 stdout_count;
+    BOOL8 active_kb;
     ACTIVE_KEYBINDS active_keybinds;
 } SHELL_INSTANCE;
 
@@ -91,5 +92,8 @@ BOOLEAN ResolvePath(PU8 path, PU8 out_buffer, size_t out_buffer_size);
 
 VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir);
 VOID PRINT_CONTENTS_PATH(PU8 path);
+
+VOID EXIT_SHELL();
+
 #endif // __SHELL__
 #endif // SHELL_H

@@ -9,6 +9,7 @@ VOID CMD_CD(PU8 raw_line) {
     else if (!path_arg || *path_arg == '\0') CD_INTO((PU8)"/");
     else CD_INTO(path_arg);
     SET_VAR("CD", GET_PATH());
+    if(!batsh_mode) PRINTNEWLINE();
 }
 
 VOID CMD_CD_BACKWARDS(PU8 line) { 

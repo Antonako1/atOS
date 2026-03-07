@@ -5,6 +5,7 @@
 #include <STD/STRING.h>
 #include <STD/TIME.h>
 #include <STD/MATH.h>
+#include <STD/PROC_COM.h>
 
 /* key geometry */
 #define NUM_WHITE 8
@@ -103,7 +104,7 @@ U32 main(U32 argc, PPU8 argv) {
     for(U32 i=0;i<NUM_WHITE;i++) draw_white_key(&white[i]);
     for(U32 i=0;i<NUM_BLACK;i++) draw_black_key(&black[i]);
     FLUSH_VRAM();
-
+    DISABLE_SHELL_KEYBOARD();
     while(running){
         PS2_KB_DATA *kp = kb_poll();
         if(kp) {
@@ -156,6 +157,6 @@ U32 main(U32 argc, PPU8 argv) {
             }
         }
     }
-
+    ENABLE_SHELL_KEYBOARD();
     return 1;
 }

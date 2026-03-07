@@ -57,7 +57,7 @@ VOID CMD_COLOUR(PU8 raw_line) {
     else {
         for (U32 i = 0; i < arr.argc; i++) {
             if(!arr.argv[i]) break;
-            DEBUG_PRINTF("'%d', '%s'\n", i, arr.argv[i]);
+            // DEBUG_PRINTF("'%d', '%s'\n", i, arr.argv[i]);
             if (STRCMP(arr.argv[i], "-h") == 0 || STRCMP(arr.argv[i], "--help") == 0) {
                 show_help = TRUE;
                 break;

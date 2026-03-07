@@ -190,6 +190,102 @@ U32 ATOI_HEX(CONST U8* str) {
     }
     return res;
 }
+
+F32 ATOF(PU8 str)
+{
+    F32 result = 0.0f;
+    F32 fraction = 0.1f;
+    int sign = 1;
+
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    }
+
+    while (*str && *str != '.') {
+        result = result * 10.0f + (*str - '0');
+        str++;
+    }
+
+    if (*str == '.') {
+        str++;
+
+        while (*str) {
+            result += (*str - '0') * fraction;
+            fraction *= 0.1f;
+            str++;
+        }
+    }
+
+    return result * sign;
+}
+static int hex_val(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return 0;
+}
+
+F32 ATOF_HEX(PU8 str)
+{
+    F32 result = 0.0f;
+    F32 fraction = 1.0f / 16.0f;
+    int sign = 1;
+
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    }
+
+    while (*str && *str != '.') {
+        result = result * 16.0f + hex_val(*str);
+        str++;
+    }
+
+    if (*str == '.') {
+        str++;
+
+        while (*str) {
+            result += hex_val(*str) * fraction;
+            fraction /= 16.0f;
+            str++;
+        }
+    }
+
+    return result * sign;
+}
+
+F32 ATOF_BIN(PU8 str)
+{
+    F32 result = 0.0f;
+    F32 fraction = 0.5f;
+    int sign = 1;
+
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    }
+
+    while (*str && *str != '.') {
+        result = result * 2.0f + (*str - '0');
+        str++;
+    }
+
+    if (*str == '.') {
+        str++;
+
+        while (*str) {
+            result += (*str - '0') * fraction;
+            fraction *= 0.5f;
+            str++;
+        }
+    }
+
+    return result * sign;
+}
+
+
 U32 ATOI_BIN(CONST U8* str) {
     U32 res = 0;
     while ((*str == '0' || *str == '1')) {
@@ -807,6 +903,72 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
         }
 
         switch (*fmt) {
+            case 'f': {
+                F32 val = (F32)va_arg(args, double);
+
+                if (precision < 0)
+                    precision = 6;
+
+                if (val < 0) {
+                    is_negative = TRUE;
+                    val = -val;
+                }
+
+                U32 int_part = (U32)val;
+                F32 frac = val - (F32)int_part;
+
+                CHAR buf[32];
+                I32 len = 0;
+
+                // Convert integer part (reverse)
+                if (int_part == 0) {
+                    buf[len++] = '0';
+                } else {
+                    U32 tmp = int_part;
+                    while (tmp) {
+                        buf[len++] = '0' + (tmp % 10);
+                        tmp /= 10;
+                    }
+                }
+
+                // Reverse integer digits
+                for (I32 i = 0; i < len / 2; i++) {
+                    CHAR t = buf[i];
+                    buf[i] = buf[len - 1 - i];
+                    buf[len - 1 - i] = t;
+                }
+
+                I32 total_len = len + (precision ? precision + 1 : 0) + (is_negative ? 1 : 0);
+
+                if (!left_align) {
+                    CHAR pad = pad_zero ? '0' : ' ';
+                    for (I32 i = total_len; i < width; i++)
+                        putch(pad, ctx);
+                }
+
+                if (is_negative)
+                    putch('-', ctx);
+
+                for (I32 i = 0; i < len; i++)
+                    putch(buf[i], ctx);
+
+                if (precision > 0)
+                    putch('.', ctx);
+
+                for (I32 i = 0; i < precision; i++) {
+                    frac *= 10.0f;
+                    I32 digit = (I32)frac;
+                    putch('0' + digit, ctx);
+                    frac -= digit;
+                }
+
+                if (left_align) {
+                    for (I32 i = total_len; i < width; i++)
+                        putch(' ', ctx);
+                }
+
+                break;
+            }
             case 'c': {
                 CHAR c = (CHAR)va_arg(args, I32);
                 if (!left_align) for (I32 i = 1; i < width; i++) putch(' ', ctx);

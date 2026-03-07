@@ -90,6 +90,9 @@ U32 get_current_pid(void) {
     }
     return master_tcb.info.pid;
 }
+U32 get_active_task_pid() {
+    return current_tcb->info.pid;
+}
 U32 get_last_pid(void) {
     return next_pid - 1;
 }
@@ -602,6 +605,15 @@ static inline VOID *stack_phys_ptr(TCB *proc, U32 phys_offset) {
     return (VOID *)((U8 *)proc->stack_phys_base + phys_offset);
 }
 
+VOID ADD_CHILD_PROC_TO_PARENT(TCB *c, U32 ppid) {
+    c->parent = get_tcb_by_pid(ppid);
+    TCB *parent = get_tcb_by_pid(ppid);
+    if(parent->child_count+1>MAX_CHILD_PROC_COUNT){
+        c->parent = 0;
+    }
+    parent->children[parent->child_count++] = c;
+}
+
 BOOLEAN RUN_BINARY(
     U8 *proc_name, 
     VOIDPTR file, 
@@ -637,8 +649,11 @@ BOOLEAN RUN_BINARY(
     panic_if(!new_proc, "Unable to allocate memory for TCB!", PANIC_OUT_OF_MEMORY);
     MEMZERO(new_proc, sizeof(TCB));
 
-    if (parent_pid != U32_MAX)
-        new_proc->parent = get_tcb_by_pid(parent_pid);
+    if (parent_pid != U32_MAX) {
+        ADD_CHILD_PROC_TO_PARENT(new_proc, parent_pid);
+    } else {
+        new_proc->parent = 0;
+    }
 
     new_proc->info.pid = get_next_pid();
     
@@ -705,8 +720,16 @@ void remove_tcb_from_scheduler(TCB *tcb) {
     }
 }
 
-
-
+VOID KILL_CHILD_PROCS(TCB *t)
+{
+    while (t->child_count > 0) {
+        TCB *child = t->children[--t->child_count];
+        if (child) {
+            KDEBUG_STR_HEX_LN("[proc] Killing child process", child->info.pid);
+            KILL_PROCESS(child->info.pid);
+        }
+    }
+}
 void KILL_PROCESS(U32 pid) {
     if (pid == 0) return; // cannot kill master process
 
@@ -726,8 +749,23 @@ void KILL_PROCESS(U32 pid) {
     if (target == focused_task) {
         focused_task = current_shell;
     }
+
+    // If target was the last fpu user, reset fpu
     if(target == last_fpu_user) 
         last_fpu_user = NULL;
+
+    // if shell, tag for kill on next run to allow resource freeing
+    // if(target->info.state == TCB_STATE_INFO_CHILD_PROC_HANDLER) {
+        // target->info.state = TCB_STATE_KILL;
+        // return;
+    // }
+
+    // if tagged for kill, kill
+    // else if(target->info.state == TCB_STATE_KILL) {
+        // kill
+    // } 
+    KILL_CHILD_PROCS(target);
+
     // Remove from scheduler (this adjusts proc_amount automatically)
     remove_tcb_from_scheduler(target);
 
@@ -760,14 +798,19 @@ void KILL_PROCESS(U32 pid) {
         KFREE_PAGE(target->stack_phys_base);
         target->stack_phys_base = NULL;
     }
-
+    if(focused_task == target) {
+        if(current_shell == target) {
+            focused_task = &master_tcb;
+        } else {
+            focused_task = current_shell;
+        }
+    }
     // Finally free the TCB itself
     KFREE(target);
 
     KDEBUG_PUTS("[proc] Process killed successfully\n");
     KDEBUG_HEX32(pid);
     KDEBUG_PUTC('\n');
-    
 }
 
 volatile static U32 tcks __attribute__((section(".data"))) = 0;
@@ -856,6 +899,8 @@ void early_debug_tcb(U32 pid) {
     // for early task debugging
     TCB *t = get_master_tcb();
     U32 rki_row = 0;
+    VBE_DRAW_STRING(0, rki_row, "PRESS CTRL+ALT+INS to run a new shell process", VBE_GREEN, VBE_BLACK);
+    INC_rki_row(&rki_row);
     VBE_DRAW_STRING(0, rki_row, "32RTOSKRNL TCB Dump:", VBE_GREEN, VBE_BLACK);
     INC_rki_row(&rki_row);
     U8 buf[20];
@@ -1222,6 +1267,11 @@ void handle_kernel_messages(void) {
                     FLAG_UNSET(t->info.event_types, PROC_EVENT_INFORM_ON_MOUSE_EVENTS);
                 }
                 break;
+            case PROC_KILL_SHELL_PROC: {
+                focused_task = &master_tcb;
+                KILL_PROCESS(msg->sender_pid);
+                current_shell = NULLPTR;
+            } break;
             case PROC_MSG_CREATE_PROCESS: 
                 {
                     if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) {
@@ -1287,10 +1337,33 @@ void handle_kernel_messages(void) {
             data->kb.mods.ctrl &&
             data->kb.cur.keycode == KEY_DELETE) {
             system_reboot();
+        } else if(
+            current_shell == NULLPTR &&
+            data->kb.cur.pressed &&
+            data->kb.mods.alt &&
+            data->kb.mods.ctrl &&
+            data->kb.cur.keycode == KEY_INSERT
+        ) {
+            LOAD_AND_RUN_KERNEL_SHELL();
         }
     }
 
     if(data->ms.seq != last_mouse_seq) {
         last_mouse_seq = data->ms.seq;
+    }
+
+
+    if(current_tcb == &master_tcb) { // no needed
+        // on every master task switch
+        // we look for TCB_STATE_KILL procs and kill them as needed
+        TCB *start = &master_tcb;
+        TCB *next = start->next;
+        while(next != &master_tcb) {
+            if(next->info.state == TCB_STATE_KILL) {
+                KILL_PROCESS(next->info.pid);
+            }
+            next = next->next;
+
+        }
     }
 }

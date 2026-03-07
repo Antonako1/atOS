@@ -1,0 +1,12 @@
+"METRONOME - A Metronome program\n\n"
+
+"Usage: METRONOME <BPM> <NOTE>\n\n"
+
+"\tBPM\tBeats per minute\n"
+"\tNOTE\tNote interval (1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth)\n\n"
+
+"Example:\n"
+"\tMETRONOME 120 4\tQuarter note beat at 120 BPM\n"
+"\tMETRONOME 120 8\tEighth note ticks\n\n"
+
+"Press ESC to stop the metronome.\n"
