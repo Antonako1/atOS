@@ -20,6 +20,6 @@ U32 main(U32 argc, PPU8 argv) {
         pid = (U32)ATOI(argv[1]);
     }
     KILL_PROCESS_INSTANCE(pid);
-    printf("Sent kill signal to PID number %02x\n", pid);
+    printf("Sent kill signal to PID number 0x%02x\n", pid);
     return 0;
 }
