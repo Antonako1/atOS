@@ -1,0 +1,6 @@
+"STRINGS - Prints out all possible string values found inside in a file\n\n"
+
+"Usage: STRINGS <file> [OPTIONS]\n\n"
+
+"OPTIONS:\n"
+"\t-h, --help\tDisplays this message"
