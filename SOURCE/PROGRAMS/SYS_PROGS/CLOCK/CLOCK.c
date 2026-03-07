@@ -137,7 +137,7 @@ U32 main(U32 argc, PPU8 argv) {
         UPDATE_CLOCK();
         cpu_relax();
         // Optional: Yield CPU slightly to prevent 100% usage while waiting for second to tick
-        // sys_yield(); 
+        YIELD();
     }
 
     return 0;
