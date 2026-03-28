@@ -176,7 +176,7 @@ VESA_CTRL_SIZE    EQU 512
 VBE_MODE_OFFSET   EQU VESA_LOAD_OFFSET + VESA_CTRL_SIZE
 VBE_MODE_SIZE     EQU 256          ; typical size for mode info structure
 
-VESA_TARGET_MODE  EQU 0x116   
+VESA_TARGET_MODE  EQU 0x118 ; 1024x768x32bpp mode
 
 
 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
