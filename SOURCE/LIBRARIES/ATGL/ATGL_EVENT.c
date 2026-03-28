@@ -58,8 +58,7 @@ BOOL ATGL_POLL_EVENTS(ATGL_EVENT *ev)
         if (bl && !atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_DOWN;
         if (!bl && atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_UP;
         if (br && !atgl.last_btn_right) ev->type = ATGL_EVT_MOUSE_DOWN;
-        DEBUG_PRINTF("Mouse event: btn_left=%d btn_right=%d btn_middle=%d\n", bl, br, bm);
-        DEBUG_PRINTF("Mouse event: x=%d y=%d\n", mx, my);   
+
         ev->mouse.x          = mx;
         ev->mouse.y          = my;
         ev->mouse.btn_left   = bl;
@@ -293,17 +292,19 @@ static VOID atgl_cursor_show(I32 mx, I32 my)
     c->has_saved = TRUE;
 }
 
-static VOID render_recursive(PATGL_NODE node, I32 px, I32 py)
+static VOID render_recursive(PATGL_NODE node, I32 px, I32 py, BOOL force)
 {
     if (!node || !node->visible) return;
 
     /* Compute absolute position from parent origin */
     atgl_compute_abs_rect(node, px, py);
 
+    BOOL render_this = force || node->dirty;
+
     /* With upward dirty propagation (ATGL_NODE_INVALIDATE), a clean
        node guarantees all descendants are also clean — skip the
        entire subtree in O(1). */
-    if (!node->dirty) return;
+    if (!render_this) return;
 
     /* Render this node */
     if (node->fn_render) {
@@ -313,7 +314,7 @@ static VOID render_recursive(PATGL_NODE node, I32 px, I32 py)
     /* Render children */
     for (U32 i = 0; i < node->child_count; i++) {
         render_recursive(node->children[i],
-                         node->abs_rect.x, node->abs_rect.y);
+                         node->abs_rect.x, node->abs_rect.y, render_this);
     }
 
     node->dirty = FALSE;
@@ -329,10 +330,11 @@ VOID ATGL_RENDER_TREE(PATGL_NODE root)
 
     /* 2. Render dirty sub-trees (full clear only on first frame /
           theme change when root is dirty). */
-    if (root->dirty) {
+    BOOL force = root->dirty;
+    if (force) {
         CLEAR_SCREEN_COLOUR(atgl.theme.bg);
     }
-    render_recursive(root, 0, 0);
+    render_recursive(root, 0, 0, force);
 
     /* 3. Save the screen content at the new cursor position and draw
           the cursor on top.  This uses direct framebuffer access —
