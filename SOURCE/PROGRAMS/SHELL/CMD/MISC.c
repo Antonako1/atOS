@@ -38,9 +38,27 @@ VOID CMD_ECHO(U8 *line) {
 
 VOID CMD_SHELL(U8 *line) {
     PU8 path = 
-        "/PROGRAMS/ATOSHELL/ATOSHELL.BIN";
+        "/ATOS/TSHELL.BIN";
     FILE *f = FOPEN(path, MODE_FR);
-    U8 *shell_argv[] = { path , "--legitemate-run", NULLPTR };
+    if (!f) {
+        PRINTNEWLINE();
+        PUTS((U8*)"Failed to open shell binary: ");
+        PUTS(path);
+        PRINTNEWLINE();
+        return;
+    }
+    PU8 shell_argv = MAlloc(sizeof(U8*) * 3);
+    if (!shell_argv) {
+        FCLOSE(f);
+        PRINTNEWLINE();
+        PUTS((U8*)"Failed to allocate memory for shell arguments");
+        PRINTNEWLINE();
+        return;
+    }
+    shell_argv[0] = STRDUP(path);
+    shell_argv[1] = STRDUP("-c");
+    shell_argv[2] = NULLPTR;
+    // U8 *shell_argv[3] = { STRDUP("/ATOS/TSHELL.BIN"), STRDUP("-c"), NULLPTR };
 
     START_PROCESS(
         path,
@@ -51,6 +69,7 @@ VOID CMD_SHELL(U8 *line) {
         shell_argv,
         2
     );
+    FCLOSE(f);
 }
 
 VOID CMD_UNKNOWN(U8 *line) {
