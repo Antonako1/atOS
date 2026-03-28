@@ -1,0 +1,6 @@
+"RMDIR - Removes a directory\n\n"
+
+"Usage: RMDIR [-f|--force] <path>\n\n"
+
+"OPTIONS:\n\n"
+"-f, --force\tForce delete the directory\n"
