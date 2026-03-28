@@ -17,6 +17,10 @@ VOID CMD_RESTART(PU8 line){
     (void) line;
     SYS_RESTART();
 }
+VOID CMD_SHUTDOWN(PU8 line) {
+    (void) line;
+    SYS_SHUTDOWN();
+}
 VOID CMD_CLEAR(U8 *line) { (void)line; LE_CLS(); }
 VOID CMD_VERSION(U8 *line) { (void)line; PRINTNEWLINE(); PUTS((U8*)"atOS Shell version 1.0.0" LEND); }
 VOID CMD_EXIT(U8 *line) { 
