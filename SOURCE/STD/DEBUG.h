@@ -37,7 +37,7 @@ void DEBUG_PUTS_LN(PU8 s);
 void DEBUG_HEX32(U32 value);
 
 // Dump memory (simple hex view)
-void MEMORY_DUMP(const void *addr, U32 length);
+void DEBUG_MEMORY_DUMP(const void *addr, U32 length);
 
 void DEBUG_PRINTF(PU8 fmt, ...);
 
