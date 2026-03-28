@@ -383,6 +383,10 @@ U32 SYS_RESTART_MACHINE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 
     system_reboot();
 }   
 
+U32 SYS_SHUTDOWN_MACHINE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    system_shutdown();
+}   
 
 U32 SYS_SERIAL_WRITE_BYTE(U32 port, U32 data, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused3;(void)unused4;(void)unused5;
