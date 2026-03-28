@@ -25,13 +25,14 @@ typedef enum {
 typedef enum {
     STDOUT_ACTION_CLEAR_SCREEN,
 } EXTRA_STDOUT_ACTIONS;
+
 typedef struct {
     U8 buf[STDOUT_MAX_LENGTH];
-    U32 buf_end;
-    U32 proc_seq;
-    U32 shell_seq;
-    U32 borrowers_pid;
-    U32 owner_pid;
+    U32 buf_end; // end pos of current buf
+    U32 proc_seq; // writer seq
+    U32 shell_seq; // reader seq
+    U32 borrowers_pid; // writer pid
+    U32 owner_pid; // reader pid
     EXTRA_STDOUT_ACTIONS actions;
 } STDOUT;
 
