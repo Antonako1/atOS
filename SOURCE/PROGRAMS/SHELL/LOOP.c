@@ -57,7 +57,7 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     // PUTS(" terminated with code 0x");
     // PUT_HEX(exit_code);
     // PUTC('\n');
-    DEBUG_PRINTF("[SHELL %d] Process end acknowledged\n", PROC_GETPID());
+    DEBUG_PRINTF("[SHELL %d] Process end acknowledged for %d\n", PROC_GETPID(), pid);
     // Restore shell prompt
     PROC_MESSAGE msg;
     SHELL_INSTANCE *shndl = GET_SHNDL();
@@ -70,9 +70,11 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     if(std) {
         BOOL prev = GetOutputHandle()->CURSOR_BLINK;
         GetOutputHandle()->CURSOR_BLINK = FALSE;
+        // DEBUG_PRINTF("Handle got and blink off, %s, %d, %d\n", std->buf, std->proc_seq, std->shell_seq);
         if(std->buf[0] != NULLT && std->proc_seq != std->shell_seq) {
             PUTS(std->buf);
             PRINTNEWLINE();
+            std->shell_seq = std->proc_seq;
         }
         GetOutputHandle()->CURSOR_BLINK = prev;
     }
@@ -157,20 +159,32 @@ U0 EDIT_LINE_MSG_LOOP() {
 
 U0 EDIT_LINE_STDOUT_LOOP() {
     SHELL_INSTANCE *shndl = GET_SHNDL();
+    BOOL p2 = shndl->active_kb;
+    shndl->active_kb = FALSE; 
     for (U32 i = 0; i < shndl->stdout_count; i++) {
         STDOUT *out = shndl->stdouts[i];
+        // DEBUG_PRINTF("stdout seq %u -> %u\n", out->shell_seq, out->proc_seq);
         if (out->shell_seq != out->proc_seq) {
+            U32 seq = out->proc_seq;
+
             PUTS(out->buf);
-            out->shell_seq = out->proc_seq;
-            out->buf_end = 0;
-            out->buf[out->buf_end] = NULLT;
+
+            if (seq == out->proc_seq) {
+                out->shell_seq = seq;
+                out->buf_end = 0;
+                out->buf[0] = NULLT;
+            }
             PRINTNEWLINE();
         }
     }
+    shndl->active_kb = p2;
 }
 
 U0 EDIT_LINE_LOOP() {
+    BOOL prev = GetOutputHandle()->CURSOR_BLINK;
+    GetOutputHandle()->CURSOR_BLINK = FALSE;
     EDIT_LINE_STDOUT_LOOP();
+    GetOutputHandle()->CURSOR_BLINK = prev;
     EDIT_LINE_MSG_LOOP();
     BLINK_CURSOR();
 }
