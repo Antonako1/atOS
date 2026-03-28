@@ -41,8 +41,10 @@ void _start(U32 argc, PPU8 argv)
             EXIT(-1);
         };
     }
+
     DEBUG_PRINTF("[RUNTIME] Entering main!\n");
     KB_MS_INIT();
+    
     U32 code = main(argc, argv);
 
     call_exit_functions();
