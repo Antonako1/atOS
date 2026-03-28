@@ -26,6 +26,18 @@
 /*+++
 Standard file manipulation functions.
 Raw ISO9660 and FAT32 functions are below
+
+Usage:
+
+Read and write to fat
+
+    MODE_R | MODE_W | MODE_FAT32
+
+    OR
+
+    MODE_FRW
+
+Implemented like this to allow both ISO and FAT usage for files
 ---*/
 typedef enum {
     MODE_R        = 0x0001,  // Read
@@ -47,6 +59,7 @@ typedef struct {
     U32 sz;              // File size in bytes
     U32 read_ptr;        // Current read position
     FILEMODES mode;
+    U8 path[FAT_MAX_PATH]; // Original file path (for reference, not used for I/O)
     union {
         FAT_LFN_ENTRY fat_ent;
         IsoDirectoryRecord iso_ent;
@@ -162,6 +175,10 @@ VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr);
 /// @param ptr Pointer to the memory to free
 /// @note Not really necessary, just legacy code... MFree does the same job.
 VOID FREE_ISO9660_MEMORY(VOIDPTR ptr);
+
+/**
+ * FAT32
+ */
 
 U32 FAT32_GET_ROOT_CLUSTER();
 
