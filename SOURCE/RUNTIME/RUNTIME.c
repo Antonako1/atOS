@@ -54,18 +54,11 @@ void _start(U32 argc, PPU8 argv)
 
 #else // RUNTIME_ATGL
 #include <LIBRARIES/ATGL/ATGL.h>
-U32 ATGL_MAIN(U32 argc, PPU8 argv);
-VOID ATGL_GRAPHICS_LOOP(U32 ticks);
-VOID ATGL_EVENT_LOOP(ATGL_EVENT *ev);
 
-U32 freq ATTRIB_DATA = 24;
-VOID SET_GRAPHIC_LOOP_CALL_FREQUENCY(U32 frequency) {
-    freq = frequency;
-}
 
 void _start(U32 argc, PPU8 argv) 
 {
-    DEBUG_PRINTF("[RUNTIME_ATGL] Entered _start with argc:%d\n",argc);
+    DEBUG_PRINTF("[RUNTIME_ATGL] Entered _start with argc:%d\n", argc);
     PRIC_INIT_GRAPHICAL();
     U32 timeout = U32_MAX;
     while(!IS_PROC_GUI_INITIALIZED()) 
@@ -79,35 +72,28 @@ void _start(U32 argc, PPU8 argv)
     DEBUG_PRINTF("[RUNTIME_ATGL] Entering ATGL_MAIN!\n");
     KB_MS_INIT();
     U32 code = ATGL_MAIN(argc, argv);
-    if(code != 0) {
-        DEBUG_PRINTF("[RUNTIME_ATGL] ATGL_MAIN returned error code %d, exiting immediately.\n", code);
+    if (code != 0) 
+    {
+        call_exit_functions();
+        DEBUG_PRINTF("[RUNTIME_ATGL] ATGL_MAIN returned %d, exiting\n", code);
         EXIT(code);
     }
-    
-    U32 current_tick;
-    U32 last_frame_tick = GET_PIT_TICKS();
 
-    while(ATGL_IS_SCREEN_RUNNING()) 
+    /* Main event/render loop */
+    ATGL_EVENT ev;
+    while (!ATGL_SHOULD_QUIT()) 
     {
-        ATGL_EVENT ev;
-        ATGL_POLL_EVENT(&ev);
-        if(ev.type != ATGL_EV_NONE) ATGL_EVENT_LOOP(&ev);
-
-        current_tick = GET_PIT_TICKS();
-        
-        // Use >= to handle cases where the PIT might skip a count 
-        // if Event Loop took too long.
-        if(current_tick - last_frame_tick >= freq) {
-            ATGL_GRAPHICS_LOOP(current_tick);
-            
-            // Increment by freq rather than setting to current_tick
-            // to prevent "timing drift" over long periods.
-            last_frame_tick += freq; 
+        while (ATGL_POLL_EVENTS(&ev)) 
+        {
+            ATGL_EVENT_LOOP(&ev);
         }
+        ATGL_GRAPHICS_LOOP(GET_PIT_TICKS());
+        // CPU_SLEEP(10);
     }
+
     call_exit_functions();
-    DEBUG_PRINTF("[RUNTIME_ATGL] Exiting with code %d\n", code);
-    EXIT(code);
+    DEBUG_PRINTF("[RUNTIME_ATGL] Exiting normally\n");
+    EXIT(0);
 }
 #endif // RUNTIME_ATGL
 

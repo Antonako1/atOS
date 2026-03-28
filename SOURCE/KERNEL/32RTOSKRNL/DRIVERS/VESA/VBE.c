@@ -403,24 +403,19 @@ BOOLEAN VBE_CLEAR_SCREEN(VBE_PIXEL_COLOUR colour) {
 
 
 BOOLEAN VBE_DRAW_RECTANGLE(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL_COLOUR colours) {
-    if (width == 0 || height == 0) {
-        return TRUE;
-    }
-
     U32 errcnt = 0;
-
-    if(!VBE_DRAW_LINE(x, y, width, y, colours)) errcnt++;
-    if(!VBE_DRAW_LINE(width, y, width, height, colours)) errcnt++;
-    if(!VBE_DRAW_LINE(width, height, x, height, colours)) errcnt++;
-    if(!VBE_DRAW_LINE(x, height, x, y, colours)) errcnt++;
-
+    errcnt += !VBE_DRAW_LINE(x, y, x + width - 1, y, colours);
+    errcnt += !VBE_DRAW_LINE(x + width - 1, y, x + width - 1, y + height - 1, colours);
+    errcnt += !VBE_DRAW_LINE(x + width - 1, y + height - 1, x, y + height - 1, colours);
+    errcnt += !VBE_DRAW_LINE(x, y + height - 1, x, y, colours);
     return errcnt == 0;
 }
 BOOLEAN VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
-    VBE_DRAW_LINE(x1, y1, x2, y2, colours);
-    VBE_DRAW_LINE(x2, y2, x3, y3, colours);
-    VBE_DRAW_LINE(x3, y3, x1, y1, colours);
-    return TRUE;
+    U32 errcnt = 0;
+    errcnt += !VBE_DRAW_LINE(x1, y1, x2, y2, colours);
+    errcnt += !VBE_DRAW_LINE(x2, y2, x3, y3, colours);
+    errcnt += !VBE_DRAW_LINE(x3, y3, x1, y1, colours);
+    return errcnt == 0;
 }
 
 // #include <stddef.h> /* for NULL if needed */

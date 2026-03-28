@@ -197,6 +197,9 @@ typedef enum {
     // Data, signal and message are ignored
     PROC_RELEASE_MOUSE_EVENTS = 0x00000202,
 
+    PROC_MANUAL_FLUSH_FRAMEBUFFER = 0x00000400, // Process will do manual flushing of framebuffer. Sent by process to kernel. Data, signal and message are ignored.
+    PROC_AUTO_FLUSH_FRAMEBUFFER = 0x00000401, // Process will do automatic flushing of framebuffer. Sent by process to kernel. Data, signal and message are ignored.
+    
     // Send to shell process
     PROC_KILL_SHELL_PROC, // Send by procs
     PROC_KILL_SHELL_KRNL, // Send by kernel
@@ -258,6 +261,7 @@ typedef struct TCB {
     U32 framebuffer_pages; // Number of pages allocated for framebuffer
     VOIDPTR framebuffer_phys; // Physical address of framebuffer
     VOIDPTR framebuffer_virt; // Virtual address of framebuffer
+    BOOLEAN framebuffer_manual_flushing; // If TRUE, process is responsible for flushing framebuffer itself. Otherwise, kernel flushes it on each PIT tick if this process is focused or master.
     
     PROC_MESSAGE msg_queue[PROC_MSG_QUEUE_SIZE]; // Simple fixed-size message queue
     U32 msg_count; // Number of messages in the queue
