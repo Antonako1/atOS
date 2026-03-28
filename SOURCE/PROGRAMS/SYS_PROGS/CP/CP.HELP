@@ -1,0 +1,3 @@
+"CP - Copies a file/directory into dest\n\n"
+
+"Usage: CP <src> <dest>\n"
