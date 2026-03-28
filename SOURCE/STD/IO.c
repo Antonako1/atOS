@@ -11,8 +11,11 @@
 
 void putc(U8 c) {
     STDOUT *stdout = GET_PROC_STDOUT();
-    if (!stdout) return;
-
+    if (!stdout) {
+        DEBUG_PRINTF("Print without stdout");
+        return;
+    }
+    // DEBUG_PRINTF("info: %d, %c\n", stdout->buf_end, c);
     if (stdout->buf_end < STDOUT_MAX_LENGTH - 1) {
         stdout->buf[stdout->buf_end++] = c;
         stdout->buf[stdout->buf_end] = '\0';  // keep null-terminated
