@@ -22,9 +22,8 @@ REMARKS
     Access VBE struct at memory address VBE_MODE_LOAD_ADDRESS_PHYS,
         or use macro GET_VBE_MODE()
 
-    OS runs in VBE 116h, 1024x768x32bpp.
-     Although allowing 32-bit real colours,
-     use the 5:6:5 colour format and its macros.
+    OS runs in VBE 118h, 1024x768x32bpp.
+     Full 32-bit true colour (8:8:8, 0x00RRGGBB) is used.
 
     When compiling include VBE.c and VESA.c
 
@@ -74,103 +73,106 @@ void update_current_framebuffer();
 void debug_vram_start();
 void debug_vram_dump();
 #endif
-// 5:6:5 color format
+// 8:8:8 (32-bit) color format — 0x00RRGGBB
 /*
 Usage as follows:
-Red min-max: 0-31
-Green min-max: 0-63
-Blue min-max: 0-31
+Red min-max:   0-255
+Green min-max: 0-255
+Blue min-max:  0-255
 */
 #define VBE_COLOUR(r, g, b) \
-    (U16)((r << 11) | (g << 5) | b)
+    (U32)(((U32)(r) << 16) | ((U32)(g) << 8) | (U32)(b))
 
 #define DECONSTRUCT_VBE_COLOUR(colour, r, g, b) \
     do { \
-        r = (colour >> 11) & 0x1F; \
-        g = (colour >> 5) & 0x3F; \
-        b = colour & 0x1F; \
+        r = ((colour) >> 16) & 0xFF; \
+        g = ((colour) >>  8) & 0xFF; \
+        b = (colour)         & 0xFF; \
     } while (0)
 
-#define VBE_SEE_THROUGH VBE_COLOUR(0, 1, 2)
+// Unique sentinel — not a real colour, used for transparency
+#define VBE_SEE_THROUGH ((U32)0x00010203)
 
 // Reds
-#define VBE_RED          VBE_COLOUR(31, 0, 0)
-#define VBE_DARK_RED     VBE_COLOUR(15, 0, 0)
-#define VBE_LIGHT_RED    VBE_COLOUR(31, 16, 16)
+#define VBE_RED           VBE_COLOUR(255,   0,   0)
+#define VBE_DARK_RED      VBE_COLOUR(139,   0,   0)
+#define VBE_LIGHT_RED     VBE_COLOUR(255, 102, 102)
 
 // Greens
-#define VBE_GREEN        VBE_COLOUR(0, 63, 0)
-#define VBE_DARK_GREEN   VBE_COLOUR(0, 31, 0)
-#define VBE_LIGHT_GREEN  VBE_COLOUR(16, 63, 16)
+#define VBE_GREEN         VBE_COLOUR(  0, 200,   0)
+#define VBE_DARK_GREEN    VBE_COLOUR(  0, 100,   0)
+#define VBE_LIGHT_GREEN   VBE_COLOUR(144, 238, 144)
 
 // Blues
-#define VBE_BLUE         VBE_COLOUR(0, 0, 31)
-#define VBE_DARK_BLUE    VBE_COLOUR(0, 0, 15)
-#define VBE_LIGHT_BLUE   VBE_COLOUR(16, 16, 31)
+#define VBE_BLUE          VBE_COLOUR(  0,   0, 255)
+#define VBE_DARK_BLUE     VBE_COLOUR(  0,   0, 139)
+#define VBE_LIGHT_BLUE    VBE_COLOUR(173, 216, 230)
 
 // Yellows
-#define VBE_YELLOW       VBE_COLOUR(31, 63, 0)
-#define VBE_DARK_YELLOW  VBE_COLOUR(15, 31, 0)
-#define VBE_LIGHT_YELLOW VBE_COLOUR(31, 63, 16)
+#define VBE_YELLOW        VBE_COLOUR(255, 255,   0)
+#define VBE_DARK_YELLOW   VBE_COLOUR(180, 180,   0)
+#define VBE_LIGHT_YELLOW  VBE_COLOUR(255, 255, 153)
 
 // Cyans
-#define VBE_CYAN         VBE_COLOUR(0, 63, 31)
-#define VBE_DARK_CYAN    VBE_COLOUR(0, 31, 15)
-#define VBE_LIGHT_CYAN   VBE_COLOUR(16, 63, 31)
+#define VBE_CYAN          VBE_COLOUR(  0, 255, 255)
+#define VBE_DARK_CYAN     VBE_COLOUR(  0, 139, 139)
+#define VBE_LIGHT_CYAN    VBE_COLOUR(224, 255, 255)
 
 // Magentas
-#define VBE_MAGENTA      VBE_COLOUR(31, 0, 31)
-#define VBE_DARK_MAGENTA VBE_COLOUR(15, 0, 15)
-#define VBE_LIGHT_MAGENTA VBE_COLOUR(31, 16, 31)
+#define VBE_MAGENTA       VBE_COLOUR(255,   0, 255)
+#define VBE_DARK_MAGENTA  VBE_COLOUR(139,   0, 139)
+#define VBE_LIGHT_MAGENTA VBE_COLOUR(255, 153, 255)
 
 // Oranges
-#define VBE_ORANGE       VBE_COLOUR(31, 31, 0)
-#define VBE_DARK_ORANGE  VBE_COLOUR(15, 15, 0)
-#define VBE_LIGHT_ORANGE VBE_COLOUR(31, 47, 16)
+#define VBE_ORANGE        VBE_COLOUR(255, 165,   0)
+#define VBE_DARK_ORANGE   VBE_COLOUR(200, 100,   0)
+#define VBE_LIGHT_ORANGE  VBE_COLOUR(255, 200, 128)
 
 // Browns
-#define VBE_BROWN        VBE_COLOUR(19, 31, 0)
-#define VBE_DARK_BROWN   VBE_COLOUR(9, 15, 0)
-#define VBE_LIGHT_BROWN  VBE_COLOUR(23, 47, 8)
+#define VBE_BROWN         VBE_COLOUR(165,  42,  42)
+#define VBE_DARK_BROWN    VBE_COLOUR(101,  67,  33)
+#define VBE_LIGHT_BROWN   VBE_COLOUR(205, 133,  63)
 
 // Grays
-#define VBE_GRAY         VBE_COLOUR(16, 32, 16)
-#define VBE_LIGHT_GRAY   VBE_COLOUR(24, 48, 24)
-#define VBE_DARK_GRAY    VBE_COLOUR(8, 16, 8)
+#define VBE_GRAY          VBE_COLOUR(128, 128, 128)
+#define VBE_LIGHT_GRAY    VBE_COLOUR(211, 211, 211)
+#define VBE_DARK_GRAY     VBE_COLOUR( 64,  64,  64)
 
 // Black & White
-#define VBE_BLACK        VBE_COLOUR(0, 0, 0)
-#define VBE_WHITE        VBE_COLOUR(31, 63, 31)
+#define VBE_BLACK         VBE_COLOUR(  0,   0,   0)
+#define VBE_WHITE         VBE_COLOUR(255, 255, 255)
 
 // Additional common colors
-#define VBE_PINK         VBE_COLOUR(31, 24, 28)
-#define VBE_PURPLE       VBE_COLOUR(19, 0, 31)
-#define VBE_PURPLE2      VBE_COLOUR(26, 0, 31)
-#define VBE_LIME         VBE_COLOUR(16, 63, 16)
-#define VBE_TEAL         VBE_COLOUR(0, 31, 31)
-#define VBE_NAVY         VBE_COLOUR(0, 0, 19)
-#define VBE_OLIVE        VBE_COLOUR(19, 31, 0)
-#define VBE_MAROON       VBE_COLOUR(16, 0, 0)
-#define VBE_AQUA         VBE_COLOUR(0, 31, 31)
-#define VBE_SILVER       VBE_COLOUR(24, 48, 24)
-#define VBE_GOLD         VBE_COLOUR(31, 51, 0)
-#define VBE_CORAL        VBE_COLOUR(31, 31, 16)
-#define VBE_INDIGO       VBE_COLOUR(8, 0, 16)
-#define VBE_VIOLET       VBE_COLOUR(23, 0, 31)
-#define VBE_BEIGE        VBE_COLOUR(24, 48, 16)
-#define VBE_TAN          VBE_COLOUR(21, 40, 8)
-#define VBE_KHAKI        VBE_COLOUR(24, 51, 8)
-#define VBE_LAVENDER     VBE_COLOUR(28, 24, 28)
-#define VBE_SALMON       VBE_COLOUR(31, 24, 16)
-#define VBE_CRIMSON      VBE_COLOUR(31, 0, 8)
+#define VBE_PINK          VBE_COLOUR(255, 192, 203)
+#define VBE_PURPLE        VBE_COLOUR(128,   0, 128)
+#define VBE_PURPLE2       VBE_COLOUR(148,   0, 211)
+#define VBE_FUCHSIA       VBE_COLOUR(255,   0, 255)
+#define VBE_LIME          VBE_COLOUR(  0, 255,   0)
+#define VBE_TEAL          VBE_COLOUR(  0, 128, 128)
+#define VBE_NAVY          VBE_COLOUR(  0,   0, 128)
+#define VBE_OLIVE         VBE_COLOUR(128, 128,   0)
+#define VBE_MAROON        VBE_COLOUR(128,   0,   0)
+#define VBE_AQUA          VBE_COLOUR(  0, 255, 255)
+#define VBE_SILVER        VBE_COLOUR(192, 192, 192)
+#define VBE_GOLD          VBE_COLOUR(255, 215,   0)
+#define VBE_CORAL         VBE_COLOUR(255, 127,  80)
+#define VBE_INDIGO        VBE_COLOUR( 75,   0, 130)
+#define VBE_VIOLET        VBE_COLOUR(238, 130, 238)
+#define VBE_BEIGE         VBE_COLOUR(245, 245, 220)
+#define VBE_TAN           VBE_COLOUR(210, 180, 140)
+#define VBE_KHAKI         VBE_COLOUR(240, 230, 140)
+#define VBE_LAVENDER      VBE_COLOUR(230, 230, 250)
+#define VBE_SALMON        VBE_COLOUR(250, 128, 114)
+#define VBE_CRIMSON       VBE_COLOUR(220,  20,  60)
 
-#define VBE_NOTEPAD_PAPER1 VBE_COLOUR(31, 31, 24) // slightly brighter
-#define VBE_NOTEPAD_PAPER2 VBE_COLOUR(28, 28, 16) // more muted, aged look
-#define VBE_NOTEPAD_PAPER3 VBE_COLOUR(31, 28, 16) // slightly orange tint
+#define VBE_NOTEPAD_PAPER1 VBE_COLOUR(255, 255, 200) // slightly brighter
+#define VBE_NOTEPAD_PAPER2 VBE_COLOUR(230, 220, 170) // more muted, aged look
+#define VBE_NOTEPAD_PAPER3 VBE_COLOUR(255, 240, 180) // slightly orange tint
 
-// VBE_COLOUR macros
-typedef U16 VBE_PIXEL_COLOUR;
-typedef U16 VBE_COLOUR; // For compatibility with older code
+// VBE_COLOUR types — 32-bit 0x00RRGGBB
+typedef U32 VBE_PIXEL_COLOUR;
+typedef U32 VBE_COLOUR; // 32-bit true colour
+#define VBE_COLOUR_DEFINED
 
 typedef struct {
     U32 X;
