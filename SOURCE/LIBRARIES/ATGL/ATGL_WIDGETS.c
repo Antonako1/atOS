@@ -300,6 +300,10 @@ static VOID render_progressbar(PATGL_NODE node)
 
 static VOID render_panel(PATGL_NODE node)
 {
+    /* Apply layout to reposition children before drawing */
+    if (node->data.panel.layout != ATGL_LAYOUT_NONE)
+        ATGL_LAYOUT_APPLY(node);
+
     ATGL_RECT *r = &node->abs_rect;
 
     /* Background fill */
@@ -407,35 +411,110 @@ static VOID render_image(PATGL_NODE node)
 
     if (!id->pixels) return;
 
-    U32 *pixels   = (U32 *)id->pixels;
-    U32  draw_w   = id->img_w < (U32)r->w ? id->img_w : (U32)r->w;
-    U32  draw_h   = id->img_h < (U32)r->h ? id->img_h : (U32)r->h;
-    U32  base_x   = (U32)r->x;
-    U32  base_y   = (U32)r->y;
+    U32 *pixels = (U32 *)id->pixels;
+    U32 zoom    = id->zoom ? id->zoom : 100;
 
-    /* Scanline-based drawing: collapse runs of opaque pixels into
-       single DRAW_LINE calls, reducing syscall count dramatically
-       (worst-case equal to per-pixel; best-case one call per row). */
-    for (U32 iy = 0; iy < draw_h; iy++) {
-        U32 row_off = iy * id->img_w;
-        U32 ix = 0;
-        while (ix < draw_w) {
-            /* Skip transparent pixels */
-            while (ix < draw_w && pixels[row_off + ix] == VBE_SEE_THROUGH)
-                ix++;
-            if (ix >= draw_w) break;
+    /* Scaled pixel size (how many screen pixels per image pixel) */
+    U32 scale = zoom / 100;
+    if (scale < 1) scale = 1;
 
-            /* Start of an opaque run — find contiguous span of the
-               same colour so it can be emitted as one DRAW_LINE. */
-            VBE_COLOUR run_colour = pixels[row_off + ix];
-            U32 run_start = ix;
-            while (ix < draw_w &&
-                   pixels[row_off + ix] == run_colour)
-                ix++;
+    I32 ox = id->offset_x;
+    I32 oy = id->offset_y;
 
-            DRAW_LINE(base_x + run_start, base_y + iy,
-                      base_x + ix - 1,    base_y + iy,
-                      run_colour);
+    U32 view_w = (U32)r->w;
+    U32 view_h = (U32)r->h;
+
+    /* For each screen pixel inside the widget, work out which image
+       pixel it maps to and emit runs of the same colour. */
+    if (zoom <= 100) {
+        /* Zoom-out / 1:1 — one image pixel maps to <=1 screen pixel.
+           Step through image coords and sample. */
+        U32 draw_w = id->img_w * zoom / 100;
+        U32 draw_h = id->img_h * zoom / 100;
+        if (draw_w > view_w) draw_w = view_w;
+        if (draw_h > view_h) draw_h = view_h;
+
+        for (U32 sy = 0; sy < draw_h; sy++) {
+            U32 img_y = (sy * 100) / zoom + oy;
+            if (img_y >= id->img_h) continue;
+
+            U32 row_off = img_y * id->img_w;
+            U32 sx = 0;
+            while (sx < draw_w) {
+                U32 img_x = (sx * 100) / zoom + ox;
+                if (img_x >= id->img_w) { sx++; continue; }
+
+                VBE_COLOUR c = pixels[row_off + img_x];
+                if (c == VBE_SEE_THROUGH) { sx++; continue; }
+
+                /* Find run of same colour at this scanline */
+                U32 run_start = sx;
+                while (sx < draw_w) {
+                    U32 nx = (sx * 100) / zoom + ox;
+                    if (nx >= id->img_w) break;
+                    if (pixels[row_off + nx] != c) break;
+                    sx++;
+                }
+                DRAW_LINE(r->x + (I32)run_start, r->y + (I32)sy,
+                          r->x + (I32)(sx - 1),  r->y + (I32)sy, c);
+            }
+        }
+    } else {
+        /* Zoom-in — each image pixel covers scale×scale screen pixels. */
+        /* How many image pixels fit in the viewport? */
+        U32 vis_img_w = (view_w + scale - 1) / scale;
+        U32 vis_img_h = (view_h + scale - 1) / scale;
+
+        for (U32 iy = 0; iy < vis_img_h; iy++) {
+            I32 src_y = (I32)iy + oy;
+            if (src_y < 0 || (U32)src_y >= id->img_h) continue;
+
+            U32 row_off = (U32)src_y * id->img_w;
+            I32 screen_y = r->y + (I32)(iy * scale);
+            if (screen_y >= r->y + (I32)view_h) break;
+
+            I32 block_h = (I32)scale;
+            if (screen_y + block_h > r->y + (I32)view_h)
+                block_h = r->y + (I32)view_h - screen_y;
+
+            for (U32 ix = 0; ix < vis_img_w; ix++) {
+                I32 src_x = (I32)ix + ox;
+                if (src_x < 0 || (U32)src_x >= id->img_w) continue;
+
+                VBE_COLOUR c = pixels[row_off + (U32)src_x];
+                if (c == VBE_SEE_THROUGH) continue;
+
+                I32 screen_x = r->x + (I32)(ix * scale);
+                if (screen_x >= r->x + (I32)view_w) break;
+
+                I32 block_w = (I32)scale;
+                if (screen_x + block_w > r->x + (I32)view_w)
+                    block_w = r->x + (I32)view_w - screen_x;
+
+                /* Draw the scaled pixel block */
+                for (I32 dy = 0; dy < block_h; dy++) {
+                    DRAW_LINE(screen_x, screen_y + dy,
+                              screen_x + block_w - 1, screen_y + dy, c);
+                }
+            }
+        }
+
+        /* Pixel grid overlay (only when zoomed in enough) */
+        if (id->show_grid && scale >= 4) {
+            VBE_COLOUR gc = id->grid_colour;
+
+            /* Vertical grid lines */
+            for (U32 ix = 0; ix <= vis_img_w && (I32)(ix * scale) <= (I32)view_w; ix++) {
+                I32 lx = r->x + (I32)(ix * scale);
+                if (lx >= r->x + (I32)view_w) break;
+                DRAW_LINE(lx, r->y, lx, r->y + (I32)view_h - 1, gc);
+            }
+            /* Horizontal grid lines */
+            for (U32 iy = 0; iy <= vis_img_h && (I32)(iy * scale) <= (I32)view_h; iy++) {
+                I32 ly = r->y + (I32)(iy * scale);
+                if (ly >= r->y + (I32)view_h) break;
+                DRAW_LINE(r->x, ly, r->x + (I32)view_w - 1, ly, gc);
+            }
         }
     }
 }
@@ -1072,16 +1151,54 @@ PATGL_NODE ATGL_CREATE_SEPARATOR(PATGL_NODE parent, ATGL_RECT rect)
     return node;
 }
 
+static VOID destroy_image(PATGL_NODE node)
+{
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (id->owns_pixels && id->pixels) {
+        MFree(id->pixels);
+        id->pixels = NULLPTR;
+    }
+}
+
 PATGL_NODE ATGL_CREATE_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
                              PU8 pixels, U32 img_w, U32 img_h)
 {
     PATGL_NODE node = ATGL_NODE_CREATE(ATGL_NODE_IMAGE, parent, rect);
     if (!node) return NULLPTR;
 
-    node->fn_render       = render_image;
-    node->data.image.pixels = pixels;
-    node->data.image.img_w  = img_w;
-    node->data.image.img_h  = img_h;
+    node->fn_render             = render_image;
+    node->fn_destroy            = destroy_image;
+    node->data.image.pixels     = pixels;
+    node->data.image.img_w      = img_w;
+    node->data.image.img_h      = img_h;
+    node->data.image.offset_x   = 0;
+    node->data.image.offset_y   = 0;
+    node->data.image.zoom       = 100;
+    node->data.image.owns_pixels = FALSE;
+    node->data.image.show_grid   = FALSE;
+    node->data.image.grid_colour = RGB(60, 60, 60);
+    return node;
+}
+
+PATGL_NODE ATGL_CREATE_BLANK_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
+                                   U32 img_w, U32 img_h,
+                                   VBE_COLOUR fill)
+{
+    U32 buf_sz = img_w * img_h * sizeof(U32);
+    PU8 pixels = (PU8)MAlloc(buf_sz);
+    if (!pixels) return NULLPTR;
+
+    /* Fill every pixel with the requested colour */
+    U32 *p = (U32 *)pixels;
+    for (U32 i = 0; i < img_w * img_h; i++)
+        p[i] = fill;
+
+    PATGL_NODE node = ATGL_CREATE_IMAGE(parent, rect, pixels, img_w, img_h);
+    if (!node) {
+        MFree(pixels);
+        return NULLPTR;
+    }
+    node->data.image.owns_pixels = TRUE;
     return node;
 }
 
@@ -1212,5 +1329,280 @@ VOID ATGL_LISTBOX_CLEAR(PATGL_NODE node)
     node->data.listbox.item_count   = 0;
     node->data.listbox.selected     = 0;
     node->data.listbox.scroll_offset = 0;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+/* ================================================================ */
+/*                     IMAGE MANIPULATION                           */
+/* ================================================================ */
+
+#define IMG_CHECK(n) if (!(n) || (n)->type != ATGL_NODE_IMAGE) return
+#define IMG_CHECK_RET(n, r) if (!(n) || (n)->type != ATGL_NODE_IMAGE) return (r)
+
+VOID ATGL_IMAGE_SET_PIXEL(PATGL_NODE node, U32 x, U32 y,
+                          VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels || x >= id->img_w || y >= id->img_h) return;
+    ((U32 *)id->pixels)[y * id->img_w + x] = colour;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VBE_COLOUR ATGL_IMAGE_GET_PIXEL(PATGL_NODE node, U32 x, U32 y)
+{
+    IMG_CHECK_RET(node, 0);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels || x >= id->img_w || y >= id->img_h) return 0;
+    return ((U32 *)id->pixels)[y * id->img_w + x];
+}
+
+VOID ATGL_IMAGE_CLEAR(PATGL_NODE node, VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels) return;
+    U32 *p = (U32 *)id->pixels;
+    U32 total = id->img_w * id->img_h;
+    for (U32 i = 0; i < total; i++)
+        p[i] = colour;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VOID ATGL_IMAGE_FILL_RECT(PATGL_NODE node, U32 x, U32 y,
+                          U32 w, U32 h, VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels) return;
+    U32 *p = (U32 *)id->pixels;
+
+    U32 x1 = x, y1 = y;
+    U32 x2 = x + w, y2 = y + h;
+    if (x2 > id->img_w) x2 = id->img_w;
+    if (y2 > id->img_h) y2 = id->img_h;
+
+    for (U32 iy = y1; iy < y2; iy++)
+        for (U32 ix = x1; ix < x2; ix++)
+            p[iy * id->img_w + ix] = colour;
+
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VOID ATGL_IMAGE_DRAW_RECT(PATGL_NODE node, U32 x, U32 y,
+                          U32 w, U32 h, VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels || w == 0 || h == 0) return;
+    U32 *p = (U32 *)id->pixels;
+
+    U32 x2 = x + w - 1, y2 = y + h - 1;
+    if (x2 >= id->img_w) x2 = id->img_w - 1;
+    if (y2 >= id->img_h) y2 = id->img_h - 1;
+
+    for (U32 ix = x; ix <= x2; ix++) {
+        if (y  < id->img_h) p[y  * id->img_w + ix] = colour;
+        if (y2 < id->img_h) p[y2 * id->img_w + ix] = colour;
+    }
+    for (U32 iy = y; iy <= y2; iy++) {
+        if (x  < id->img_w) p[iy * id->img_w + x]  = colour;
+        if (x2 < id->img_w) p[iy * id->img_w + x2] = colour;
+    }
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VOID ATGL_IMAGE_DRAW_LINE(PATGL_NODE node, I32 x0, I32 y0,
+                          I32 x1, I32 y1, VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels) return;
+    U32 *p = (U32 *)id->pixels;
+
+    I32 dx = x1 - x0;
+    I32 dy = y1 - y0;
+    I32 sx = dx >= 0 ? 1 : -1;
+    I32 sy = dy >= 0 ? 1 : -1;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    I32 err = dx - dy;
+
+    while (1) {
+        if (x0 >= 0 && (U32)x0 < id->img_w &&
+            y0 >= 0 && (U32)y0 < id->img_h)
+            p[y0 * id->img_w + x0] = colour;
+
+        if (x0 == x1 && y0 == y1) break;
+        I32 e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x0 += sx; }
+        if (e2 <  dx) { err += dx; y0 += sy; }
+    }
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VOID ATGL_IMAGE_FILL_CIRCLE(PATGL_NODE node, I32 cx, I32 cy,
+                            U32 radius, VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels) return;
+    U32 *p  = (U32 *)id->pixels;
+    I32  r  = (I32)radius;
+    I32 r2  = r * r;
+
+    for (I32 dy = -r; dy <= r; dy++) {
+        I32 py = cy + dy;
+        if (py < 0 || (U32)py >= id->img_h) continue;
+        for (I32 dx = -r; dx <= r; dx++) {
+            if (dx * dx + dy * dy > r2) continue;
+            I32 px = cx + dx;
+            if (px < 0 || (U32)px >= id->img_w) continue;
+            p[py * id->img_w + px] = colour;
+        }
+    }
+    ATGL_NODE_INVALIDATE(node);
+}
+
+PU8 ATGL_IMAGE_GET_PIXELS(PATGL_NODE node)
+{
+    IMG_CHECK_RET(node, NULLPTR);
+    return node->data.image.pixels;
+}
+
+VOID ATGL_IMAGE_GET_SIZE(PATGL_NODE node, U32 *w, U32 *h)
+{
+    IMG_CHECK(node);
+    if (w) *w = node->data.image.img_w;
+    if (h) *h = node->data.image.img_h;
+}
+
+VOID ATGL_IMAGE_SET_PIXELS(PATGL_NODE node, PU8 pixels,
+                           U32 img_w, U32 img_h)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (id->owns_pixels && id->pixels) {
+        MFree(id->pixels);
+    }
+    id->pixels      = pixels;
+    id->img_w       = img_w;
+    id->img_h       = img_h;
+    id->owns_pixels = FALSE;
+    id->offset_x    = 0;
+    id->offset_y    = 0;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+/* ---- Zoom ---- */
+
+VOID ATGL_IMAGE_SET_ZOOM(PATGL_NODE node, U32 zoom)
+{
+    IMG_CHECK(node);
+    if (zoom < 25)   zoom = 25;
+    if (zoom > 3200) zoom = 3200;
+    node->data.image.zoom = zoom;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+U32 ATGL_IMAGE_GET_ZOOM(PATGL_NODE node)
+{
+    IMG_CHECK_RET(node, 100);
+    return node->data.image.zoom;
+}
+
+VOID ATGL_IMAGE_ZOOM_IN(PATGL_NODE node)
+{
+    IMG_CHECK(node);
+    U32 z = node->data.image.zoom;
+    z = z * 2;
+    ATGL_IMAGE_SET_ZOOM(node, z);
+}
+
+VOID ATGL_IMAGE_ZOOM_OUT(PATGL_NODE node)
+{
+    IMG_CHECK(node);
+    U32 z = node->data.image.zoom;
+    z = z / 2;
+    ATGL_IMAGE_SET_ZOOM(node, z);
+}
+
+/* ---- Pan / Scroll ---- */
+
+VOID ATGL_IMAGE_SET_OFFSET(PATGL_NODE node, I32 ox, I32 oy)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (ox < 0) ox = 0;
+    if (oy < 0) oy = 0;
+    if ((U32)ox >= id->img_w) ox = (I32)id->img_w - 1;
+    if ((U32)oy >= id->img_h) oy = (I32)id->img_h - 1;
+    id->offset_x = ox;
+    id->offset_y = oy;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VOID ATGL_IMAGE_GET_OFFSET(PATGL_NODE node, I32 *ox, I32 *oy)
+{
+    IMG_CHECK(node);
+    if (ox) *ox = node->data.image.offset_x;
+    if (oy) *oy = node->data.image.offset_y;
+}
+
+VOID ATGL_IMAGE_PAN(PATGL_NODE node, I32 dx, I32 dy)
+{
+    IMG_CHECK(node);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    ATGL_IMAGE_SET_OFFSET(node, id->offset_x + dx, id->offset_y + dy);
+}
+
+/* ---- Screen ↔ Image coordinate conversion ---- */
+
+BOOL ATGL_IMAGE_SCREEN_TO_IMG(PATGL_NODE node, I32 sx, I32 sy,
+                              U32 *ix, U32 *iy)
+{
+    IMG_CHECK_RET(node, FALSE);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    ATGL_RECT       *r  = &node->abs_rect;
+
+    U32 zoom  = id->zoom ? id->zoom : 100;
+    U32 scale = zoom / 100;
+    if (scale < 1) scale = 1;
+
+    /* Offset from widget top-left */
+    I32 rx = sx - r->x;
+    I32 ry = sy - r->y;
+    if (rx < 0 || ry < 0) return FALSE;
+
+    U32 img_x, img_y;
+    if (zoom <= 100) {
+        img_x = ((U32)rx * 100) / zoom + id->offset_x;
+        img_y = ((U32)ry * 100) / zoom + id->offset_y;
+    } else {
+        img_x = (U32)rx / scale + id->offset_x;
+        img_y = (U32)ry / scale + id->offset_y;
+    }
+
+    if (img_x >= id->img_w || img_y >= id->img_h)
+        return FALSE;
+
+    if (ix) *ix = img_x;
+    if (iy) *iy = img_y;
+    return TRUE;
+}
+
+/* ---- Grid ---- */
+
+VOID ATGL_IMAGE_SHOW_GRID(PATGL_NODE node, BOOL show)
+{
+    IMG_CHECK(node);
+    node->data.image.show_grid = show;
+    ATGL_NODE_INVALIDATE(node);
+}
+
+VOID ATGL_IMAGE_SET_GRID_COLOUR(PATGL_NODE node, VBE_COLOUR colour)
+{
+    IMG_CHECK(node);
+    node->data.image.grid_colour = colour;
     ATGL_NODE_INVALIDATE(node);
 }

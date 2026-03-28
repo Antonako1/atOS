@@ -100,6 +100,12 @@ PATGL_NODE ATGL_CREATE_SEPARATOR(PATGL_NODE parent, ATGL_RECT rect);
 PATGL_NODE ATGL_CREATE_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
                              PU8 pixels, U32 img_w, U32 img_h);
 
+/// Create an image widget with a freshly allocated blank canvas.
+/// The pixel buffer is owned by ATGL and freed on destroy.
+PATGL_NODE ATGL_CREATE_BLANK_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
+                                   U32 img_w, U32 img_h,
+                                   VBE_COLOUR fill);
+
 /* ================================================================ */
 /*                   WIDGET GETTERS / SETTERS                       */
 /* ================================================================ */
@@ -122,6 +128,86 @@ VOID ATGL_LISTBOX_ADD_ITEM(PATGL_NODE node, PU8 text);
 U32  ATGL_LISTBOX_GET_SELECTED(PATGL_NODE node);
 PU8  ATGL_LISTBOX_GET_TEXT(PATGL_NODE node);
 VOID ATGL_LISTBOX_CLEAR(PATGL_NODE node);
+
+/* ================================================================ */
+/*                   IMAGE MANIPULATION                             */
+/* ================================================================ */
+
+/// Set a single pixel in the image buffer (image coordinates).
+VOID ATGL_IMAGE_SET_PIXEL(PATGL_NODE node, U32 x, U32 y,
+                          VBE_COLOUR colour);
+
+/// Get a single pixel from the image buffer (image coordinates).
+VBE_COLOUR ATGL_IMAGE_GET_PIXEL(PATGL_NODE node, U32 x, U32 y);
+
+/// Fill the entire image with a solid colour.
+VOID ATGL_IMAGE_CLEAR(PATGL_NODE node, VBE_COLOUR colour);
+
+/// Fill a rectangular region inside the image.
+VOID ATGL_IMAGE_FILL_RECT(PATGL_NODE node, U32 x, U32 y,
+                          U32 w, U32 h, VBE_COLOUR colour);
+
+/// Draw a 1px outline rectangle inside the image.
+VOID ATGL_IMAGE_DRAW_RECT(PATGL_NODE node, U32 x, U32 y,
+                          U32 w, U32 h, VBE_COLOUR colour);
+
+/// Draw a line inside the image (Bresenham).
+VOID ATGL_IMAGE_DRAW_LINE(PATGL_NODE node, I32 x0, I32 y0,
+                          I32 x1, I32 y1, VBE_COLOUR colour);
+
+/// Draw a filled circle inside the image.
+VOID ATGL_IMAGE_FILL_CIRCLE(PATGL_NODE node, I32 cx, I32 cy,
+                            U32 radius, VBE_COLOUR colour);
+
+/// Get the raw pixel buffer.
+PU8  ATGL_IMAGE_GET_PIXELS(PATGL_NODE node);
+
+/// Get image dimensions.
+VOID ATGL_IMAGE_GET_SIZE(PATGL_NODE node, U32 *w, U32 *h);
+
+/// Replace the pixel buffer (frees old if owned).
+VOID ATGL_IMAGE_SET_PIXELS(PATGL_NODE node, PU8 pixels,
+                           U32 img_w, U32 img_h);
+
+/* ---- Zoom ---- */
+
+/// Set zoom level (percent, 100 = 1:1). Clamped to [25 .. 3200].
+VOID ATGL_IMAGE_SET_ZOOM(PATGL_NODE node, U32 zoom);
+
+/// Get current zoom level.
+U32  ATGL_IMAGE_GET_ZOOM(PATGL_NODE node);
+
+/// Zoom in by one step (×2).
+VOID ATGL_IMAGE_ZOOM_IN(PATGL_NODE node);
+
+/// Zoom out by one step (÷2).
+VOID ATGL_IMAGE_ZOOM_OUT(PATGL_NODE node);
+
+/* ---- Pan / Scroll ---- */
+
+/// Set the pan offset (which image pixel is at top-left of viewport).
+VOID ATGL_IMAGE_SET_OFFSET(PATGL_NODE node, I32 ox, I32 oy);
+
+/// Get the current pan offset.
+VOID ATGL_IMAGE_GET_OFFSET(PATGL_NODE node, I32 *ox, I32 *oy);
+
+/// Nudge the pan offset by delta pixels.
+VOID ATGL_IMAGE_PAN(PATGL_NODE node, I32 dx, I32 dy);
+
+/* ---- Coordinate conversion ---- */
+
+/// Convert a screen coordinate to an image pixel coordinate,
+/// accounting for zoom and pan. Returns FALSE if outside image.
+BOOL ATGL_IMAGE_SCREEN_TO_IMG(PATGL_NODE node, I32 sx, I32 sy,
+                              U32 *ix, U32 *iy);
+
+/* ---- Grid ---- */
+
+/// Enable/disable the pixel grid (visible when zoom >= 400%).
+VOID ATGL_IMAGE_SHOW_GRID(PATGL_NODE node, BOOL show);
+
+/// Set the grid line colour.
+VOID ATGL_IMAGE_SET_GRID_COLOUR(PATGL_NODE node, VBE_COLOUR colour);
 
 /* ================================================================ */
 /*                       EVENT SYSTEM                               */
@@ -166,6 +252,18 @@ VOID ATGL_DRAW_TEXT(I32 x, I32 y, PU8 text, VBE_COLOUR fg,
                     VBE_COLOUR bg);
 VOID ATGL_DRAW_TEXT_CLIPPED(I32 x, I32 y, I32 max_w, PU8 text,
                             VBE_COLOUR fg, VBE_COLOUR bg);
+
+/* ================================================================ */
+/*                  SHAPES AND PIXELS                               */
+/* ================================================================ */
+VOID ATGL_DRAW_PIXEL(U32 x, U32 y, VBE_COLOUR colour);
+VOID ATGL_DRAW_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour);
+VOID ATGL_DRAW_FILLED_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour);
+VOID ATGL_DRAW_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour);
+VOID ATGL_DRAW_FILLED_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour);
+VOID ATGL_DRAW_LINE(U32 x1, U32 y1, U32 x2, U32 y2, VBE_COLOUR colour);
+VOID ATGL_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_COLOUR colour);
+VOID ATGL_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_COLOUR colour);
 
 /* ================================================================ */
 /*              USER-DEFINED CALLBACKS (RUNTIME_ATGL)               */

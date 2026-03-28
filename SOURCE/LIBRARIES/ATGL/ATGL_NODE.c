@@ -46,6 +46,13 @@ BOOL ATGL_NODE_ADD_CHILD(PATGL_NODE parent, PATGL_NODE child)
 
     child->parent = parent;
     parent->children[parent->child_count++] = child;
+
+    /* If the parent is a panel with a layout direction, recompute
+       child positions so the new child is placed correctly. */
+    if (parent->type == ATGL_NODE_PANEL &&
+        parent->data.panel.layout != ATGL_LAYOUT_NONE)
+        ATGL_LAYOUT_APPLY(parent);
+
     ATGL_NODE_INVALIDATE(parent);
     return TRUE;
 }

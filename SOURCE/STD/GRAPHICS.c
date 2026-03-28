@@ -37,9 +37,7 @@ BOOLEAN DRAW_RECTANGLE(U32 x, U32 y, U32 width, U32 height, VBE_COLOUR colour) {
     SYSCALL(SYSCALL_VBE_DRAW_RECTANGLE, (U32)x, (U32)y, (U32)width, (U32)height, (U32)colour);
 }
 BOOLEAN DRAW_FILLED_RECTANGLE(U32 x, U32 y, U32 width, U32 height, VBE_COLOUR colour) {
-    for (U32 i = 0; i < height; i++) {
-        DRAW_LINE(x, y + i, x + width - 1, y + i, colour);
-    }
+    SYSCALL(SYSCALL_VBE_DRAW_FILLED_RECTANGLE, (U32)x, (U32)y, (U32)width, (U32)height, (U32)colour);
 }
 BOOLEAN DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_COLOUR colour) {
     SYSCALL(SYSCALL_VBE_DRAW_LINE, (U32)x1, (U32)y1, (U32)x2, (U32)y2, (U32)colour);
@@ -119,4 +117,8 @@ BOOLEAN DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE
     }
 
     return any;
+}
+
+BOOLEAN DRAW_FILLED_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour) {
+    SYSCALL(SYSCALL_VBE_DRAW_FILLED_ELLIPSE, (U32)x, (U32)y, (U32)rx, (U32)ry, (U32)colour);
 }

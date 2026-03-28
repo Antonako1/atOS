@@ -33,7 +33,7 @@ VOID UPDATE_KP_MOUSE_DATA(void) {
         g_input.kb.cur  = ev.key;
 
         update_modifiers(&g_input.kb.cur, &g_input.kb.mods);
-
+        g_input.kb.cur.ASCII = KEYPRESS_TO_CHARS(g_input.kb.cur.keycode);
         g_input.kb.seq++;
         g_input.kb_event = TRUE;
     }

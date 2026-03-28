@@ -297,46 +297,43 @@ BOOLEAN VBE_DRAW_PIXEL(VBE_PIXEL_INFO pixel_info) {
 
 
 BOOLEAN VBE_DRAW_ELLIPSE(U32 x0, U32 y0, U32 a, U32 b, VBE_PIXEL_COLOUR fill_colours) {
-    I32 x = 0;
-    I32 y = b;
-    U32 a2 = a*a;
-    U32 b2 = b*b;
-    I32 dx = 0;
-    I32 dy = 2*a2*y;
-    I32 d1 = b2 - a2*b + a2/4;
-    while(dx < dy) {
-        for(I32 px = -x; px <= x; px++) {
-            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 + y, fill_colours));
-            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 - y, fill_colours));
-        }        
-        x++;
-        dx += 2*b2;
-        if(d1 < 0) {
-            d1 += b2 + dx;
-        } else {
-            y--;
-            dy -= 2*a2;
-            d1 += b2 + dx - dy;
-        }
-    }
+    if (a == 0 || b == 0) return FALSE;
 
-    I32 d2 = b2*(x*x + x) + a2*(y-1)*(y-1) - a2*b2;
-    while(y >= 0) {
-        for(I32 px = -x; px <= x; px++) {
-            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 + y, fill_colours));
-            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 - y, fill_colours));
+    I32 x = 0;
+    I32 y = (I32)b;
+    I32 a2 = (I32)(a * a);
+    I32 b2 = (I32)(b * b);
+    I32 err = b2 - (2 * b2 * x) + a2 * b2;
+    I32 err2;
+
+    BOOLEAN any = FALSE;
+
+    do {
+        if (x0 + x < SCREEN_WIDTH && y0 + y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + x, y0 + y, fill_colours));
+            any = TRUE;
         }
-        y--;
-        dy -= 2*a2;
-        if(d2 > 0) {
-            d2 += a2 - dy;
-        } else {
-            x++;
-            dx += 2*b2;
-            d2 += a2 - dy + dx;
+        if (x0 - x < SCREEN_WIDTH && y0 + y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 - x, y0 + y, fill_colours));
+            any = TRUE;
         }
-    }
-    return TRUE;
+        if (x0 - x < SCREEN_WIDTH && y0 - y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 - x, y0 - y, fill_colours));
+            any = TRUE;
+        }
+        if (x0 + x < SCREEN_WIDTH && y0 - y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + x, y0 - y, fill_colours));
+            any = TRUE;
+        }
+
+        err2 = 2 * err;
+        if (err2 > -(2 * a2 * y)) {
+            err -= 2 * a2 * --y;
+        }
+        if (err2 < (2 * b2 * x)) {
+            err += 2 * b2 * ++x;
+        }
+    } while (y >= 0);
 }
 BOOLEAN VBE_DRAW_LINE(U32 x0_in, U32 y0_in, U32 x1_in, U32 y1_in, VBE_PIXEL_COLOUR colour) {
     I32 x0 = (I32)x0_in;
@@ -418,20 +415,6 @@ BOOLEAN VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PI
     return errcnt == 0;
 }
 
-// #include <stddef.h> /* for NULL if needed */
-
-/* assume these types/macros exist in your codebase */
-// #ifndef TRUE
-// #define TRUE  1
-// #define FALSE 0
-// #endif
-
-/* prototypes already exist in your codebase:
-   BOOLEAN VBE_DRAW_PIXEL(VBE_PIXEL_INFO pixel_info);
-   extern const U32 SCREEN_WIDTH, SCREEN_HEIGHT;
-   VBE_PIXEL_INFO has members: U32 X, Y; VBE_PIXEL_COLOUR Colour;
-*/
-
 BOOLEAN VBE_DRAW_RECTANGLE_FILLED(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL_COLOUR colours) {
     if (width == 0 || height == 0) return FALSE;
 
@@ -464,82 +447,146 @@ BOOLEAN VBE_DRAW_RECTANGLE_FILLED(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL
 }
 
 
-BOOLEAN VBE_DRAW_TRIANGLE_FILLED(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
-    /* Compute bounding box (inclusive) */
-    U32 minx = x1;
-    if (x2 < minx) minx = x2;
-    if (x3 < minx) minx = x3;
+// BOOLEAN VBE_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
+//     /* Compute bounding box (inclusive) */
+//     U32 minx = x1;
+//     if (x2 < minx) minx = x2;
+//     if (x3 < minx) minx = x3;
 
-    U32 maxx = x1;
-    if (x2 > maxx) maxx = x2;
-    if (x3 > maxx) maxx = x3;
+//     U32 maxx = x1;
+//     if (x2 > maxx) maxx = x2;
+//     if (x3 > maxx) maxx = x3;
 
-    U32 miny = y1;
-    if (y2 < miny) miny = y2;
-    if (y3 < miny) miny = y3;
+//     U32 miny = y1;
+//     if (y2 < miny) miny = y2;
+//     if (y3 < miny) miny = y3;
 
-    U32 maxy = y1;
-    if (y2 > maxy) maxy = y2;
-    if (y3 > maxy) maxy = y3;
+//     U32 maxy = y1;
+//     if (y2 > maxy) maxy = y2;
+//     if (y3 > maxy) maxy = y3;
 
-    /* Quick reject if bbox completely off-screen */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wtype-limits"
-    if (maxx < 0 || maxy < 0) return FALSE; /* defensive, though U32 can't be <0 */
-#pragma GCC diagnostic pop
-    if (minx >= SCREEN_WIDTH || miny >= SCREEN_HEIGHT) return FALSE;
-    /* Clip bounding box to screen */
-    if (minx >= SCREEN_WIDTH) return FALSE;
-    if (miny >= SCREEN_HEIGHT) return FALSE;
+//     /* Quick reject if bbox completely off-screen */
+// #pragma GCC diagnostic push
+// #pragma GCC diagnostic ignored "-Wtype-limits"
+//     if (maxx < 0 || maxy < 0) return FALSE; /* defensive, though U32 can't be <0 */
+// #pragma GCC diagnostic pop
+//     if (minx >= SCREEN_WIDTH || miny >= SCREEN_HEIGHT) return FALSE;
+//     /* Clip bounding box to screen */
+//     if (minx >= SCREEN_WIDTH) return FALSE;
+//     if (miny >= SCREEN_HEIGHT) return FALSE;
 
-    U32 bx0 = minx;
-    U32 by0 = miny;
-    U32 bx1 = maxx;
-    U32 by1 = maxy;
+//     U32 bx0 = minx;
+//     U32 by0 = miny;
+//     U32 bx1 = maxx;
+//     U32 by1 = maxy;
 
-    if (bx0 >= SCREEN_WIDTH) bx0 = SCREEN_WIDTH - 1;
-    if (by0 >= SCREEN_HEIGHT) by0 = SCREEN_HEIGHT - 1;
-    if (bx1 >= SCREEN_WIDTH) bx1 = SCREEN_WIDTH - 1;
-    if (by1 >= SCREEN_HEIGHT) by1 = SCREEN_HEIGHT - 1;
+//     if (bx0 >= SCREEN_WIDTH) bx0 = SCREEN_WIDTH - 1;
+//     if (by0 >= SCREEN_HEIGHT) by0 = SCREEN_HEIGHT - 1;
+//     if (bx1 >= SCREEN_WIDTH) bx1 = SCREEN_WIDTH - 1;
+//     if (by1 >= SCREEN_HEIGHT) by1 = SCREEN_HEIGHT - 1;
 
-    /* Use integer edge functions (64-bit to avoid overflow) */
-    const I32 ax = (I32)x1;
-    const I32 ay = (I32)y1;
-    const I32 bx = (I32)x2;
-    const I32 by = (I32)y2;
-    const I32 cx = (I32)x3;
-    const I32 cy = (I32)y3;
+//     /* Use integer edge functions (64-bit to avoid overflow) */
+//     const I32 ax = (I32)x1;
+//     const I32 ay = (I32)y1;
+//     const I32 bx = (I32)x2;
+//     const I32 by = (I32)y2;
+//     const I32 cx = (I32)x3;
+//     const I32 cy = (I32)y3;
+
+//     VBE_PIXEL_INFO p;
+//     p.Colour = colours;
+//     BOOLEAN any = FALSE;
+
+//     for (U32 yy = bx0 /* dummy init */; yy <= bx1; ++yy) { /* we will overwrite loops below */
+//         break;
+//     }
+//     /* iterate y then x within clipped bbox */
+//     for (U32 yy = by0; yy <= by1; ++yy) {
+//         for (U32 xx = bx0; xx <= bx1; ++xx) {
+//             /* compute edge functions relative to point (xx, yy) */
+//             I32 px = (I32)xx;
+//             I32 py = (I32)yy;
+
+//             I32 e0 = (bx - ax) * (py - ay) - (by - ay) * (px - ax); /* edge AB */
+//             I32 e1 = (cx - bx) * (py - by) - (cy - by) * (px - bx); /* edge BC */
+//             I32 e2 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx); /* edge CA */
+
+//             /* point is inside if all edge functions have same sign (or zero) */
+//             if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0)) {
+//                 p.X = xx;
+//                 p.Y = yy;
+//                 if (VBE_DRAW_PIXEL(p)) any = TRUE;
+//             }
+//         }
+//     }
+
+//     return any;
+// }
+
+BOOLEAN VBE_DRAW_FILLED_RECTANGLE(U32 x0, U32 y0, U32 x1, U32 y1, VBE_PIXEL_COLOUR fill_colours) {
+    if (x0 >= x1 || y0 >= y1) return FALSE; // invalid rectangle
+
+    /* clip to screen */
+    if (x0 >= SCREEN_WIDTH || y0 >= SCREEN_HEIGHT) return FALSE;
+    if (x1 > SCREEN_WIDTH) x1 = SCREEN_WIDTH;
+    if (y1 > SCREEN_HEIGHT) y1 = SCREEN_HEIGHT;
 
     VBE_PIXEL_INFO p;
-    p.Colour = colours;
+    p.Colour = fill_colours;
     BOOLEAN any = FALSE;
 
-    for (U32 yy = bx0 /* dummy init */; yy <= bx1; ++yy) { /* we will overwrite loops below */
-        break;
-    }
-    /* iterate y then x within clipped bbox */
-    for (U32 yy = by0; yy <= by1; ++yy) {
-        for (U32 xx = bx0; xx <= bx1; ++xx) {
-            /* compute edge functions relative to point (xx, yy) */
-            I32 px = (I32)xx;
-            I32 py = (I32)yy;
-
-            I32 e0 = (bx - ax) * (py - ay) - (by - ay) * (px - ax); /* edge AB */
-            I32 e1 = (cx - bx) * (py - by) - (cy - by) * (px - bx); /* edge BC */
-            I32 e2 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx); /* edge CA */
-
-            /* point is inside if all edge functions have same sign (or zero) */
-            if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0)) {
-                p.X = xx;
-                p.Y = yy;
-                if (VBE_DRAW_PIXEL(p)) any = TRUE;
-            }
+    for (U32 yy = y0; yy < y1; ++yy) {
+        p.Y = yy;
+        for (U32 xx = x0; xx < x1; ++xx) {
+            p.X = xx;
+            if (VBE_DRAW_PIXEL(p)) any = TRUE;
         }
     }
 
     return any;
 }
+BOOLEAN VBE_DRAW_FILLED_ELLIPSE(U32 x0, U32 y0, U32 a, U32 b, VBE_PIXEL_COLOUR fill_colours) {
+    I32 x = 0;
+    I32 y = b;
+    U32 a2 = a*a;
+    U32 b2 = b*b;
+    I32 dx = 0;
+    I32 dy = 2*a2*y;
+    I32 d1 = b2 - a2*b + a2/4;
+    while(dx < dy) {
+        for(I32 px = -x; px <= x; px++) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 + y, fill_colours));
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 - y, fill_colours));
+        }        
+        x++;
+        dx += 2*b2;
+        if(d1 < 0) {
+            d1 += b2 + dx;
+        } else {
+            y--;
+            dy -= 2*a2;
+            d1 += b2 + dx - dy;
+        }
+    }
 
+    I32 d2 = b2*(x*x + x) + a2*(y-1)*(y-1) - a2*b2;
+    while(y >= 0) {
+        for(I32 px = -x; px <= x; px++) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 + y, fill_colours));
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + px, y0 - y, fill_colours));
+        }
+        y--;
+        dy -= 2*a2;
+        if(d2 > 0) {
+            d2 += a2 - dy;
+        } else {
+            x++;
+            dx += 2*b2;
+            d2 += a2 - dy + dx;
+        }
+    }
+    return TRUE;
+}
 
 
 /* Saved for later:

@@ -247,9 +247,15 @@ typedef struct {
 } ATGL_PANEL_DATA;
 
 typedef struct {
-    PU8 pixels;     /* VBE_COLOUR array */
-    U32 img_w;
-    U32 img_h;
+    PU8 pixels;         /* VBE_COLOUR (U32) array, row-major          */
+    U32 img_w;          /* Actual image width in pixels                */
+    U32 img_h;          /* Actual image height in pixels               */
+    I32 offset_x;       /* Pan offset: source-image X shown at rect.x  */
+    I32 offset_y;       /* Pan offset: source-image Y shown at rect.y  */
+    U32 zoom;           /* Zoom level in percent (100 = 1:1)           */
+    BOOL owns_pixels;   /* TRUE → pixels was MAlloc'd by ATGL          */
+    BOOL show_grid;     /* TRUE → draw pixel grid when zoom >= 400     */
+    VBE_COLOUR grid_colour; /* Grid line colour                        */
 } ATGL_IMAGE_DATA;
 
 /* ================================================================ */

@@ -256,3 +256,31 @@ VOID ATGL_CENTER_IN_SCREEN(PATGL_NODE node)
     node->rect.y = ((I32)atgl.height - node->rect.h) / 2;
     ATGL_NODE_INVALIDATE(node);
 }
+
+VOID ATGL_DRAW_PIXEL(U32 x, U32 y, VBE_COLOUR colour) {
+    DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x, y, colour));
+}
+VOID ATGL_DRAW_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour) {
+    DRAW_RECTANGLE(x, y, w, h, colour);
+}
+VOID ATGL_DRAW_FILLED_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour) {
+    for (U32 i = 0; i < h; i++) {
+        DRAW_LINE(x, y + i, x + w - 1, y + i, colour);
+    }
+}
+VOID ATGL_DRAW_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour) {
+    DRAW_ELLIPSE(x, y, rx, ry, colour);
+}
+VOID ATGL_DRAW_FILLED_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour) {
+    DRAW_FILLED_ELLIPSE(x, y, rx, ry, colour);
+}
+VOID ATGL_DRAW_LINE(U32 x1, U32 y1, U32 x2, U32 y2, VBE_COLOUR colour) {
+    DRAW_LINE(x1, y1, x2, y2, colour);
+}
+
+VOID ATGL_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_COLOUR colour) {
+    DRAW_TRIANGLE(x1, y1, x2, y2, x3, y3, colour);
+}
+VOID ATGL_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_COLOUR colour) {
+    DRAW_FILLED_TRIANGLE(x1, y1, x2, y2, x3, y3, colour);
+}

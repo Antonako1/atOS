@@ -63,6 +63,17 @@ typedef struct {
     ATGL_CURSOR cursor;
 } ATGL_STATE;
 
+typedef struct _ATGL_IMAGE_HEADER {
+    U8 signature[4]; // "ATGI"
+    U32 version;    // 1
+    U32 flags;      // reserved for future use
+    U32 data_offset; // offset to pixel data from start of file
+    U32 data_size;   // size of pixel data in bytes
+    U32 width;
+    U32 height;
+    U32 bpp; // bits per pixel (e.g. 24 for RGB, 32 for RGBA)
+} ATGL_IMAGE_HEADER;
+
 extern ATGL_STATE atgl;
 
 /* Internal helpers (implemented in ATGL_NODE.c) */

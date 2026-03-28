@@ -40,10 +40,12 @@ FUNCTIONS
     BOOLEAN VBE_DRAW_PIXEL(...);            // Draws a pixel on the screen
     BOOLEAN VBE_DRAW_FRAMEBUFFER(...);      // Draws a pixel in the framebuffer
     BOOLEAN VBE_DRAW_ELLIPSE(...);          // Draws an ellipse on the screen
+    BOOLEAN VBE_DRAW_FILLED_ELLIPSE(...);   // Draws a filled ellipse on the screen
     BOOLEAN VBE_DRAW_LINE(...);             // Draws a line on the screen
     BOOLEAN VBE_DRAW_RECTANGLE(...);        // Draws a rectangle on the screen
+    BOOLEAN VBE_DRAW_FILLED_RECTANGLE(...); // Draws a filled rectangle on the screen
     BOOLEAN VBE_DRAW_TRIANGLE(...);         // Draws a triangle on the screen
-    BOOLEAN VBE_DRAW_TRIANGLE_FILLED(...);  // Draws a filled triangle on the screen
+    BOOLEAN VBE_DRAW_FILLED_TRIANGLE(...);  // Draws a filled triangle on the screen
 ---*/
 #ifndef VBE_H
 #define VBE_H
@@ -80,6 +82,7 @@ Blue min-max:  0-255
 */
 #define VBE_COLOUR(r, g, b) \
     (U32)(((U32)(r) << 16) | ((U32)(g) << 8) | (U32)(b))
+#define RGB(r, g, b) VBE_COLOUR(r, g, b)
 
 #define DECONSTRUCT_VBE_COLOUR(colour, r, g, b) \
     do { \
@@ -677,7 +680,7 @@ REMARKS
 BOOLEAN VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours);
 
 /*+++
-BOOLEAN VBE_DRAW_TRIANGLE_FILLED(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours)
+BOOLEAN VBE_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours)
 
 DESCRIPTION
     Draws a filled triangle on the framebuffer.
@@ -711,6 +714,6 @@ REVISION HISTORY
 REMARKS
     This draws a filled triangle in the framebuffer.
 ---*/
-BOOLEAN VBE_DRAW_TRIANGLE_FILLED(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours);
+BOOLEAN VBE_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours);
 #endif // __RTOS__ || KERNEL_ENTRY
 #endif
