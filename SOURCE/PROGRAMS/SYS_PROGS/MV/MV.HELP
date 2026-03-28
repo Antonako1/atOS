@@ -1,0 +1,3 @@
+"MV - Moves a file/directory from src to dest\n\n"
+
+"Usage: MV <src> <dest>\n"
