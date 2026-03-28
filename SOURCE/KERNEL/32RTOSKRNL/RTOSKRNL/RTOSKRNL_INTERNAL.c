@@ -552,10 +552,9 @@ void system_reboot_if(BOOL condition) {
     }
 }
 void system_shutdown(VOID) {
-    panic(PANIC_TEXT("System shutdown not implemented, here's a halt instead"), PANIC_NONE);   
+    panic(PANIC_TEXT("Unable to proceed with system_shutdown()"), PANIC_NONE);   
     ACPI_SHUTDOWN_SYSTEM();
     // If ACPI shutdown fails, halt the system
-    system_halt();
 }
 void system_shutdown_if(BOOL condition) {
     if (condition) {

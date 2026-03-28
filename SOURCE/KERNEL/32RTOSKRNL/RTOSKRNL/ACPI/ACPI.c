@@ -55,11 +55,10 @@ void ACPI_SHUTDOWN_SYSTEM(void) {
     if(!fadt) HLT;
 
     U16 pm1a = (U16)fadt->Pm1aCntBlk;
-    U16 sleep_type = ((fadt->S5SleepTypeA & 0x7) << 10);
-    U16 sleep_enable = (1 << 13);
-    U16 shutdown_cmd = sleep_type | sleep_enable;
+
+    U16 shutdown = (5 << 10) | (1 << 13);
 
     asm volatile("cli");
-    _outw(pm1a, shutdown_cmd);
+    _outw(pm1a, shutdown);
     HLT;
 }
