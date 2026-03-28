@@ -1691,7 +1691,9 @@ BOOL FILE_APPEND(FAT_LFN_ENTRY *lfn_entry, const U8 *data, U32 size) {
 // Marks the entry as deleted and frees its clusters.
 BOOL DIR_REMOVE_ENTRY(FAT_LFN_ENTRY *dir_entry, const char *name) {
     if (!dir_entry || !name) return FALSE;
-
+    KDEBUG_PUTSN(dir_entry->entry.FILENAME, 11);
+    KDEBUG_PUTS(name);
+    KDEBUG_PUTS("\n");
     U32 dir_cluster = (dir_entry->entry.HIGH_CLUSTER_BITS << 16) |
                       dir_entry->entry.LOW_CLUSTER_BITS;
 

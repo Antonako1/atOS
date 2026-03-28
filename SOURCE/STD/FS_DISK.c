@@ -5,6 +5,7 @@
 #include <STD/MEM.h>
 #include <STD/BINARY.h>
 #include <STD/STRING.h>
+#include <STD/DEBUG.h>
 
 U32 CDROM_READ(U32 lba, U32 sectors, U8 *buf) {
     return SYSCALL3(SYSCALL_CDROM_READ, lba, sectors, buf);
@@ -249,6 +250,7 @@ FILE * FOPEN(PU8 path, FILEMODES mode) {
     file->read_ptr = 0;
     file->sz = 0;
     file->data = NULLPTR;   
+    STRCPY(file->path, path);
 
     const BOOLEAN iso = (mode & MODE_ISO9660) != 0;
     const BOOLEAN fat = (mode & MODE_FAT32) != 0;
@@ -535,30 +537,50 @@ BOOLEAN DIR_EXISTS(PU8 path) {
     return FALSE;
 }
 
-BOOLEAN FILE_DELETE(PU8 path) {
+BOOLEAN DELETE_ENTRY(PU8 path, BOOL8 is_dir) {
     if (!path) return FALSE;
 
-    FAT_LFN_ENTRY ent = {0};
-    if (!FAT32_PATH_RESOLVE_ENTRY(path, &ent)) return FALSE;
+    FAT_LFN_ENTRY parent = {0};
+    FAT_LFN_ENTRY target = {0};
 
-    const U8 *basename = GET_BASENAME(path);
-    if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
+    PU8 fullpath = path;
 
+    if (fullpath[0] != '/') {
+        fullpath = MAlloc(STRLEN(path) + 2);
+        if (!fullpath) return FALSE;
+
+        fullpath[0] = '/';
+        STRCPY(fullpath + 1, path);
+    }
+
+    PU8 parent_path = GET_PARENT_PATH(fullpath);
+    if (!parent_path) goto err;
+
+    if (!FAT32_PATH_RESOLVE_ENTRY(parent_path, &parent)) goto err;
+    if (!FAT32_PATH_RESOLVE_ENTRY(fullpath, &target)) goto err;
+
+    if (XOR(is_dir, IS_FLAG_SET(target.entry.ATTRIB, FAT_ATTRB_DIR)))
+        goto err;
+
+    const U8 *basename = GET_BASENAME(fullpath);
+
+    if (FAT32_DIR_REMOVE_ENTRY(&parent, basename)) {
+        if (fullpath != path) MFree(fullpath);
+        MFree(parent_path);
+        return TRUE;
+    }
+
+err:
+    if (fullpath != path) MFree(fullpath);
+    if (parent_path) MFree(parent_path);
     return FALSE;
+}
+BOOLEAN FILE_DELETE(PU8 path) {
+    return DELETE_ENTRY(path, FALSE);
 }
 
 BOOLEAN DIR_DELETE(PU8 path, BOOLEAN force) {
-    if (!path) return FALSE;
-
-    FAT_LFN_ENTRY ent = {0};
-    if (!FAT32_PATH_RESOLVE_ENTRY(path, &ent)) return FALSE;
-
-    if (!IS_FLAG_SET(ent.entry.ATTRIB, FAT_ATTRB_DIR))
-        return FALSE;
-    const U8 *basename = GET_BASENAME(path);
-    if (FAT32_DIR_REMOVE_ENTRY(&ent, basename)) return TRUE;
-
-    return FALSE;
+    return DELETE_ENTRY(path, TRUE);
 }
 
 BOOLEAN FILE_CREATE(PU8 path) {
