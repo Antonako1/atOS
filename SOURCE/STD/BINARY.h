@@ -13,10 +13,15 @@
 #define IS_FLAG_SET(x, flag) ((x & (flag)) != 0)
 #define IS_FLAG_UNSET(x, flag) ((x & (flag)) == 0)
 
-#define SHR(x, n) (x >> n)
-#define SHL(x, n) (x << n)
 
 #define ALIGN_UP(x, align) (((x) + (align)-1) & ~((align)-1))
 #define ALIGN_DOWN(x, align) ((x) & ~((align)-1))
 
+#define SHR(x, n) (x >> n)
+#define SHL(x, n) (x << n)
+
+#define XOR(a, b) (a ^ b)
+#define OR(a, b) (a | b)
+#define AND(a, b) (a & b)
+#define NOT(a, b) (a ~ b)
 #endif // BINARY_H
