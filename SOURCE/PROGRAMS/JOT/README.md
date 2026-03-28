@@ -1,1 +1,0 @@
-# JOT — Minimal console text-editor 
