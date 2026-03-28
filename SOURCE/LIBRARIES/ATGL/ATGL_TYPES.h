@@ -210,6 +210,9 @@ typedef struct {
     U32  max_len;
     BOOL password;
     CHAR placeholder[ATGL_PLACEHOLDER_MAX];
+    U32  selection_start;
+    U32  selection_end;
+    BOOL is_selecting;
 } ATGL_TEXTINPUT_DATA;
 
 typedef struct {

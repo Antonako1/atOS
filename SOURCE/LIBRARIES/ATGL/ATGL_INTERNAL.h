@@ -56,6 +56,9 @@ typedef struct {
     BOOL last_btn_right;
     BOOL last_btn_middle;
 
+    /* Clipboard */
+    CHAR clipboard[ATGL_TEXTINPUT_MAX];
+
     /* Mouse cursor */
     ATGL_CURSOR cursor;
 } ATGL_STATE;

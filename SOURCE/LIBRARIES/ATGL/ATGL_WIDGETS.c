@@ -184,16 +184,29 @@ static VOID render_textinput(PATGL_NODE node)
 
     if (td->len > 0) {
         PU8 display_str = (PU8)&td->buffer[td->scroll_offset];
+        U32 sel_min = td->selection_start < td->selection_end ? td->selection_start : td->selection_end;
+        U32 sel_max = td->selection_start > td->selection_end ? td->selection_start : td->selection_end;
+
         if (td->password) {
             for (U32 i = 0; i < visible_chars &&
                             i + td->scroll_offset < td->len; i++) {
+                U32 text_idx = i + td->scroll_offset;
+                VBE_COLOUR bg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_bg : t->input_bg;
+                VBE_COLOUR fg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_fg : t->input_fg;
                 DRAW_8x8_CHARACTER(text_x + (I32)(i * t->char_w),
                                    text_y, '*',
-                                   t->input_fg, t->input_bg);
+                                   fg, bg);
             }
         } else {
-            ATGL_DRAW_TEXT_CLIPPED(text_x, text_y, r->w - 6,
-                                   display_str, t->input_fg, t->input_bg);
+            for (U32 i = 0; i < visible_chars &&
+                            i + td->scroll_offset < td->len; i++) {
+                U32 text_idx = i + td->scroll_offset;
+                VBE_COLOUR bg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_bg : t->input_bg;
+                VBE_COLOUR fg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_fg : t->input_fg;
+                DRAW_8x8_CHARACTER(text_x + (I32)(i * t->char_w),
+                                   text_y, display_str[i],
+                                   fg, bg);
+            }
         }
     } else if (td->placeholder[0]) {
         ATGL_DRAW_TEXT_CLIPPED(text_x, text_y, r->w - 6,
@@ -550,16 +563,139 @@ static VOID event_radio(PATGL_NODE node, ATGL_EVENT *ev)
 
 /* ----------------------------- TextInput ------------------------- */
 
+static VOID textinput_delete_selection(ATGL_TEXTINPUT_DATA *td) {
+    U32 sel_min = td->selection_start < td->selection_end ? td->selection_start : td->selection_end;
+    U32 sel_max = td->selection_start > td->selection_end ? td->selection_start : td->selection_end;
+    if (sel_min == sel_max) return;
+    
+    U32 del_len = sel_max - sel_min;
+    MEMMOVE(&td->buffer[sel_min], &td->buffer[sel_max], td->len - sel_max + 1);
+    td->len -= del_len;
+    td->cursor = sel_min;
+    td->selection_start = td->selection_end = td->cursor;
+}
+
 static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
 {
-    if (ev->type != ATGL_EVT_KEY_DOWN || !node->focused) return;
-
     ATGL_TEXTINPUT_DATA *td = &node->data.textinput;
     U32 visible_chars = ((U32)node->abs_rect.w - 6) / atgl.theme.char_w;
 
+    if (ev->type == ATGL_EVT_MOUSE_DOWN) {
+        if (ATGL_RECT_CONTAINS(&node->abs_rect, ev->mouse.x, ev->mouse.y)) {
+            I32 rel_x = ev->mouse.x - (node->abs_rect.x + 3);
+            if (rel_x < 0) rel_x = 0;
+            U32 char_idx = td->scroll_offset + (U32)rel_x / atgl.theme.char_w;
+            if (char_idx > td->len) char_idx = td->len;
+            
+            td->cursor = char_idx;
+            td->selection_start = td->cursor;
+            td->selection_end = td->cursor;
+            td->is_selecting = TRUE;
+            ATGL_NODE_INVALIDATE(node);
+            ev->handled = TRUE;
+        }
+        return;
+    } else if (ev->type == ATGL_EVT_MOUSE_MOVE && td->is_selecting) {
+        I32 rel_x = ev->mouse.x - (node->abs_rect.x + 3);
+        if (rel_x < 0) rel_x = 0;
+        U32 char_idx = td->scroll_offset + (U32)rel_x / atgl.theme.char_w;
+        if (char_idx > td->len) char_idx = td->len;
+        
+        if (ev->mouse.btn_left) {
+            if (char_idx != td->cursor || char_idx != td->selection_end) {
+                td->cursor = char_idx;
+                td->selection_end = td->cursor;
+                ATGL_NODE_INVALIDATE(node);
+            }
+        } else {
+            td->is_selecting = FALSE;
+        }
+        ev->handled = TRUE;
+        return;
+    } else if (ev->type == ATGL_EVT_MOUSE_UP) {
+        if (td->is_selecting) {
+            td->is_selecting = FALSE;
+            ev->handled = TRUE;
+        }
+        return;
+    }
+
+    if (ev->type != ATGL_EVT_KEY_DOWN || !node->focused) return;
+
+    U32 sel_min = td->selection_start < td->selection_end ? td->selection_start : td->selection_end;
+    U32 sel_max = td->selection_start > td->selection_end ? td->selection_start : td->selection_end;
+
+    /* Handle CTRL + A/C/V/X */
+    if (ev->key.ctrl) {
+        if (ev->key.ch == 'a' || ev->key.ch == 'A') {
+            td->selection_start = 0;
+            td->selection_end = td->len;
+            td->cursor = td->len;
+            ATGL_NODE_INVALIDATE(node);
+            ev->handled = TRUE;
+        } else if (ev->key.ch == 'c' || ev->key.ch == 'C') {
+            if (sel_min < sel_max && !td->password) {
+                U32 copy_len = sel_max - sel_min;
+                if (copy_len >= ATGL_TEXTINPUT_MAX) copy_len = ATGL_TEXTINPUT_MAX - 1;
+                MEMCPY(atgl.clipboard, &td->buffer[sel_min], copy_len);
+                atgl.clipboard[copy_len] = '\0';
+            }
+            ev->handled = TRUE;
+        } else if (ev->key.ch == 'x' || ev->key.ch == 'X') {
+            if (sel_min < sel_max && !td->password) {
+                U32 copy_len = sel_max - sel_min;
+                if (copy_len >= ATGL_TEXTINPUT_MAX) copy_len = ATGL_TEXTINPUT_MAX - 1;
+                MEMCPY(atgl.clipboard, &td->buffer[sel_min], copy_len);
+                atgl.clipboard[copy_len] = '\0';
+                textinput_delete_selection(td);
+                ATGL_NODE_INVALIDATE(node);
+                if (node->on_change) node->on_change(node);
+            }
+            ev->handled = TRUE;
+        } else if (ev->key.ch == 'v' || ev->key.ch == 'V') {
+            textinput_delete_selection(td);
+            U32 paste_len = STRLEN(atgl.clipboard);
+            if (paste_len > 0 && td->len + paste_len < td->max_len) {
+                MEMMOVE(&td->buffer[td->cursor + paste_len],
+                        &td->buffer[td->cursor],
+                        td->len - td->cursor + 1);
+                MEMCPY(&td->buffer[td->cursor], atgl.clipboard, paste_len);
+                td->cursor += paste_len;
+                td->len += paste_len;
+                if (td->cursor >= td->scroll_offset + visible_chars)
+                    td->scroll_offset = td->cursor > visible_chars ? td->cursor - visible_chars : 0;
+                td->selection_start = td->selection_end = td->cursor;
+                ATGL_NODE_INVALIDATE(node);
+                if (node->on_change) node->on_change(node);
+            }
+            ev->handled = TRUE;
+        }
+        return;
+    }
+
     switch (ev->key.keycode) {
+    case KEY_DELETE:
+        if (sel_min < sel_max) {
+            textinput_delete_selection(td);
+            ATGL_NODE_INVALIDATE(node);
+            if (node->on_change) node->on_change(node);
+        } else if (td->cursor < td->len) {
+            MEMMOVE(&td->buffer[td->cursor],
+                    &td->buffer[td->cursor + 1],
+                    td->len - td->cursor);
+            td->len--;
+            td->selection_start = td->selection_end = td->cursor;
+            ATGL_NODE_INVALIDATE(node);
+            if (node->on_change) node->on_change(node);
+        }
+        ev->handled = TRUE;
+        break;
     case KEY_BACKSPACE:
-        if (td->cursor > 0) {
+        if (sel_min < sel_max) {
+            textinput_delete_selection(td);
+            ATGL_NODE_INVALIDATE(node);
+            if (node->on_change) node->on_change(node);
+        } else if (td->cursor > 0) {
             MEMMOVE(&td->buffer[td->cursor - 1],
                     &td->buffer[td->cursor],
                     td->len - td->cursor + 1);
@@ -569,6 +705,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
                 td->cursor < td->scroll_offset) {
                 td->scroll_offset = td->cursor;
             }
+            td->selection_start = td->selection_end = td->cursor;
             ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
         }
@@ -576,21 +713,51 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
         break;
 
     case KEY_ARROW_LEFT:
-        if (td->cursor > 0) {
-            td->cursor--;
-            if (td->cursor < td->scroll_offset)
-                td->scroll_offset = td->cursor;
-            ATGL_NODE_INVALIDATE(node);
+        if (ev->key.shift) {
+            if (td->cursor > 0) {
+                td->cursor--;
+                td->selection_end = td->cursor;
+                if (td->cursor < td->scroll_offset)
+                    td->scroll_offset = td->cursor;
+                ATGL_NODE_INVALIDATE(node);
+            }
+        } else {
+            if (sel_min < sel_max) {
+                td->cursor = sel_min;
+                td->selection_start = td->selection_end = td->cursor;
+                ATGL_NODE_INVALIDATE(node);
+            } else if (td->cursor > 0) {
+                td->cursor--;
+                td->selection_start = td->selection_end = td->cursor;
+                if (td->cursor < td->scroll_offset)
+                    td->scroll_offset = td->cursor;
+                ATGL_NODE_INVALIDATE(node);
+            }
         }
         ev->handled = TRUE;
         break;
 
     case KEY_ARROW_RIGHT:
-        if (td->cursor < td->len) {
-            td->cursor++;
-            if (td->cursor >= td->scroll_offset + visible_chars)
-                td->scroll_offset = td->cursor - visible_chars + 1;
-            ATGL_NODE_INVALIDATE(node);
+        if (ev->key.shift) {
+            if (td->cursor < td->len) {
+                td->cursor++;
+                td->selection_end = td->cursor;
+                if (td->cursor >= td->scroll_offset + visible_chars)
+                    td->scroll_offset = td->cursor > visible_chars ? td->cursor - visible_chars : 0;
+                ATGL_NODE_INVALIDATE(node);
+            }
+        } else {
+            if (sel_min < sel_max) {
+                td->cursor = sel_max;
+                td->selection_start = td->selection_end = td->cursor;
+                ATGL_NODE_INVALIDATE(node);
+            } else if (td->cursor < td->len) {
+                td->cursor++;
+                td->selection_start = td->selection_end = td->cursor;
+                if (td->cursor >= td->scroll_offset + visible_chars)
+                    td->scroll_offset = td->cursor > visible_chars ? td->cursor - visible_chars : 0;
+                ATGL_NODE_INVALIDATE(node);
+            }
         }
         ev->handled = TRUE;
         break;
@@ -598,6 +765,9 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
     default:
         /* Printable character insertion */
         if (ev->key.ch >= 0x20 && ev->key.ch < 0x7F) {
+            if (sel_min < sel_max) {
+                textinput_delete_selection(td);
+            }
             if (td->len < td->max_len - 1) {
                 MEMMOVE(&td->buffer[td->cursor + 1],
                         &td->buffer[td->cursor],
@@ -605,8 +775,9 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
                 td->buffer[td->cursor] = ev->key.ch;
                 td->cursor++;
                 td->len++;
+                td->selection_start = td->selection_end = td->cursor;
                 if (td->cursor >= td->scroll_offset + visible_chars)
-                    td->scroll_offset = td->cursor - visible_chars + 1;
+                    td->scroll_offset = td->cursor > visible_chars ? td->cursor - visible_chars : 0;
                 ATGL_NODE_INVALIDATE(node);
                 if (node->on_change) node->on_change(node);
             }
