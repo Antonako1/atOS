@@ -127,7 +127,7 @@ VOID ATGL_NODE_SET_TEXT(PATGL_NODE node, PU8 text)
     if (text) {
         U32 len = STRLEN(text);
         if (len >= ATGL_NODE_MAX_TEXT) len = ATGL_NODE_MAX_TEXT - 1;
-        MEMCPY(node->text, text, len);
+        MEMCPY_OPT(node->text, text, len);
         node->text[len] = '\0';
     } else {
         node->text[0] = '\0';
@@ -169,7 +169,13 @@ VOID ATGL_NODE_SET_COLORS(PATGL_NODE node, VBE_COLOUR fg, VBE_COLOUR bg)
 VOID ATGL_NODE_INVALIDATE(PATGL_NODE node)
 {
     if (!node) return;
-    node->dirty = TRUE;
+    if(node->parent == ATGL_GET_SCREEN_ROOT_NODE()) {
+        atgl.needs_full_clear = TRUE;
+    } else if(node->parent) {
+         ATGL_NODE_INVALIDATE(node->parent);
+    } else {
+         node->dirty = TRUE;
+    }
     /* Propagate upward so the render pass never skips
        a clean ancestor whose subtree contains dirty nodes. */
     PATGL_NODE p = node->parent;

@@ -43,6 +43,7 @@ typedef struct {
     PATGL_NODE focus;
     BOOL initialized;
     BOOL quit;
+    BOOL needs_full_clear;
     U32  next_id;
     ATGL_SCREEN_ATTRIBS attrs;
     U32 bpp; // bytes per pixel

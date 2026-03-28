@@ -79,7 +79,7 @@ ATGL_THEME ATGL_DEFAULT_THEME(VOID)
 VOID ATGL_SET_THEME(ATGL_THEME *theme)
 {
     if (!theme) return;
-    MEMCPY(&atgl.theme, theme, sizeof(ATGL_THEME));
+    MEMCPY_OPT(&atgl.theme, theme, sizeof(ATGL_THEME));
 
     /* Force full repaint */
     if (atgl.root) {

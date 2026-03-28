@@ -36,6 +36,7 @@ VOID ATGL_CREATE_SCREEN(ATGL_SCREEN_ATTRIBS attrs)
     atgl.quit   = FALSE;
     atgl.focus  = NULLPTR;
     atgl.next_id = 1;
+    atgl.needs_full_clear = TRUE;
 
     /* Create root node spanning the entire screen */
     atgl.root = ATGL_NODE_CREATE(
@@ -80,7 +81,12 @@ VOID ATGL_INIT(VOID)
         DEBUG_PRINTF("[ATGL] VBE mode detected: %dx%d, %d bpp, BytesPerScanLine: %d\n",
                      mode->XResolution, mode->YResolution, mode->BitsPerPixel, mode->BytesPerScanLine);
         atgl.cursor.stride = mode->BytesPerScanLine;
+        atgl.width = mode->XResolution;
+        atgl.height = mode->YResolution;
     } else {
+        atgl.bpp = 4;
+        atgl.width = ATGL_SCREEN_WIDTH;
+        atgl.height = ATGL_SCREEN_HEIGHT;
         atgl.cursor.stride = atgl.width * atgl.bpp; // fallback 
     }
     
@@ -202,7 +208,7 @@ VOID ATGL_DRAW_TEXT_CLIPPED(I32 x, I32 y, I32 max_w, PU8 text,
            issuing a per-character syscall for every visible glyph. */
         CHAR buf[ATGL_NODE_MAX_TEXT];
         if (max_chars >= ATGL_NODE_MAX_TEXT) max_chars = ATGL_NODE_MAX_TEXT - 1;
-        MEMCPY(buf, text, max_chars);
+        MEMCPY_OPT(buf, text, max_chars);
         buf[max_chars] = '\0';
         DRAW_8x8_STRING(x, y, (PU8)buf, fg, bg);
     }
@@ -264,9 +270,7 @@ VOID ATGL_DRAW_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour) {
     DRAW_RECTANGLE(x, y, w, h, colour);
 }
 VOID ATGL_DRAW_FILLED_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour) {
-    for (U32 i = 0; i < h; i++) {
-        DRAW_LINE(x, y + i, x + w - 1, y + i, colour);
-    }
+    DRAW_FILLED_RECTANGLE(x, y, w, h, colour);
 }
 VOID ATGL_DRAW_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour) {
     DRAW_ELLIPSE(x, y, rx, ry, colour);

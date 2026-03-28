@@ -247,8 +247,7 @@ BOOLEAN VBE_DRAW_FRAMEBUFFER(U32 pos, VBE_PIXEL_COLOUR colour) {
     if (!framebuffer || !mode) return FALSE;
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
     if (pos + bytes_per_pixel > mode->BytesPerScanLineLinear * mode->YResolution) return FALSE;
-    if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
-
+    // if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
     switch (bytes_per_pixel) {
         case 1:
             framebuffer[pos] = (U8)(colour & 0xFF);
@@ -291,7 +290,7 @@ BOOLEAN VBE_DRAW_PIXEL(VBE_PIXEL_INFO pixel_info) {
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
     U32 pos = (pixel_info.Y * mode->BytesPerScanLineLinear) + (pixel_info.X * bytes_per_pixel);
     
-    return VBE_DRAW_FRAMEBUFFER(pos, pixel_info.Colour);
+    return VBE_DRAW_FRAMEBUFFER(pos, (VBE_PIXEL_COLOUR)pixel_info.Colour);
 }
 
 

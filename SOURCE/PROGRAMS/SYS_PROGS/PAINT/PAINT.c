@@ -178,8 +178,8 @@ CMAIN() {
     DISABLE_SHELL_KEYBOARD();
     ON_EXIT(ENABLE_SHELL_KEYBOARD);
     ON_EXIT(ATGL_QUIT);
-    ATGL_CREATE_SCREEN(ATGL_SA_NONE);
     ATGL_INIT();
+    ATGL_CREATE_SCREEN(ATGL_SA_NONE);
 
     app_state.primary_color = RGB(0, 0, 0);
     app_state.secondary_color = RGB(255, 255, 255);
@@ -224,7 +224,7 @@ CMAIN() {
     /* ---- Canvas (blank white image) ---- */
     app_state.canvas_rect = (ATGL_RECT){0, app_state.header_height, width, height - app_state.header_height};
     canvas = ATGL_CREATE_BLANK_IMAGE(root, app_state.canvas_rect, width, height - app_state.header_height, RGB(255, 255, 255));
-
+    
     return 0;
 }
 

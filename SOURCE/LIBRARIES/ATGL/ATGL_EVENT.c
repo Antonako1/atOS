@@ -19,7 +19,7 @@
 BOOL ATGL_POLL_EVENTS(ATGL_EVENT *ev)
 {
     if (!ev) return FALSE;
-    MEMSET(ev, 0, sizeof(ATGL_EVENT));
+    MEMSET_OPT(ev, 0, sizeof(ATGL_EVENT));
 
     /* ---- Keyboard ---- */
     PS2_KB_DATA *kb = kb_poll();
@@ -53,11 +53,24 @@ BOOL ATGL_POLL_EVENTS(ATGL_EVENT *ev)
         I32  my = (I32)ms->cur.y;
 
         /* Determine event type */
-        ev->type = ATGL_EVT_MOUSE_MOVE;        /* default */
+        BOOL btn_changed = (bl != atgl.last_btn_left) ||
+                           (br != atgl.last_btn_right) ||
+                           (bm != atgl.last_btn_middle);
+        BOOL pos_changed = (mx != atgl.last_mouse_x) ||
+                           (my != atgl.last_mouse_y);
 
         if (bl && !atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_DOWN;
-        if (!bl && atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_UP;
-        if (br && !atgl.last_btn_right) ev->type = ATGL_EVT_MOUSE_DOWN;
+        else if (!bl && atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_UP;
+        else if (br && !atgl.last_btn_right) ev->type = ATGL_EVT_MOUSE_DOWN;
+        else if (pos_changed) ev->type = ATGL_EVT_MOUSE_MOVE;
+        else {
+            /* No position change and no button change worth reporting —
+               skip this event entirely to avoid unnecessary dispatch. */
+            atgl.last_btn_left   = bl;
+            atgl.last_btn_right  = br;
+            atgl.last_btn_middle = bm;
+            return FALSE;
+        }
 
         ev->mouse.x          = mx;
         ev->mouse.y          = my;
@@ -292,6 +305,24 @@ static VOID atgl_cursor_show(I32 mx, I32 my)
     c->has_saved = TRUE;
 }
 
+/* Pre-render pass: apply layout to dirty panels before drawing.
+   This decouples layout computation from the render pass, avoiding
+   redundant invalidations during rendering. */
+static VOID layout_recursive(PATGL_NODE node)
+{
+    if (!node || !node->visible || !node->dirty) return;
+
+    if (node->type == ATGL_NODE_PANEL &&
+        node->data.panel.layout != ATGL_LAYOUT_NONE)
+    {
+        ATGL_LAYOUT_APPLY(node);
+    }
+
+    for (U32 i = 0; i < node->child_count; i++) {
+        layout_recursive(node->children[i]);
+    }
+}
+
 static VOID render_recursive(PATGL_NODE node, I32 px, I32 py, BOOL force)
 {
     if (!node || !node->visible) return;
@@ -328,20 +359,28 @@ VOID ATGL_RENDER_TREE(PATGL_NODE root)
           does not interfere with rendering or get "baked in". */
     atgl_cursor_hide();  
 
-    /* 2. Render dirty sub-trees (full clear only on first frame /
-          theme change when root is dirty). */
-    BOOL force = root->dirty;
-    if (force) {
+    /* 2. Pre-render layout pass: reposition children of dirty panels
+          BEFORE any drawing occurs, so the render pass sees final
+          positions and does not trigger redundant invalidations. */
+    layout_recursive(root);
+
+    /* 3. Render dirty sub-trees.  Only do a full screen clear on
+          first frame, theme change, or screen resize — not on every
+          single child invalidation that bubbles up to root. */
+    BOOL force = FALSE;
+    if (atgl.needs_full_clear) {
         CLEAR_SCREEN_COLOUR(atgl.theme.bg);
+        force = TRUE;
+        atgl.needs_full_clear = FALSE;
     }
     render_recursive(root, 0, 0, force);
 
-    /* 3. Save the screen content at the new cursor position and draw
+    /* 4. Save the screen content at the new cursor position and draw
           the cursor on top.  This uses direct framebuffer access —
           no syscalls needed for the cursor itself. */
     atgl_cursor_show(atgl.last_mouse_x, atgl.last_mouse_y);
 
-    /* 4. Push to display */
+    /* 5. Push to display */
     FLUSH_VRAM();
 }
 

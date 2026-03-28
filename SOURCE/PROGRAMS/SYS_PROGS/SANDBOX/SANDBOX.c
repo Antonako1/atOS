@@ -99,8 +99,9 @@ U32 ATGL_MAIN(U32 argc, PPU8 argv)
                        0, 100, 50, 5);
 
     /* ---- Progress bar ---- */
-    progress = ATGL_CREATE_PROGRESSBAR(root,
-                       (ATGL_RECT){10, 240, 200, 20}, 100);
+    PATGL_NODE progress_panel = ATGL_CREATE_PANEL(root, (ATGL_RECT){10, 240, 200, 20}, ATGL_LAYOUT_NONE, 0, 0);
+    progress = ATGL_CREATE_PROGRESSBAR(progress_panel,
+                       (ATGL_RECT){0, 0, 200, 20}, 100);
 
     /* ---- Listbox ---- */
     PATGL_NODE list = ATGL_CREATE_LISTBOX(root,

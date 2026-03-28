@@ -187,25 +187,98 @@ static VOID render_textinput(PATGL_NODE node)
         U32 sel_min = td->selection_start < td->selection_end ? td->selection_start : td->selection_end;
         U32 sel_max = td->selection_start > td->selection_end ? td->selection_start : td->selection_end;
 
+        /* Determine how many characters we will actually draw */
+        U32 draw_count = visible_chars;
+        if (draw_count > td->len - td->scroll_offset)
+            draw_count = td->len - td->scroll_offset;
+
+        BOOL has_selection = (sel_min < sel_max);
+
         if (td->password) {
-            for (U32 i = 0; i < visible_chars &&
-                            i + td->scroll_offset < td->len; i++) {
-                U32 text_idx = i + td->scroll_offset;
-                VBE_COLOUR bg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_bg : t->input_bg;
-                VBE_COLOUR fg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_fg : t->input_fg;
-                DRAW_8x8_CHARACTER(text_x + (I32)(i * t->char_w),
-                                   text_y, '*',
-                                   fg, bg);
+            if (!has_selection) {
+                /* No selection — fill a password-mask string and draw once */
+                CHAR pwd_buf[ATGL_TEXTINPUT_MAX];
+                MEMSET_OPT(pwd_buf, '*', draw_count);
+                pwd_buf[draw_count] = '\0';
+                DRAW_8x8_STRING(text_x, text_y, (PU8)pwd_buf,
+                                t->input_fg, t->input_bg);
+            } else {
+                /* Selection present — batch into up to 3 runs */
+                CHAR pwd_buf[ATGL_TEXTINPUT_MAX];
+                for (U32 i = 0; i < draw_count; i++) pwd_buf[i] = '*';
+
+                U32 vis_sel_start = (sel_min > td->scroll_offset) ? sel_min - td->scroll_offset : 0;
+                U32 vis_sel_end   = (sel_max > td->scroll_offset) ? sel_max - td->scroll_offset : 0;
+                if (vis_sel_end > draw_count) vis_sel_end = draw_count;
+
+                /* Before selection */
+                if (vis_sel_start > 0) {
+                    pwd_buf[vis_sel_start] = '\0';
+                    DRAW_8x8_STRING(text_x, text_y, (PU8)pwd_buf,
+                                    t->input_fg, t->input_bg);
+                    pwd_buf[vis_sel_start] = '*';
+                }
+                /* Selected region */
+                if (vis_sel_end > vis_sel_start) {
+                    CHAR sel_buf[ATGL_TEXTINPUT_MAX];
+                    U32 sel_len = vis_sel_end - vis_sel_start;
+                    MEMSET_OPT(sel_buf, '*', sel_len);
+                    sel_buf[sel_len] = '\0';
+                    DRAW_8x8_STRING(text_x + (I32)(vis_sel_start * t->char_w),
+                                    text_y, (PU8)sel_buf,
+                                    t->list_sel_fg, t->list_sel_bg);
+                }
+                /* After selection */
+                if (vis_sel_end < draw_count) {
+                    pwd_buf[vis_sel_end] = '*';
+                    pwd_buf[draw_count]  = '\0';
+                    DRAW_8x8_STRING(text_x + (I32)(vis_sel_end * t->char_w),
+                                    text_y, (PU8)&pwd_buf[vis_sel_end],
+                                    t->input_fg, t->input_bg);
+                }
             }
         } else {
-            for (U32 i = 0; i < visible_chars &&
-                            i + td->scroll_offset < td->len; i++) {
-                U32 text_idx = i + td->scroll_offset;
-                VBE_COLOUR bg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_bg : t->input_bg;
-                VBE_COLOUR fg = (text_idx >= sel_min && text_idx < sel_max) ? t->list_sel_fg : t->input_fg;
-                DRAW_8x8_CHARACTER(text_x + (I32)(i * t->char_w),
-                                   text_y, display_str[i],
-                                   fg, bg);
+            if (!has_selection) {
+                /* No selection — single batched string draw */
+                CHAR tmp_buf[ATGL_TEXTINPUT_MAX];
+                MEMCPY_OPT(tmp_buf, display_str, draw_count);
+                tmp_buf[draw_count] = '\0';
+                DRAW_8x8_STRING(text_x, text_y, (PU8)tmp_buf,
+                                t->input_fg, t->input_bg);
+            } else {
+                /* Selection present — batch into up to 3 runs */
+                U32 vis_sel_start = (sel_min > td->scroll_offset) ? sel_min - td->scroll_offset : 0;
+                U32 vis_sel_end   = (sel_max > td->scroll_offset) ? sel_max - td->scroll_offset : 0;
+                if (vis_sel_end > draw_count) vis_sel_end = draw_count;
+
+                /* Before selection */
+                if (vis_sel_start > 0) {
+                    CHAR tmp_buf[ATGL_TEXTINPUT_MAX];
+                    MEMCPY_OPT(tmp_buf, display_str, vis_sel_start);
+                    tmp_buf[vis_sel_start] = '\0';
+                    DRAW_8x8_STRING(text_x, text_y, (PU8)tmp_buf,
+                                    t->input_fg, t->input_bg);
+                }
+                /* Selected region */
+                if (vis_sel_end > vis_sel_start) {
+                    CHAR sel_buf[ATGL_TEXTINPUT_MAX];
+                    U32 sel_len = vis_sel_end - vis_sel_start;
+                    MEMCPY_OPT(sel_buf, &display_str[vis_sel_start], sel_len);
+                    sel_buf[sel_len] = '\0';
+                    DRAW_8x8_STRING(text_x + (I32)(vis_sel_start * t->char_w),
+                                    text_y, (PU8)sel_buf,
+                                    t->list_sel_fg, t->list_sel_bg);
+                }
+                /* After selection */
+                if (vis_sel_end < draw_count) {
+                    CHAR tmp_buf[ATGL_TEXTINPUT_MAX];
+                    U32 after_len = draw_count - vis_sel_end;
+                    MEMCPY_OPT(tmp_buf, &display_str[vis_sel_end], after_len);
+                    tmp_buf[after_len] = '\0';
+                    DRAW_8x8_STRING(text_x + (I32)(vis_sel_end * t->char_w),
+                                    text_y, (PU8)tmp_buf,
+                                    t->input_fg, t->input_bg);
+                }
             }
         }
     } else if (td->placeholder[0]) {
@@ -278,7 +351,7 @@ static VOID render_progressbar(PATGL_NODE node)
     U32 max_val = pd->max ? pd->max : 1;
     I32 fill_w  = (I32)((pd->value * (U32)(r->w - 4)) / max_val);
     if (fill_w > r->w - 4) fill_w = r->w - 4;
-    if (fill_w > 0) {
+    if (fill_w >= 0) {
         DRAW_FILLED_RECTANGLE(r->x + 2, r->y + 2,
                               fill_w, r->h - 4, t->progress_fill);
     }
@@ -300,10 +373,6 @@ static VOID render_progressbar(PATGL_NODE node)
 
 static VOID render_panel(PATGL_NODE node)
 {
-    /* Apply layout to reposition children before drawing */
-    if (node->data.panel.layout != ATGL_LAYOUT_NONE)
-        ATGL_LAYOUT_APPLY(node);
-
     ATGL_RECT *r = &node->abs_rect;
 
     /* Background fill */
@@ -477,25 +546,35 @@ static VOID render_image(PATGL_NODE node)
             if (screen_y + block_h > r->y + (I32)view_h)
                 block_h = r->y + (I32)view_h - screen_y;
 
-            for (U32 ix = 0; ix < vis_img_w; ix++) {
+            U32 ix = 0;
+            while (ix < vis_img_w) {
                 I32 src_x = (I32)ix + ox;
-                if (src_x < 0 || (U32)src_x >= id->img_w) continue;
+                if (src_x < 0 || (U32)src_x >= id->img_w) { ix++; continue; }
 
                 VBE_COLOUR c = pixels[row_off + (U32)src_x];
-                if (c == VBE_SEE_THROUGH) continue;
+                if (c == VBE_SEE_THROUGH) { ix++; continue; }
 
                 I32 screen_x = r->x + (I32)(ix * scale);
                 if (screen_x >= r->x + (I32)view_w) break;
 
-                I32 block_w = (I32)scale;
-                if (screen_x + block_w > r->x + (I32)view_w)
-                    block_w = r->x + (I32)view_w - screen_x;
-
-                /* Draw the scaled pixel block */
-                for (I32 dy = 0; dy < block_h; dy++) {
-                    DRAW_LINE(screen_x, screen_y + dy,
-                              screen_x + block_w - 1, screen_y + dy, c);
+                /* Coalesce adjacent image pixels of the same colour
+                   into a single wide filled-rectangle. */
+                U32 run = 1;
+                while (ix + run < vis_img_w) {
+                    I32 nx = (I32)(ix + run) + ox;
+                    if (nx < 0 || (U32)nx >= id->img_w) break;
+                    if (pixels[row_off + (U32)nx] != c) break;
+                    run++;
                 }
+
+                I32 total_w = (I32)(run * scale);
+                if (screen_x + total_w > r->x + (I32)view_w)
+                    total_w = r->x + (I32)view_w - screen_x;
+
+                /* Single syscall instead of scale × run DRAW_LINE calls */
+                DRAW_FILLED_RECTANGLE(screen_x, screen_y,
+                                      total_w, block_h, c);
+                ix += run;
             }
         }
 
@@ -648,7 +727,7 @@ static VOID textinput_delete_selection(ATGL_TEXTINPUT_DATA *td) {
     if (sel_min == sel_max) return;
     
     U32 del_len = sel_max - sel_min;
-    MEMMOVE(&td->buffer[sel_min], &td->buffer[sel_max], td->len - sel_max + 1);
+    MEMMOVE_OPT(&td->buffer[sel_min], &td->buffer[sel_max], td->len - sel_max + 1);
     td->len -= del_len;
     td->cursor = sel_min;
     td->selection_start = td->selection_end = td->cursor;
@@ -716,7 +795,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             if (sel_min < sel_max && !td->password) {
                 U32 copy_len = sel_max - sel_min;
                 if (copy_len >= ATGL_TEXTINPUT_MAX) copy_len = ATGL_TEXTINPUT_MAX - 1;
-                MEMCPY(atgl.clipboard, &td->buffer[sel_min], copy_len);
+                MEMCPY_OPT(atgl.clipboard, &td->buffer[sel_min], copy_len);
                 atgl.clipboard[copy_len] = '\0';
             }
             ev->handled = TRUE;
@@ -724,7 +803,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             if (sel_min < sel_max && !td->password) {
                 U32 copy_len = sel_max - sel_min;
                 if (copy_len >= ATGL_TEXTINPUT_MAX) copy_len = ATGL_TEXTINPUT_MAX - 1;
-                MEMCPY(atgl.clipboard, &td->buffer[sel_min], copy_len);
+                MEMCPY_OPT(atgl.clipboard, &td->buffer[sel_min], copy_len);
                 atgl.clipboard[copy_len] = '\0';
                 textinput_delete_selection(td);
                 ATGL_NODE_INVALIDATE(node);
@@ -735,10 +814,10 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             textinput_delete_selection(td);
             U32 paste_len = STRLEN(atgl.clipboard);
             if (paste_len > 0 && td->len + paste_len < td->max_len) {
-                MEMMOVE(&td->buffer[td->cursor + paste_len],
+                MEMMOVE_OPT(&td->buffer[td->cursor + paste_len],
                         &td->buffer[td->cursor],
                         td->len - td->cursor + 1);
-                MEMCPY(&td->buffer[td->cursor], atgl.clipboard, paste_len);
+                MEMCPY_OPT(&td->buffer[td->cursor], atgl.clipboard, paste_len);
                 td->cursor += paste_len;
                 td->len += paste_len;
                 if (td->cursor >= td->scroll_offset + visible_chars)
@@ -759,7 +838,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
         } else if (td->cursor < td->len) {
-            MEMMOVE(&td->buffer[td->cursor],
+            MEMMOVE_OPT(&td->buffer[td->cursor],
                     &td->buffer[td->cursor + 1],
                     td->len - td->cursor);
             td->len--;
@@ -775,7 +854,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
         } else if (td->cursor > 0) {
-            MEMMOVE(&td->buffer[td->cursor - 1],
+            MEMMOVE_OPT(&td->buffer[td->cursor - 1],
                     &td->buffer[td->cursor],
                     td->len - td->cursor + 1);
             td->cursor--;
@@ -848,7 +927,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
                 textinput_delete_selection(td);
             }
             if (td->len < td->max_len - 1) {
-                MEMMOVE(&td->buffer[td->cursor + 1],
+                MEMMOVE_OPT(&td->buffer[td->cursor + 1],
                         &td->buffer[td->cursor],
                         td->len - td->cursor + 1);
                 td->buffer[td->cursor] = ev->key.ch;
@@ -1066,7 +1145,7 @@ PATGL_NODE ATGL_CREATE_TEXTINPUT(PATGL_NODE parent, ATGL_RECT rect,
     if (placeholder) {
         U32 plen = STRLEN(placeholder);
         if (plen >= ATGL_PLACEHOLDER_MAX) plen = ATGL_PLACEHOLDER_MAX - 1;
-        MEMCPY(td->placeholder, placeholder, plen);
+        MEMCPY_OPT(td->placeholder, placeholder, plen);
     }
     return node;
 }
@@ -1188,10 +1267,8 @@ PATGL_NODE ATGL_CREATE_BLANK_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
     PU8 pixels = (PU8)MAlloc(buf_sz);
     if (!pixels) return NULLPTR;
 
-    /* Fill every pixel with the requested colour */
-    U32 *p = (U32 *)pixels;
-    for (U32 i = 0; i < img_w * img_h; i++)
-        p[i] = fill;
+    /* Fill every pixel with the requested colour (rep stosl) */
+    MEMSET32_OPT(pixels, fill, img_w * img_h);
 
     PATGL_NODE node = ATGL_CREATE_IMAGE(parent, rect, pixels, img_w, img_h);
     if (!node) {
@@ -1247,7 +1324,7 @@ VOID ATGL_TEXTINPUT_SET_TEXT(PATGL_NODE node, PU8 text)
     if (text) {
         U32 len = STRLEN(text);
         if (len >= td->max_len) len = td->max_len - 1;
-        MEMCPY(td->buffer, text, len);
+        MEMCPY_OPT(td->buffer, text, len);
         td->buffer[len] = '\0';
         td->len    = len;
         td->cursor = len;
@@ -1301,7 +1378,7 @@ VOID ATGL_LISTBOX_ADD_ITEM(PATGL_NODE node, PU8 text)
     if (text) {
         U32 len = STRLEN(text);
         if (len >= ATGL_LISTBOX_ITEM_LEN) len = ATGL_LISTBOX_ITEM_LEN - 1;
-        MEMCPY(ld->items[ld->item_count], text, len);
+        MEMCPY_OPT(ld->items[ld->item_count], text, len);
         ld->items[ld->item_count][len] = '\0';
     }
     ld->item_count++;
@@ -1362,10 +1439,8 @@ VOID ATGL_IMAGE_CLEAR(PATGL_NODE node, VBE_COLOUR colour)
     IMG_CHECK(node);
     ATGL_IMAGE_DATA *id = &node->data.image;
     if (!id->pixels) return;
-    U32 *p = (U32 *)id->pixels;
     U32 total = id->img_w * id->img_h;
-    for (U32 i = 0; i < total; i++)
-        p[i] = colour;
+    MEMSET32_OPT(id->pixels, colour, total);
     ATGL_NODE_INVALIDATE(node);
 }
 
@@ -1382,9 +1457,9 @@ VOID ATGL_IMAGE_FILL_RECT(PATGL_NODE node, U32 x, U32 y,
     if (x2 > id->img_w) x2 = id->img_w;
     if (y2 > id->img_h) y2 = id->img_h;
 
+    U32 row_w = x2 - x1;
     for (U32 iy = y1; iy < y2; iy++)
-        for (U32 ix = x1; ix < x2; ix++)
-            p[iy * id->img_w + ix] = colour;
+        MEMSET32_OPT(&p[iy * id->img_w + x1], colour, row_w);
 
     ATGL_NODE_INVALIDATE(node);
 }

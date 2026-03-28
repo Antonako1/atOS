@@ -1297,12 +1297,12 @@ void handle_kernel_messages(void) {
             } break;
             case PROC_MSG_CREATE_PROCESS: 
                 {
-                    if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) {
+                    RUN_BINARY_STRUCT *sct = msg->raw_data;
+                    if(!msg->raw_data || msg->raw_data_size < sizeof(RUN_BINARY_STRUCT)) {
                         KDEBUG_PUTS("[proc_msg] No data provided for PROC_MSG_CREATE_PROCESS\n");
                         goto free_create_proc_data;
                     };
                     KDEBUG_PUTS("[proc_msg] Creating new process\n");
-                    RUN_BINARY_STRUCT *sct = msg->data;
                     RUN_BINARY(
                         sct->proc_name,
                         sct->file,
@@ -1314,19 +1314,16 @@ void handle_kernel_messages(void) {
                         sct->argv,
                         sct->argc
                     );
-                    // KDEBUG_PUTS("Freeing args\n");
                     for(U32 i = 0; i < sct->argc; i++) {
                         KDEBUG_HEX32(i);
                         KDEBUG_PUTC('\n');
                         KFREE(sct->argv[i]);
                     }
-                    // KDEBUG_PUTS("To array\n");
                     KFREE(sct->argv);
+                    KDEBUG_PUTS("[proc_msg] New process created\n");
                     free_create_proc_data:
-                    // KDEBUG_PUTS("Freeing data\n");
 
                     KFREE(sct);
-                    KDEBUG_PUTS("[proc_msg] New process created\n");
                 }
                 break;
             case PROC_MSG_KILL_PROCESS:

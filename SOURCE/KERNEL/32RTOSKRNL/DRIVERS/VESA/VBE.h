@@ -73,7 +73,7 @@ void update_current_framebuffer();
 void debug_vram_start();
 void debug_vram_dump();
 #endif
-// 8:8:8 (32-bit) color format — 0x00RRGGBB
+// 24-bit colour format: 0x00RRGGBB
 /*
 Usage as follows:
 Red min-max:   0-255
@@ -170,9 +170,9 @@ Blue min-max:  0-255
 #define VBE_NOTEPAD_PAPER2 VBE_COLOUR(230, 220, 170) // more muted, aged look
 #define VBE_NOTEPAD_PAPER3 VBE_COLOUR(255, 240, 180) // slightly orange tint
 
-// VBE_COLOUR types — 32-bit 0x00RRGGBB
+// VBE_COLOUR types — 24-bit 0x00RRGGBB
 typedef U32 VBE_PIXEL_COLOUR;
-typedef U32 VBE_COLOUR; // 32-bit true colour
+typedef U32 VBE_COLOUR; // 24-bit true colour
 #define VBE_COLOUR_DEFINED
 
 typedef struct {
