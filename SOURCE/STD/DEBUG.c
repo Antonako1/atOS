@@ -63,7 +63,7 @@ void DEBUG_HEX32(U32 value) {
 }
 
 // Simple memory dump: 16 bytes per line
-void MEMORY_DUMP(const void *addr, U32 length) {
+void DEBUG_MEMORY_DUMP(const void *addr, U32 length) {
     const U8 *p = (const U8 *)addr;
     U8 line[17] = {0}; // 16 chars + null terminator for ASCII
 
