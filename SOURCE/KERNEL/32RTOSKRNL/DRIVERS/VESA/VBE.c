@@ -47,6 +47,7 @@ VOIDPTR __memcpy_safe_chunks(VOIDPTR dest, const VOIDPTR src, U32 n) {
 #include <PROGRAMS/SHELL/VOUTPUT.h>
 #include <PROC/PROC.h>
 #include <STD/ASM.h>
+#include <DEBUG/KDEBUG.h>
 static VOIDPTR focused_task_framebuffer ATTRIB_DATA = FRAMEBUFFER_ADDRESS;
 static VOIDPTR current_frambuffer ATTRIB_DATA = FRAMEBUFFER_ADDRESS;
 static BOOLEAN early_mode = TRUE;
@@ -181,6 +182,13 @@ BOOL vbe_check(U0) {
     if (mode->XResolution < SCREEN_WIDTH || mode->YResolution < SCREEN_HEIGHT) {
         return FALSE;
     }
+    #ifdef __RTOS__
+    KDEBUG_STR_HEX_LN("[VBE] Mode Attributes: ", mode->ModeAttributes);
+    KDEBUG_STR_HEX_LN("[VBE] Physical Base Pointer: ", mode->PhysBasePtr);
+    KDEBUG_STR_HEX_LN("[VBE] X Resolution: ", mode->XResolution);
+    KDEBUG_STR_HEX_LN("[VBE] Y Resolution: ", mode->YResolution);
+    KDEBUG_STR_HEX_LN("[VBE] Bits Per Pixel: ", mode->BitsPerPixel);
+    #endif
     return TRUE;
 }
 
@@ -240,7 +248,7 @@ BOOLEAN VBE_DRAW_FRAMEBUFFER(U32 pos, VBE_PIXEL_COLOUR colour) {
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
     if (pos + bytes_per_pixel > mode->BytesPerScanLineLinear * mode->YResolution) return FALSE;
     if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
-    
+
     switch (bytes_per_pixel) {
         case 1:
             framebuffer[pos] = (U8)(colour & 0xFF);
