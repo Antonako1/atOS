@@ -39,7 +39,7 @@ static inline BOOL ATGL_RECT_CONTAINS(ATGL_RECT *r, I32 px, I32 py)
 
 typedef enum {
     ATGL_SA_NONE     = 0,
-    ATGL_SA_NO_CLEAR = (1 << 0),
+    ATGL_SA_NO_CLEAR = (1 << 0), // Don't clear the screen on initialization (useful for hot-reloading)
 } ATGL_SCREEN_ATTRIBS;
 
 /* ================================================================ */

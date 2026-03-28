@@ -394,17 +394,35 @@ static VOID render_image(PATGL_NODE node)
 
     if (!id->pixels) return;
 
-    U32 *pixels = (U32 *)id->pixels;
-    for (U32 iy = 0; iy < id->img_h && iy < (U32)r->h; iy++) {
-        for (U32 ix = 0; ix < id->img_w && ix < (U32)r->w; ix++) {
-            VBE_COLOUR c = pixels[iy * id->img_w + ix];
-            if (c != VBE_SEE_THROUGH) {
-                VBE_PIXEL_INFO px;
-                px.X      = (U32)r->x + ix;
-                px.Y      = (U32)r->y + iy;
-                px.Colour = c;
-                DRAW_PIXEL(px);
-            }
+    U32 *pixels   = (U32 *)id->pixels;
+    U32  draw_w   = id->img_w < (U32)r->w ? id->img_w : (U32)r->w;
+    U32  draw_h   = id->img_h < (U32)r->h ? id->img_h : (U32)r->h;
+    U32  base_x   = (U32)r->x;
+    U32  base_y   = (U32)r->y;
+
+    /* Scanline-based drawing: collapse runs of opaque pixels into
+       single DRAW_LINE calls, reducing syscall count dramatically
+       (worst-case equal to per-pixel; best-case one call per row). */
+    for (U32 iy = 0; iy < draw_h; iy++) {
+        U32 row_off = iy * id->img_w;
+        U32 ix = 0;
+        while (ix < draw_w) {
+            /* Skip transparent pixels */
+            while (ix < draw_w && pixels[row_off + ix] == VBE_SEE_THROUGH)
+                ix++;
+            if (ix >= draw_w) break;
+
+            /* Start of an opaque run — find contiguous span of the
+               same colour so it can be emitted as one DRAW_LINE. */
+            VBE_COLOUR run_colour = pixels[row_off + ix];
+            U32 run_start = ix;
+            while (ix < draw_w &&
+                   pixels[row_off + ix] == run_colour)
+                ix++;
+
+            DRAW_LINE(base_x + run_start, base_y + iy,
+                      base_x + ix - 1,    base_y + iy,
+                      run_colour);
         }
     }
 }
@@ -423,16 +441,16 @@ static VOID event_button(PATGL_NODE node, ATGL_EVENT *ev)
     case ATGL_EVT_MOUSE_DOWN:
         if (ATGL_RECT_CONTAINS(&node->abs_rect,
                                 ev->mouse.x, ev->mouse.y)) {
-            bd->pressed   = TRUE;
-            node->dirty   = TRUE;
-            ev->handled   = TRUE;
+            bd->pressed = TRUE;
+            ATGL_NODE_INVALIDATE(node);
+            ev->handled = TRUE;
         }
         break;
 
     case ATGL_EVT_MOUSE_UP:
         if (bd->pressed) {
             bd->pressed = FALSE;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (ATGL_RECT_CONTAINS(&node->abs_rect,
                                     ev->mouse.x, ev->mouse.y)) {
                 if (node->on_click) node->on_click(node);
@@ -447,7 +465,7 @@ static VOID event_button(PATGL_NODE node, ATGL_EVENT *ev)
                                              ev->mouse.x, ev->mouse.y);
             if (hover != bd->hovered) {
                 bd->hovered = hover;
-                node->dirty = TRUE;
+                ATGL_NODE_INVALIDATE(node);
             }
         }
         break;
@@ -457,7 +475,7 @@ static VOID event_button(PATGL_NODE node, ATGL_EVENT *ev)
             (ev->key.keycode == KEY_ENTER ||
              ev->key.keycode == KEY_SPACE)) {
             bd->pressed = TRUE;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (node->on_click) node->on_click(node);
             bd->pressed = FALSE;
             ev->handled = TRUE;
@@ -487,7 +505,7 @@ static VOID event_checkbox(PATGL_NODE node, ATGL_EVENT *ev)
 
     if (toggle) {
         cd->checked = !cd->checked;
-        node->dirty = TRUE;
+        ATGL_NODE_INVALIDATE(node);
         if (node->on_change) node->on_change(node);
         ev->handled = TRUE;
     }
@@ -518,13 +536,13 @@ static VOID event_radio(PATGL_NODE node, ATGL_EVENT *ev)
                 if (sib->type == ATGL_NODE_RADIO &&
                     sib->data.radio.group_id == rd->group_id) {
                     sib->data.radio.selected = FALSE;
-                    sib->dirty = TRUE;
+                    ATGL_NODE_INVALIDATE(sib);
                 }
             }
         }
 
         rd->selected = TRUE;
-        node->dirty  = TRUE;
+        ATGL_NODE_INVALIDATE(node);
         if (node->on_change) node->on_change(node);
         ev->handled = TRUE;
     }
@@ -551,7 +569,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
                 td->cursor < td->scroll_offset) {
                 td->scroll_offset = td->cursor;
             }
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
         }
         ev->handled = TRUE;
@@ -562,7 +580,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             td->cursor--;
             if (td->cursor < td->scroll_offset)
                 td->scroll_offset = td->cursor;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
         }
         ev->handled = TRUE;
         break;
@@ -572,7 +590,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
             td->cursor++;
             if (td->cursor >= td->scroll_offset + visible_chars)
                 td->scroll_offset = td->cursor - visible_chars + 1;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
         }
         ev->handled = TRUE;
         break;
@@ -589,7 +607,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
                 td->len++;
                 if (td->cursor >= td->scroll_offset + visible_chars)
                     td->scroll_offset = td->cursor - visible_chars + 1;
-                node->dirty = TRUE;
+                ATGL_NODE_INVALIDATE(node);
                 if (node->on_change) node->on_change(node);
             }
             ev->handled = TRUE;
@@ -634,7 +652,7 @@ static VOID event_slider(PATGL_NODE node, ATGL_EVENT *ev)
 
         if (new_val != sd->value) {
             sd->value   = new_val;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
         }
         ev->handled = TRUE;
@@ -657,7 +675,7 @@ static VOID event_slider(PATGL_NODE node, ATGL_EVENT *ev)
 
         if (nv != sd->value) {
             sd->value   = nv;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
         }
         ev->handled = TRUE;
@@ -680,7 +698,7 @@ static VOID event_listbox(PATGL_NODE node, ATGL_EVENT *ev)
             U32 clicked = ld->scroll_offset + (U32)rel_y / item_h;
             if (clicked < ld->item_count) {
                 ld->selected = clicked;
-                node->dirty  = TRUE;
+                ATGL_NODE_INVALIDATE(node);
                 if (node->on_change) node->on_change(node);
             }
         }
@@ -693,7 +711,7 @@ static VOID event_listbox(PATGL_NODE node, ATGL_EVENT *ev)
             ld->selected--;
             if (ld->selected < ld->scroll_offset)
                 ld->scroll_offset = ld->selected;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
             ev->handled = TRUE;
         }
@@ -702,7 +720,7 @@ static VOID event_listbox(PATGL_NODE node, ATGL_EVENT *ev)
             ld->selected++;
             if (ld->selected >= ld->scroll_offset + ld->visible_rows)
                 ld->scroll_offset = ld->selected - ld->visible_rows + 1;
-            node->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(node);
             if (node->on_change) node->on_change(node);
             ev->handled = TRUE;
         }
@@ -789,16 +807,12 @@ PATGL_NODE ATGL_CREATE_TEXTINPUT(PATGL_NODE parent, ATGL_RECT rect,
     node->fn_render = render_textinput;
     node->fn_event  = event_textinput;
 
+    /* CAlloc already zeroed the entire node including the union,
+       so buffer/len/cursor/scroll_offset/password are already 0/FALSE. */
     ATGL_TEXTINPUT_DATA *td = &node->data.textinput;
-    MEMSET(td->buffer, 0, ATGL_TEXTINPUT_MAX);
-    td->len           = 0;
-    td->cursor        = 0;
-    td->scroll_offset = 0;
     td->max_len = (max_len && max_len < ATGL_TEXTINPUT_MAX)
                   ? max_len : ATGL_TEXTINPUT_MAX - 1;
-    td->password = FALSE;
 
-    MEMSET(td->placeholder, 0, ATGL_PLACEHOLDER_MAX);
     if (placeholder) {
         U32 plen = STRLEN(placeholder);
         if (plen >= ATGL_PLACEHOLDER_MAX) plen = ATGL_PLACEHOLDER_MAX - 1;
@@ -914,7 +928,7 @@ VOID ATGL_CHECKBOX_SET(PATGL_NODE node, BOOL checked)
 {
     if (!node || node->type != ATGL_NODE_CHECKBOX) return;
     node->data.checkbox.checked = checked;
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 U32 ATGL_RADIO_GET_SELECTED(PATGL_NODE parent, U32 group_id)
@@ -955,7 +969,7 @@ VOID ATGL_TEXTINPUT_SET_TEXT(PATGL_NODE node, PU8 text)
         td->cursor = 0;
     }
     td->scroll_offset = 0;
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 I32 ATGL_SLIDER_GET_VALUE(PATGL_NODE node)
@@ -971,7 +985,7 @@ VOID ATGL_SLIDER_SET_VALUE(PATGL_NODE node, I32 value)
     if (value < sd->min) value = sd->min;
     if (value > sd->max) value = sd->max;
     sd->value   = value;
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 VOID ATGL_PROGRESSBAR_SET(PATGL_NODE node, U32 value)
@@ -980,7 +994,7 @@ VOID ATGL_PROGRESSBAR_SET(PATGL_NODE node, U32 value)
     ATGL_PROGRESS_DATA *pd = &node->data.progress;
     if (value > pd->max) value = pd->max;
     pd->value   = value;
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 U32 ATGL_PROGRESSBAR_GET(PATGL_NODE node)
@@ -1003,7 +1017,7 @@ VOID ATGL_LISTBOX_ADD_ITEM(PATGL_NODE node, PU8 text)
         ld->items[ld->item_count][len] = '\0';
     }
     ld->item_count++;
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 U32 ATGL_LISTBOX_GET_SELECTED(PATGL_NODE node)
@@ -1027,5 +1041,5 @@ VOID ATGL_LISTBOX_CLEAR(PATGL_NODE node)
     node->data.listbox.item_count   = 0;
     node->data.listbox.selected     = 0;
     node->data.listbox.scroll_offset = 0;
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }

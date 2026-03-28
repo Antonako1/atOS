@@ -22,8 +22,8 @@ REMARKS
     Access VBE struct at memory address VBE_MODE_LOAD_ADDRESS_PHYS,
         or use macro GET_VBE_MODE()
 
-    OS runs in VBE 118h, 1024x768x32bpp.
-     Full 32-bit true colour (8:8:8, 0x00RRGGBB) is used.
+    OS runs in VBE 118h, 1024x768x24bpp.
+     Full 24-bit true colour (8:8:8, 0x00RRGGBB) is used.
 
     When compiling include VBE.c and VESA.c
 
@@ -54,8 +54,6 @@ FUNCTIONS
 #define VBE_MODE_OFFSET (VESA_LOAD_ADDRESS_PHYS + VESA_CTRL_SIZE)
 #define VBE_MODE_LOAD_ADDRESS_PHYS (VBE_MODE_OFFSET)
 #define VBE_MODE_SIZE 256
-
-#define SCREEN_BPP 32
 
 /*
 Framebuffer is located at 0x08562000-0x0B000000

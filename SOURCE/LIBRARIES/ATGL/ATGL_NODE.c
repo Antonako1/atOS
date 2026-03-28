@@ -16,29 +16,21 @@
 PATGL_NODE ATGL_NODE_CREATE(ATGL_NODE_TYPE type, PATGL_NODE parent,
                             ATGL_RECT rect)
 {
+    /* CAlloc zeroes all memory — only set fields that differ from 0. */
     PATGL_NODE node = (PATGL_NODE)CAlloc(1, sizeof(ATGL_NODE));
     if (!node) return NULLPTR;
 
-    node->type      = type;
-    node->id        = atgl.next_id++;
-    node->rect      = rect;
-    node->abs_rect  = rect;
-    node->visible   = TRUE;
-    node->enabled   = TRUE;
-    node->focused   = FALSE;
-    node->dirty     = TRUE;
-    node->focusable = FALSE;
-    node->fg        = VBE_BLACK;
-    node->bg        = VBE_SEE_THROUGH;
-    node->parent    = NULLPTR;
-    node->child_count = 0;
-    node->fn_render  = NULLPTR;
-    node->fn_event   = NULLPTR;
-    node->fn_destroy = NULLPTR;
-    node->on_click   = NULLPTR;
-    node->on_change  = NULLPTR;
-
-    MEMSET(node->text, 0, ATGL_NODE_MAX_TEXT);
+    node->type     = type;
+    node->id       = atgl.next_id++;
+    node->rect     = rect;
+    node->abs_rect = rect;
+    node->visible  = TRUE;
+    node->enabled  = TRUE;
+    node->dirty    = TRUE;
+    node->fg       = VBE_BLACK;
+    node->bg       = VBE_SEE_THROUGH;
+    /* All pointer / count / boolean fields are already 0 / FALSE / NULLPTR
+       from CAlloc — no need to touch them again. */
 
     if (parent) {
         ATGL_NODE_ADD_CHILD(parent, node);
@@ -54,7 +46,7 @@ BOOL ATGL_NODE_ADD_CHILD(PATGL_NODE parent, PATGL_NODE child)
 
     child->parent = parent;
     parent->children[parent->child_count++] = child;
-    parent->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(parent);
     return TRUE;
 }
 
@@ -69,7 +61,7 @@ BOOL ATGL_NODE_REMOVE_CHILD(PATGL_NODE parent, PATGL_NODE child)
             }
             parent->children[--parent->child_count] = NULLPTR;
             child->parent = NULLPTR;
-            parent->dirty = TRUE;
+            ATGL_NODE_INVALIDATE(parent);
             return TRUE;
         }
     }
@@ -80,12 +72,24 @@ VOID ATGL_NODE_DESTROY(PATGL_NODE node)
 {
     if (!node) return;
 
-    /* Destroy children first (depth-first) */
-    for (U32 i = 0; i < node->child_count; i++) {
-        ATGL_NODE_DESTROY(node->children[i]);
-        node->children[i] = NULLPTR;
+    /* Snapshot the child list.  Recursive destruction mutates the
+       children array (via ATGL_NODE_REMOVE_CHILD), so iterating
+       the live array by index would skip every other child. */
+    U32 n = node->child_count;
+    PATGL_NODE kids[ATGL_MAX_CHILDREN];
+    for (U32 i = 0; i < n; i++) kids[i] = node->children[i];
+
+    /* Detach each child from *this* node first so the recursive
+       destroy doesn't shift the array we're walking. */
+    for (U32 i = 0; i < n; i++) {
+        kids[i]->parent = NULLPTR;
     }
     node->child_count = 0;
+
+    /* Now destroy every former child (depth-first). */
+    for (U32 i = 0; i < n; i++) {
+        ATGL_NODE_DESTROY(kids[i]);
+    }
 
     /* Call widget-specific destructor */
     if (node->fn_destroy) {
@@ -121,44 +125,51 @@ VOID ATGL_NODE_SET_TEXT(PATGL_NODE node, PU8 text)
     } else {
         node->text[0] = '\0';
     }
-    node->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 VOID ATGL_NODE_SET_VISIBLE(PATGL_NODE node, BOOL visible)
 {
     if (!node) return;
     node->visible = visible;
-    node->dirty   = TRUE;
-    if (node->parent) node->parent->dirty = TRUE;
+    ATGL_NODE_INVALIDATE(node);
+    if (node->parent) ATGL_NODE_INVALIDATE(node->parent);
 }
 
 VOID ATGL_NODE_SET_ENABLED(PATGL_NODE node, BOOL enabled)
 {
     if (!node) return;
     node->enabled = enabled;
-    node->dirty   = TRUE;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 VOID ATGL_NODE_SET_RECT(PATGL_NODE node, ATGL_RECT rect)
 {
     if (!node) return;
-    node->rect  = rect;
-    node->dirty = TRUE;
-    if (node->parent) node->parent->dirty = TRUE;
+    node->rect = rect;
+    ATGL_NODE_INVALIDATE(node);
+    if (node->parent) ATGL_NODE_INVALIDATE(node->parent);
 }
 
 VOID ATGL_NODE_SET_COLORS(PATGL_NODE node, VBE_COLOUR fg, VBE_COLOUR bg)
 {
     if (!node) return;
-    node->fg    = fg;
-    node->bg    = bg;
-    node->dirty = TRUE;
+    node->fg = fg;
+    node->bg = bg;
+    ATGL_NODE_INVALIDATE(node);
 }
 
 VOID ATGL_NODE_INVALIDATE(PATGL_NODE node)
 {
     if (!node) return;
     node->dirty = TRUE;
+    /* Propagate upward so the render pass never skips
+       a clean ancestor whose subtree contains dirty nodes. */
+    PATGL_NODE p = node->parent;
+    while (p && !p->dirty) {
+        p->dirty = TRUE;
+        p = p->parent;
+    }
 }
 
 /* ================================================================ */

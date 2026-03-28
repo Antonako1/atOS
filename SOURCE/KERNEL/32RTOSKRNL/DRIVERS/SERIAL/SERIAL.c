@@ -19,7 +19,7 @@ VOID SERIAL_PORT_INIT(U16 port) {
 
 VOID SERIAL_INIT() {
     SERIAL_PORT_INIT(COM1_PORT);
-    KDEBUG_PUTS("[SERIAL] COM1 initialized\n");
+    KDEBUG_PUTS("[SERIAL] COM1 debug port initialized\n");
     SERIAL_PORT_INIT(COM2_PORT);
     KDEBUG_PUTS("[SERIAL] COM2 initialized\n");
     SERIAL_PORT_INIT(COM3_PORT);

@@ -90,7 +90,7 @@ void _start(U32 argc, PPU8 argv)
         ATGL_GRAPHICS_LOOP(GET_PIT_TICKS());
         // CPU_SLEEP(10);
     }
-
+    ATGL_DESTROY_SCREEN();
     call_exit_functions();
     DEBUG_PRINTF("[RUNTIME_ATGL] Exiting normally\n");
     EXIT(0);

@@ -58,7 +58,8 @@ BOOL ATGL_POLL_EVENTS(ATGL_EVENT *ev)
         if (bl && !atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_DOWN;
         if (!bl && atgl.last_btn_left)  ev->type = ATGL_EVT_MOUSE_UP;
         if (br && !atgl.last_btn_right) ev->type = ATGL_EVT_MOUSE_DOWN;
-
+        DEBUG_PRINTF("Mouse event: btn_left=%d btn_right=%d btn_middle=%d\n", bl, br, bm);
+        DEBUG_PRINTF("Mouse event: x=%d y=%d\n", mx, my);   
         ev->mouse.x          = mx;
         ev->mouse.y          = my;
         ev->mouse.btn_left   = bl;
@@ -84,8 +85,8 @@ static VOID dispatch_recursive(PATGL_NODE node, ATGL_EVENT *ev)
 {
     if (!node || !node->visible || !node->enabled || ev->handled) return;
 
-    /* Children first (depth-first, front nodes have priority) */
-    for (U32 i = 0; i < node->child_count; i++) {
+    /* Children in reverse order (topmost / last-added has priority) */
+    for (I32 i = (I32)node->child_count - 1; i >= 0; i--) {
         dispatch_recursive(node->children[i], ev);
         if (ev->handled) return;
     }
@@ -148,19 +149,148 @@ VOID ATGL_DISPATCH_EVENT(PATGL_NODE root, ATGL_EVENT *ev)
 /*                        RENDERING                                 */
 /* ================================================================ */
 
-static VOID draw_mouse_cursor(I32 x, I32 y)
-{
-    /* Define cursor dimensions */
-    const I32 cursor_width = 8;
-    const I32 cursor_height = 12;
+/* ================================================================ */
+/*                   MOUSE CURSOR SAVE/RESTORE                      */
+/* ================================================================ */
 
-    /* Draw a simple arrow cursor */
-    for (I32 i = 0; i < cursor_height; i++) {
-        for (I32 j = 0; j <= i && j < cursor_width; j++) {
-            VBE_PIXEL_INFO pixel = CREATE_VBE_PIXEL_INFO(x + j, y + i, atgl.theme.fg);
-            DRAW_PIXEL(pixel); /* Draw pixel in foreground color */
+/* Classic arrow cursor defined as two bitmasks per row (8 wide × 12 tall).
+   Bit 7 = leftmost pixel, bit 0 = rightmost pixel.
+
+   Visual layout (B = black outline, W = white fill, . = transparent):
+     Row  0: B . . . . . . .
+     Row  1: B B . . . . . .
+     Row  2: B W B . . . . .
+     Row  3: B W W B . . . .
+     Row  4: B W W W B . . .
+     Row  5: B W W W W B . .
+     Row  6: B W W W W W B .
+     Row  7: B W W B B B B .
+     Row  8: B B W B . . . .
+     Row  9: . B B W B . . .
+     Row 10: . . . B W B . .
+     Row 11: . . . . B . . .                                       */
+
+static const U8 cursor_black[ATGL_CURSOR_HEIGHT] ATTRIB_RODATA = {
+    0b10000000, 
+    0b11000000, 
+    0b10100000, 
+    0b10010000, 
+    0b10001000, 
+    0b10000100,
+    0b10000010, 
+    0b10011110, 
+    0b11010000, 
+    0b01101000, 
+    0b00010100, 
+    0b00001000,
+};
+
+static const U8 cursor_white[ATGL_CURSOR_HEIGHT] ATTRIB_RODATA = {
+    0b00000000, 
+    0b00000000, 
+    0b01000000, 
+    0b01100000, 
+    0b01110000, 
+    0b01111000,
+    0b01111100, 
+    0b01100000, 
+    0b00100000, 
+    0b00010000, 
+    0b00001000, 
+    0b00000000,
+};
+
+static inline VBE_PIXEL_COLOUR read_pixel(U32 sx, U32 sy) {
+    U8 *fb = (U8 *)atgl.cursor.framebuffer;
+    U32 offset = sy * atgl.cursor.stride + sx * atgl.bpp;
+    if (atgl.bpp == 3) {
+        return (VBE_PIXEL_COLOUR)(fb[offset] | (fb[offset+1] << 8) | (fb[offset+2] << 16));
+    } else {
+        return *(VBE_PIXEL_COLOUR *)(fb + offset);
+    }
+}
+
+static inline VOID write_pixel(U32 sx, U32 sy, VBE_PIXEL_COLOUR color) {
+    U8 *fb = (U8 *)atgl.cursor.framebuffer;
+    U32 offset = sy * atgl.cursor.stride + sx * atgl.bpp;
+    if (atgl.bpp == 3) {
+        fb[offset]   = color & 0xFF;
+        fb[offset+1] = (color >> 8) & 0xFF;
+        fb[offset+2] = (color >> 16) & 0xFF;
+    } else {
+        *(VBE_PIXEL_COLOUR *)(fb + offset) = color;
+    }
+}
+
+/*  Restore the framebuffer pixels that were under the cursor before
+    it was drawn.  Call BEFORE any rendering so the scene is clean. */
+static VOID atgl_cursor_hide(VOID)
+{
+    ATGL_CURSOR *c = &atgl.cursor;
+    if (!c->has_saved || !c->previous_buffer || !c->framebuffer) return;
+
+    VBE_PIXEL_COLOUR *saved = (VBE_PIXEL_COLOUR *)c->previous_buffer;
+    U32 idx = 0;
+
+    for (U32 row = 0; row < c->height; row++) {
+        U32 sy = c->y + row;          /* screen-space Y */
+        if (sy >= atgl.height) break;  /* clipped off bottom */
+        for (U32 col = 0; col < c->width; col++) {
+            U32 sx = c->x + col;      /* screen-space X */
+            if (sx >= atgl.width) { idx++; continue; }
+            write_pixel(sx, sy, saved[idx]);
+            idx++;
         }
     }
+    c->has_saved = FALSE;
+}
+
+/*  Save the screen content at (mx, my) into previous_buffer, then
+    draw the arrow cursor on the framebuffer. */
+static VOID atgl_cursor_show(I32 mx, I32 my)
+{
+    ATGL_CURSOR *c = &atgl.cursor;
+    if (!c->previous_buffer || !c->framebuffer) return;
+
+    c->prev_x = c->x;
+    c->prev_y = c->y;
+    c->x = (U32)mx;
+    c->y = (U32)my;
+
+    VBE_PIXEL_COLOUR *saved = (VBE_PIXEL_COLOUR *)c->previous_buffer;
+    U32 idx = 0;
+
+    /* Step 1 — save the entire bounding box from the framebuffer */
+    for (U32 row = 0; row < c->height; row++) {
+        U32 sy = c->y + row;
+        for (U32 col = 0; col < c->width; col++) {
+            U32 sx = c->x + col;
+            if (sy < atgl.height && sx < atgl.width)
+                saved[idx] = read_pixel(sx, sy);
+            else
+                saved[idx] = 0;
+            idx++;
+        }
+    }
+
+    /* Step 2 — draw the cursor from bitmap masks */
+    for (U32 row = 0; row < ATGL_CURSOR_HEIGHT; row++) {
+        U32 sy = c->y + row;
+        if (sy >= atgl.height) break;
+        U8 black_bits = cursor_black[row];
+        U8 white_bits = cursor_white[row];
+        for (U32 col = 0; col < ATGL_CURSOR_WIDTH; col++) {
+            U32 sx = c->x + col;
+            if (sx >= atgl.width) continue;
+            U8 mask = 0x80 >> col;
+            if (black_bits & mask)
+                write_pixel(sx, sy, (VBE_PIXEL_COLOUR)VBE_BLACK);
+            else if (white_bits & mask)
+                write_pixel(sx, sy, (VBE_PIXEL_COLOUR)VBE_WHITE);
+        }
+    }
+
+    c->has_saved = TRUE;
 }
 
 static VOID render_recursive(PATGL_NODE node, I32 px, I32 py)
@@ -169,6 +299,11 @@ static VOID render_recursive(PATGL_NODE node, I32 px, I32 py)
 
     /* Compute absolute position from parent origin */
     atgl_compute_abs_rect(node, px, py);
+
+    /* With upward dirty propagation (ATGL_NODE_INVALIDATE), a clean
+       node guarantees all descendants are also clean — skip the
+       entire subtree in O(1). */
+    if (!node->dirty) return;
 
     /* Render this node */
     if (node->fn_render) {
@@ -188,16 +323,23 @@ VOID ATGL_RENDER_TREE(PATGL_NODE root)
 {
     if (!root) return;
 
-    /* Clear screen with theme background */
-    CLEAR_SCREEN_COLOUR(atgl.theme.bg);
-    
-    /* Recursive render from (0, 0) */
+    /* 1. Restore framebuffer under the old cursor position so it
+          does not interfere with rendering or get "baked in". */
+    atgl_cursor_hide();  
+
+    /* 2. Render dirty sub-trees (full clear only on first frame /
+          theme change when root is dirty). */
+    if (root->dirty) {
+        CLEAR_SCREEN_COLOUR(atgl.theme.bg);
+    }
     render_recursive(root, 0, 0);
-    
-    /* Draw mouse cursor on top of everything */
-    draw_mouse_cursor(atgl.last_mouse_x, atgl.last_mouse_y);
-    
-    /* Push to display */
+
+    /* 3. Save the screen content at the new cursor position and draw
+          the cursor on top.  This uses direct framebuffer access —
+          no syscalls needed for the cursor itself. */
+    atgl_cursor_show(atgl.last_mouse_x, atgl.last_mouse_y);
+
+    /* 4. Push to display */
     FLUSH_VRAM();
 }
 
@@ -213,14 +355,14 @@ VOID ATGL_SET_FOCUS(PATGL_NODE node)
 
     if (atgl.focus) {
         atgl.focus->focused = FALSE;
-        atgl.focus->dirty   = TRUE;
+        ATGL_NODE_INVALIDATE(atgl.focus);
     }
 
     atgl.focus = node;
 
     if (node) {
         node->focused = TRUE;
-        node->dirty   = TRUE;
+        ATGL_NODE_INVALIDATE(node);
     }
 }
 
