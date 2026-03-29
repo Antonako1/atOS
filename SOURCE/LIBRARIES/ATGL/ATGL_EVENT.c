@@ -369,7 +369,8 @@ VOID ATGL_RENDER_TREE(PATGL_NODE root)
           single child invalidation that bubbles up to root. */
     BOOL force = FALSE;
     if (atgl.needs_full_clear) {
-        CLEAR_SCREEN_COLOUR(atgl.theme.bg);
+        atgl_fb_fill(0, 0, (I32)atgl.width, (I32)atgl.height,
+                     atgl.theme.bg);
         force = TRUE;
         atgl.needs_full_clear = FALSE;
     }

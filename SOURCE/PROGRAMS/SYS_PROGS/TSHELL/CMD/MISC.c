@@ -2,6 +2,7 @@
 
 VOID CMD_HELP(U8 *line) {
     (void)line;
+    TPUT_BEGIN();
     PRINTNEWLINE();
     PUTS("Available commands:" LEND);
     for (U32 i = 0; i < shell_command_count; i++) {
@@ -10,6 +11,7 @@ VOID CMD_HELP(U8 *line) {
         PUTS(shell_commands[i].help);
         PRINTNEWLINE();
     }
+    TPUT_END();
 }
 
 VOID CMD_RESTART(PU8 line) { (void)line; SYS_RESTART(); }
@@ -54,5 +56,8 @@ VOID CMD_UNKNOWN(U8 *line) {
         PUTS("Unknown command or file type: ");
         PUTS(line);
         PRINTNEWLINE();
+    } else {
+        // TPUT_NEWLINE();
+        // PUT_SHELL_START();
     }
 }

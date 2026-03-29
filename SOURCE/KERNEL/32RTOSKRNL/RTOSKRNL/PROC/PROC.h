@@ -42,7 +42,7 @@ and message passing between processes and the kernel.
 #define TCB_STATE_ZOMBIE        0x0010  // Dead, waiting for parent to reap
 #define TCB_STATE_SLEEPING      0x0020  // Sleeping, can be woken up
 #define TCB_STATE_KERNEL_WAIT   0x0040  // Waiting for kernel event (e.g. I/O)
-#define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0020 // Handles and informs kernel of child process. AKA Shell
+#define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0080 // Handles and informs kernel of child process. AKA Shell
 #define TCB_STATE_KILL                0x40000000 // Mark for kill on next cycle
 
 /*
@@ -203,6 +203,8 @@ typedef enum {
     // Send to shell process
     PROC_KILL_SHELL_PROC, // Send by procs
     PROC_KILL_SHELL_KRNL, // Send by kernel
+
+    PROC_RECHECK_STATE, // Sent by process to kernel to request recheck of its state (e.g. if it was marked for kill). Data, signal and message are ignored.
 
     // 0x100000 is limit number. User defined types start from there!
 } PROC_MESSAGE_TYPE;

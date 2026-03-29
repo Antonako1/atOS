@@ -77,6 +77,25 @@ typedef struct _ATGL_IMAGE_HEADER {
 
 extern ATGL_STATE atgl;
 
+/* ================================================================ */
+/*                DIRECT FRAMEBUFFER HELPERS                        */
+/* ================================================================ */
+/* These bypass syscalls entirely by writing to the process
+   framebuffer pointer (atgl.cursor.framebuffer).  Only valid
+   after ATGL_INIT has been called.                                 */
+
+/* Filled rectangle — O(h) memset32 calls, no syscalls. */
+VOID atgl_fb_fill(I32 x, I32 y, I32 w, I32 h, VBE_COLOUR colour);
+
+/* Unfilled rectangle outline — 4 scanline writes, no syscalls. */
+VOID atgl_fb_rect(I32 x, I32 y, I32 w, I32 h, VBE_COLOUR colour);
+
+/* Horizontal line — single memset32, no syscalls. */
+VOID atgl_fb_hline(I32 x, I32 y, I32 w, VBE_COLOUR colour);
+
+/* Vertical line — O(h) single-pixel writes, no syscalls. */
+VOID atgl_fb_vline(I32 x, I32 y, I32 h, VBE_COLOUR colour);
+
 /* Internal helpers (implemented in ATGL_NODE.c) */
 VOID       atgl_compute_abs_rect(PATGL_NODE node, I32 parent_x, I32 parent_y);
 PATGL_NODE atgl_hit_test_recursive(PATGL_NODE node, I32 x, I32 y);

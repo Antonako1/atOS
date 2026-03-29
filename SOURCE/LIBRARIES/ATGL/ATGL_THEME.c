@@ -40,7 +40,7 @@ ATGL_THEME ATGL_DEFAULT_THEME(VOID)
     t.input_bg          = VBE_WHITE;
     t.input_fg          = VBE_BLACK;
     t.input_border      = VBE_COLOUR(128, 128, 128);
-    t.input_focus       = VBE_COLOUR(  0,   0, 128);
+    t.input_focus       = VBE_BLUE;
     t.input_placeholder = VBE_COLOUR(160, 160, 160);
 
     /* Checkbox / Radio */
@@ -50,18 +50,18 @@ ATGL_THEME ATGL_DEFAULT_THEME(VOID)
 
     /* Slider */
     t.slider_track = VBE_COLOUR(192, 192, 192);
-    t.slider_fill  = VBE_COLOUR(  0,   0, 128);
+    t.slider_fill  = VBE_BLUE;
     t.slider_thumb = VBE_COLOUR(192, 192, 192);
 
     /* Progress Bar */
     t.progress_bg   = VBE_WHITE;
-    t.progress_fill = VBE_COLOUR(  0,   0, 128);
+    t.progress_fill = VBE_BLUE;
     t.progress_text = VBE_BLACK;
 
     /* Listbox */
     t.list_bg     = VBE_WHITE;
     t.list_fg     = VBE_BLACK;
-    t.list_sel_bg = VBE_COLOUR(  0,   0, 128);
+    t.list_sel_bg = VBE_BLUE;
     t.list_sel_fg = VBE_WHITE;
 
     /* Focus */

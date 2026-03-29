@@ -169,13 +169,10 @@ VOID ATGL_NODE_SET_COLORS(PATGL_NODE node, VBE_COLOUR fg, VBE_COLOUR bg)
 VOID ATGL_NODE_INVALIDATE(PATGL_NODE node)
 {
     if (!node) return;
-    if(node->parent == ATGL_GET_SCREEN_ROOT_NODE()) {
-        atgl.needs_full_clear = TRUE;
-    } else if(node->parent) {
-         ATGL_NODE_INVALIDATE(node->parent);
-    } else {
-         node->dirty = TRUE;
-    }
+
+    /* Mark this node dirty */
+    node->dirty = TRUE;
+
     /* Propagate upward so the render pass never skips
        a clean ancestor whose subtree contains dirty nodes. */
     PATGL_NODE p = node->parent;

@@ -32,9 +32,11 @@ VOID CMD_TYPE(PU8 raw_line) {
     }
 
     buffer[file_size] = '\0';
+    TPUT_BEGIN();
     PUTS("\n");
     PUTS(buffer);
     PUTS("\n");
+    TPUT_END();
 
     MFree(buffer);
 }

@@ -187,6 +187,8 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
     U32 res = FAT32_DIR_ENUMERATE(cluster, dirs, &count);
     if (!res) return;
 
+    TPUT_BEGIN();
+
     PUTS("\n");
     PUTS("Type  Size       Date       Time     Name\n");
     PUTS("----  ----------  ----------  -------  ------------------------------\n");
@@ -249,6 +251,8 @@ VOID PRINT_CONTENTS(FAT_LFN_ENTRY *dir) {
         }
         PUTS("\n");
     }
+
+    TPUT_END();
 }
 
 VOID PRINT_CONTENTS_PATH(PU8 path) {
@@ -268,6 +272,7 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
     if (ent.entry.ATTRIB & FAT_ATTRB_DIR) {
         PRINT_CONTENTS(&ent);
     } else {
+        TPUT_BEGIN();
         PUTS("\nType  Size       Date       Time     Name\n");
         PUTS("----  ----------  ----------  -------  ------------------------------\n");
         PUTS("file  ");
@@ -307,6 +312,7 @@ VOID PRINT_CONTENTS_PATH(PU8 path) {
         }
         PUTS(name_buf);
         PUTS("\n");
+        TPUT_END();
     }
 }
 

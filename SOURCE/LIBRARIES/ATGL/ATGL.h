@@ -100,6 +100,9 @@ PATGL_NODE ATGL_CREATE_SEPARATOR(PATGL_NODE parent, ATGL_RECT rect);
 PATGL_NODE ATGL_CREATE_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
                              PU8 pixels, U32 img_w, U32 img_h);
 
+PATGL_NODE ATGL_CREATE_IMAGE_FROM_FILE(PATGL_NODE parent, ATGL_RECT rect,
+                             const CHAR *filename);
+
 /// Create an image widget with a freshly allocated blank canvas.
 /// The pixel buffer is owned by ATGL and freed on destroy.
 PATGL_NODE ATGL_CREATE_BLANK_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
@@ -208,6 +211,11 @@ VOID ATGL_IMAGE_SHOW_GRID(PATGL_NODE node, BOOL show);
 
 /// Set the grid line colour.
 VOID ATGL_IMAGE_SET_GRID_COLOUR(PATGL_NODE node, VBE_COLOUR colour);
+
+/* ---- Saving ---- */
+
+/// Save the image to a file.
+BOOL ATGL_IMAGE_SAVE(PATGL_NODE node, const CHAR *filename);
 
 /* ================================================================ */
 /*                       EVENT SYSTEM                               */

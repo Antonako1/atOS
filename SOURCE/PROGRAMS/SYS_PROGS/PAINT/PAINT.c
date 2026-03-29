@@ -47,6 +47,26 @@ PATGL_NODE zoom_in_btn;
 PATGL_NODE zoom_out_btn;
 PATGL_NODE zoom_label;
 PATGL_NODE grid_btn;
+PATGL_NODE resize_btn;
+
+PATGL_NODE popup_overlay;
+PATGL_NODE popup_panel;
+PATGL_NODE popup_title;
+PATGL_NODE popup_path_label;
+PATGL_NODE popup_path_input;
+PATGL_NODE popup_width_label;
+PATGL_NODE popup_width_input;
+PATGL_NODE popup_height_label;
+PATGL_NODE popup_height_input;
+PATGL_NODE popup_ok_btn;
+PATGL_NODE popup_cancel_btn;
+
+typedef enum {
+    PAINT_POPUP_NONE = 0,
+    PAINT_POPUP_OPEN,
+    PAINT_POPUP_SAVE,
+    PAINT_POPUP_RESIZE,
+} PAINT_POPUP_MODE;
 
 typedef struct _PAINT_APP_STATE {
     VBE_COLOUR primary_color;
@@ -65,6 +85,14 @@ typedef struct _PAINT_APP_STATE {
     BOOL panning;
     I32  pan_last_x;
     I32  pan_last_y;
+
+    /* Paint stroke state */
+    BOOL painting;
+    I32  paint_last_x;
+    I32  paint_last_y;
+
+    PAINT_POPUP_MODE popup_mode;
+    CHAR current_path[128];
     
 } PAINT_APP_STATE;
 
@@ -79,6 +107,18 @@ static VBE_COLOUR get_active_color(VOID)
     return app_state.primary_color_selected
            ? app_state.primary_color
            : app_state.secondary_color;
+}
+
+static VOID apply_slider_color(VOID)
+{
+    VBE_COLOUR c = RGB((U32)ATGL_SLIDER_GET_VALUE(red_slider),
+                       (U32)ATGL_SLIDER_GET_VALUE(green_slider),
+                       (U32)ATGL_SLIDER_GET_VALUE(blue_slider));
+
+    if (app_state.primary_color_selected)
+        app_state.primary_color = c;
+    else
+        app_state.secondary_color = c;
 }
 
 static VOID update_color_preview(VOID)
@@ -105,6 +145,248 @@ static VOID update_zoom_label(VOID)
     ATGL_NODE_SET_TEXT(zoom_label, (PU8)buf);
 }
 
+static VOID ensure_tgi_extension(CHAR *path)
+{
+    U32 len;
+    if (!path) return;
+
+    len = STRLEN((PU8)path);
+    if (len == 0) return;
+    if (len >= 4 &&
+        path[len - 4] == '.' &&
+        path[len - 3] == 'T' &&
+        path[len - 2] == 'G' &&
+        path[len - 1] == 'I') {
+        return;
+    }
+
+    if (len < 123) {
+        path[len++] = '.';
+        path[len++] = 'T';
+        path[len++] = 'G';
+        path[len++] = 'I';
+        path[len]   = '\0';
+    }
+}
+
+static VOID replace_canvas(PATGL_NODE new_canvas)
+{
+    PATGL_NODE root;
+
+    if (!new_canvas) return;
+    root = ATGL_GET_SCREEN_ROOT_NODE();
+    if (canvas) ATGL_NODE_DESTROY(canvas);
+    canvas = new_canvas;
+
+    if (root && popup_overlay && popup_overlay->parent == root) {
+        ATGL_NODE_REMOVE_CHILD(root, popup_overlay);
+        ATGL_NODE_ADD_CHILD(root, popup_overlay);
+    }
+
+    app_state.painting = FALSE;
+    update_zoom_label();
+}
+
+static VOID resize_canvas_image(U32 new_w, U32 new_h)
+{
+    PATGL_NODE new_canvas;
+    U32 min_w, min_h;
+    U32 old_w = 0, old_h = 0;
+    U32 *src = NULLPTR;
+    U32 *dst;
+
+    if (new_w == 0 || new_h == 0) return;
+
+    if (canvas && canvas->type == ATGL_NODE_IMAGE) {
+        ATGL_IMAGE_GET_SIZE(canvas, &old_w, &old_h);
+        src = (U32 *)ATGL_IMAGE_GET_PIXELS(canvas);
+    }
+
+    new_canvas = ATGL_CREATE_BLANK_IMAGE(ATGL_GET_SCREEN_ROOT_NODE(),
+                                         app_state.canvas_rect,
+                                         new_w, new_h,
+                                         RGB(255, 255, 255));
+    if (!new_canvas) return;
+
+    dst = (U32 *)ATGL_IMAGE_GET_PIXELS(new_canvas);
+    if (src && dst) {
+        min_w = (old_w < new_w) ? old_w : new_w;
+        min_h = (old_h < new_h) ? old_h : new_h;
+        for (U32 y = 0; y < min_h; y++) {
+            MEMCPY_OPT(&dst[y * new_w], &src[y * old_w], min_w * sizeof(U32));
+        }
+        new_canvas->data.image.zoom = canvas->data.image.zoom;
+        new_canvas->data.image.offset_x = canvas->data.image.offset_x;
+        new_canvas->data.image.offset_y = canvas->data.image.offset_y;
+        new_canvas->data.image.show_grid = canvas->data.image.show_grid;
+        new_canvas->data.image.grid_colour = canvas->data.image.grid_colour;
+    }
+
+    replace_canvas(new_canvas);
+}
+
+static VOID set_popup_field_visibility(BOOL show_path, BOOL show_size)
+{
+    ATGL_NODE_SET_VISIBLE(popup_path_label, show_path);
+    ATGL_NODE_SET_VISIBLE(popup_path_input, show_path);
+    ATGL_NODE_SET_VISIBLE(popup_width_label, show_size);
+    ATGL_NODE_SET_VISIBLE(popup_width_input, show_size);
+    ATGL_NODE_SET_VISIBLE(popup_height_label, show_size);
+    ATGL_NODE_SET_VISIBLE(popup_height_input, show_size);
+}
+
+static VOID hide_popup(VOID)
+{
+    app_state.popup_mode = PAINT_POPUP_NONE;
+    ATGL_NODE_SET_VISIBLE(popup_overlay, FALSE);
+    ATGL_SET_FOCUS(NULLPTR);
+}
+
+static VOID show_popup(PAINT_POPUP_MODE mode)
+{
+    CHAR buf[16];
+    U32 w, h;
+
+    app_state.popup_mode = mode;
+    ATGL_NODE_SET_VISIBLE(popup_overlay, TRUE);
+
+    switch (mode) {
+    case PAINT_POPUP_OPEN:
+        ATGL_NODE_SET_TEXT(popup_title, (PU8)"Open .TGI");
+        set_popup_field_visibility(TRUE, FALSE);
+        ATGL_TEXTINPUT_SET_TEXT(popup_path_input, (PU8)app_state.current_path);
+        ATGL_SET_FOCUS(popup_path_input);
+        break;
+    case PAINT_POPUP_SAVE:
+        ATGL_NODE_SET_TEXT(popup_title, (PU8)"Save .TGI");
+        set_popup_field_visibility(TRUE, FALSE);
+        ATGL_TEXTINPUT_SET_TEXT(popup_path_input, (PU8)app_state.current_path);
+        ATGL_SET_FOCUS(popup_path_input);
+        break;
+    case PAINT_POPUP_RESIZE:
+        ATGL_NODE_SET_TEXT(popup_title, (PU8)"Resize Canvas");
+        set_popup_field_visibility(FALSE, TRUE);
+        ATGL_IMAGE_GET_SIZE(canvas, &w, &h);
+        SPRINTF(buf, "%u", w);
+        ATGL_TEXTINPUT_SET_TEXT(popup_width_input, (PU8)buf);
+        SPRINTF(buf, "%u", h);
+        ATGL_TEXTINPUT_SET_TEXT(popup_height_input, (PU8)buf);
+        ATGL_SET_FOCUS(popup_width_input);
+        break;
+    default:
+        hide_popup();
+        break;
+    }
+}
+
+static VOID on_popup_cancel(PATGL_NODE node)
+{
+    (void)node;
+    hide_popup();
+}
+
+static VOID on_popup_ok(PATGL_NODE node)
+{
+    CHAR path[128];
+    PU8 txt;
+
+    (void)node;
+
+    switch (app_state.popup_mode) {
+    case PAINT_POPUP_OPEN:
+        txt = ATGL_TEXTINPUT_GET_TEXT(popup_path_input);
+        if (!txt || !txt[0]) return;
+        MEMCPY_OPT(path, txt, STRLEN(txt) + 1);
+        ensure_tgi_extension(path);
+        {
+            PATGL_NODE loaded = ATGL_CREATE_IMAGE_FROM_FILE(ATGL_GET_SCREEN_ROOT_NODE(),
+                                                            app_state.canvas_rect,
+                                                            path);
+            if (!loaded) return;
+            MEMCPY_OPT(app_state.current_path, path, STRLEN((PU8)path) + 1);
+            replace_canvas(loaded);
+        }
+        hide_popup();
+        break;
+
+    case PAINT_POPUP_SAVE:
+        txt = ATGL_TEXTINPUT_GET_TEXT(popup_path_input);
+        if (!txt || !txt[0]) return;
+        MEMCPY_OPT(path, txt, STRLEN(txt) + 1);
+        ensure_tgi_extension(path);
+        if (!ATGL_IMAGE_SAVE(canvas, path)) return;
+        MEMCPY_OPT(app_state.current_path, path, STRLEN((PU8)path) + 1);
+        hide_popup();
+        break;
+
+    case PAINT_POPUP_RESIZE:
+    {
+        U32 new_w = ATOI(ATGL_TEXTINPUT_GET_TEXT(popup_width_input));
+        U32 new_h = ATOI(ATGL_TEXTINPUT_GET_TEXT(popup_height_input));
+        if (!new_w || !new_h) return;
+        resize_canvas_image(new_w, new_h);
+        hide_popup();
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+static VOID create_popups(PATGL_NODE root)
+{
+    U32 sw = ATGL_GET_SCREEN_WIDTH();
+    U32 sh = ATGL_GET_SCREEN_HEIGHT();
+
+    popup_overlay = ATGL_CREATE_PANEL(root, (ATGL_RECT){0, 0, sw, sh},
+                                      ATGL_LAYOUT_NONE, 0, 0);
+    ATGL_NODE_SET_COLORS(popup_overlay, RGB(255,255,255), VBE_SEE_THROUGH);
+
+    popup_panel = ATGL_CREATE_PANEL(popup_overlay, (ATGL_RECT){0, 0, 280, 120},
+                                    ATGL_LAYOUT_NONE, 0, 0);
+    ATGL_NODE_SET_COLORS(popup_panel, RGB(255,255,255), RGB(32,32,64));
+    ATGL_CENTER_IN_SCREEN(popup_panel);
+    ATGL_NODE_SET_TEXT(popup_panel, (PU8)"Dialog");
+
+    popup_title = ATGL_CREATE_LABEL(popup_panel, (ATGL_RECT){10, 8, 180, 16},
+                                    (PU8)"Dialog", RGB(255,255,255), RGB(32,32,64));
+
+    popup_path_label = ATGL_CREATE_LABEL(popup_panel, (ATGL_RECT){10, 32, 56, 16},
+                                         (PU8)"Path:", RGB(255,255,255), RGB(32,32,64));
+    popup_path_input = ATGL_CREATE_TEXTINPUT(popup_panel, (ATGL_RECT){70, 30, 200, 20},
+                                             (PU8)"/PAINT.TGI", 120);
+
+    popup_width_label = ATGL_CREATE_LABEL(popup_panel, (ATGL_RECT){10, 32, 56, 16},
+                                          (PU8)"Width:", RGB(255,255,255), RGB(32,32,64));
+    popup_width_input = ATGL_CREATE_TEXTINPUT(popup_panel, (ATGL_RECT){70, 30, 72, 20},
+                                              (PU8)"1024", 10);
+    popup_height_label = ATGL_CREATE_LABEL(popup_panel, (ATGL_RECT){150, 32, 64, 16},
+                                           (PU8)"Height:", RGB(255,255,255), RGB(32,32,64));
+    popup_height_input = ATGL_CREATE_TEXTINPUT(popup_panel, (ATGL_RECT){214, 30, 56, 20},
+                                               (PU8)"768", 10);
+
+    popup_ok_btn = ATGL_CREATE_BUTTON(popup_panel, (ATGL_RECT){70, 78, 60, 24},
+                                      (PU8)"OK", on_popup_ok);
+    popup_cancel_btn = ATGL_CREATE_BUTTON(popup_panel, (ATGL_RECT){142, 78, 76, 24},
+                                          (PU8)"Cancel", on_popup_cancel);
+
+    ATGL_NODE_SET_VISIBLE(popup_overlay, FALSE);
+}
+
+static VOID on_colour_slider_change(PATGL_NODE node)
+{
+    (void)node;
+    apply_slider_color();
+    update_color_preview();
+}
+
+static VOID on_brush_size_change(PATGL_NODE node)
+{
+    (void)node;
+    app_state.brush_size = (U32)ATGL_SLIDER_GET_VALUE(brush_size_slider);
+}
+
 /* ================================================================ */
 /*                       CALLBACKS                                  */
 /* ================================================================ */
@@ -127,6 +409,24 @@ static VOID on_eraser(PATGL_NODE node)
     (void)node;
     app_state.pencil_mode = FALSE;
     app_state.eraser_mode = TRUE;
+}
+
+static VOID on_open(PATGL_NODE node)
+{
+    (void)node;
+    show_popup(PAINT_POPUP_OPEN);
+}
+
+static VOID on_save(PATGL_NODE node)
+{
+    (void)node;
+    show_popup(PAINT_POPUP_SAVE);
+}
+
+static VOID on_resize(PATGL_NODE node)
+{
+    (void)node;
+    show_popup(PAINT_POPUP_RESIZE);
 }
 
 static VOID on_primary(PATGL_NODE node)
@@ -178,8 +478,8 @@ CMAIN() {
     DISABLE_SHELL_KEYBOARD();
     ON_EXIT(ENABLE_SHELL_KEYBOARD);
     ON_EXIT(ATGL_QUIT);
-    ATGL_INIT();
     ATGL_CREATE_SCREEN(ATGL_SA_NONE);
+    ATGL_INIT();
 
     app_state.primary_color = RGB(0, 0, 0);
     app_state.secondary_color = RGB(255, 255, 255);
@@ -189,6 +489,9 @@ CMAIN() {
     app_state.header_height = 40;
     app_state.primary_color_selected = TRUE;
     app_state.panning = FALSE;
+    app_state.painting = FALSE;
+    MEMCPY_OPT(app_state.current_path, "/PAINT.TGI", 11);
+    app_state.popup_mode = PAINT_POPUP_NONE;
 
     U32 width = ATGL_GET_SCREEN_WIDTH();
     U32 height = ATGL_GET_SCREEN_HEIGHT();
@@ -200,8 +503,8 @@ CMAIN() {
     ATGL_NODE_SET_COLORS(header_label, RGB(255, 255, 255), RGB(0, 0, 128));
     ATGL_CREATE_LABEL(header_label, (ATGL_RECT){0, 0, 0, 0}, (PU8)"PAINT", RGB(255, 255, 0), RGB(0, 0, 128));
 
-    open_btn    = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 52, 24}, (PU8)"Open",    NULL);
-    save_btn    = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 52, 24}, (PU8)"Save",    NULL);
+    open_btn    = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 52, 24}, (PU8)"Open",    on_open);
+    save_btn    = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 52, 24}, (PU8)"Save",    on_save);
     clear_btn   = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 52, 24}, (PU8)"Clear",   on_clear);
     pencil_btn  = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 60, 24}, (PU8)"Pencil",  on_pencil);
     eraser_btn  = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 60, 24}, (PU8)"Eraser",  on_eraser);
@@ -210,20 +513,32 @@ CMAIN() {
     green_slider = ATGL_CREATE_SLIDER(header_label, (ATGL_RECT){0, 0, 80, 20}, 0, 255, 0, 1);
     blue_slider  = ATGL_CREATE_SLIDER(header_label, (ATGL_RECT){0, 0, 80, 20}, 0, 255, 0, 1);
 
+    red_slider->on_change   = on_colour_slider_change;
+    green_slider->on_change = on_colour_slider_change;
+    blue_slider->on_change  = on_colour_slider_change;
+
     color_preview       = ATGL_CREATE_LABEL(header_label, (ATGL_RECT){0, 0, 24, 20}, NULL, app_state.primary_color, app_state.primary_color);
     primary_color_btn   = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 28, 24}, (PU8)"P1", on_primary);
     secondary_color_btn = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 28, 24}, (PU8)"P2", on_secondary);
 
     brush_size_slider = ATGL_CREATE_SLIDER(header_label, (ATGL_RECT){0, 0, 60, 20}, 1, 50, 5, 1);
+    brush_size_slider->on_change = on_brush_size_change;
 
     zoom_out_btn = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 24, 24}, (PU8)"-",  on_zoom_out);
     zoom_label   = ATGL_CREATE_LABEL(header_label,  (ATGL_RECT){0, 0, 40, 20}, (PU8)"100%", RGB(255,255,255), RGB(0,0,128));
     zoom_in_btn  = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 24, 24}, (PU8)"+",  on_zoom_in);
     grid_btn     = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 40, 24}, (PU8)"Grid", on_grid_toggle);
+    resize_btn   = ATGL_CREATE_BUTTON(header_label, (ATGL_RECT){0, 0, 52, 24}, (PU8)"Size", on_resize);
 
     /* ---- Canvas (blank white image) ---- */
     app_state.canvas_rect = (ATGL_RECT){0, app_state.header_height, width, height - app_state.header_height};
     canvas = ATGL_CREATE_BLANK_IMAGE(root, app_state.canvas_rect, width, height - app_state.header_height, RGB(255, 255, 255));
+
+    create_popups(root);
+
+    on_primary(NULLPTR);
+    on_brush_size_change(NULLPTR);
+    update_zoom_label();
     
     return 0;
 }
@@ -234,11 +549,18 @@ CMAIN() {
 
 static VOID paint_at_screen(I32 sx, I32 sy, VBE_COLOUR colour)
 {
+    if (!canvas || canvas->type != ATGL_NODE_IMAGE) return;
+
+    ATGL_IMAGE_DATA *id = &canvas->data.image;
+    U32 *pixels = (U32 *)id->pixels;
     U32 brush = app_state.brush_size;
+
+    if (!pixels) return;
+
     if (brush <= 1) {
         U32 ix, iy;
         if (ATGL_IMAGE_SCREEN_TO_IMG(canvas, sx, sy, &ix, &iy))
-            ATGL_IMAGE_SET_PIXEL(canvas, ix, iy, colour);
+            pixels[iy * id->img_w + ix] = colour;
     } else {
         /* Paint a circle of radius brush/2, converting each point */
         I32 r = (I32)brush / 2;
@@ -247,7 +569,36 @@ static VOID paint_at_screen(I32 sx, I32 sy, VBE_COLOUR colour)
                 if (dx * dx + dy * dy > r * r) continue;
                 U32 ix, iy;
                 if (ATGL_IMAGE_SCREEN_TO_IMG(canvas, sx + dx, sy + dy, &ix, &iy))
-                    ATGL_IMAGE_SET_PIXEL(canvas, ix, iy, colour);
+                    pixels[iy * id->img_w + ix] = colour;
+            }
+        }
+    }
+
+    ATGL_NODE_INVALIDATE(canvas);
+}
+
+static VOID paint_line_screen(I32 x0, I32 y0, I32 x1, I32 y1,
+                              VBE_COLOUR colour)
+{
+    I32 dx = x1 - x0;
+    I32 dy = y1 - y0;
+    I32 sx = (dx >= 0) ? 1 : -1;
+    I32 sy = (dy >= 0) ? 1 : -1;
+
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+
+    {
+        I32 err = dx - dy;
+
+        while (1) {
+            paint_at_screen(x0, y0, colour);
+            if (x0 == x1 && y0 == y1) break;
+
+            {
+                I32 e2 = err << 1;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 <  dx) { err += dx; y0 += sy; }
             }
         }
     }
@@ -258,6 +609,22 @@ static VOID paint_at_screen(I32 sx, I32 sy, VBE_COLOUR colour)
 /* ================================================================ */
 
 void ATGL_EVENT_LOOP(ATGL_EVENT *ev) {
+    if (app_state.popup_mode != PAINT_POPUP_NONE) {
+        ATGL_DISPATCH_EVENT(popup_overlay, ev);
+
+        if (ev->type == ATGL_EVT_KEY_DOWN && ev->key.keycode == KEY_ESC) {
+            hide_popup();
+            return;
+        }
+        if (ev->type == ATGL_EVT_KEY_DOWN && ev->key.keycode == KEY_ENTER) {
+            on_popup_ok(NULLPTR);
+            return;
+        }
+        return;
+    }
+
+    ATGL_DISPATCH_EVENT(ATGL_GET_SCREEN_ROOT_NODE(), ev);
+
     if (ev->type == ATGL_EVT_KEY_DOWN) {
         if (ev->key.keycode == KEY_ESC) {
             ATGL_QUIT();
@@ -274,11 +641,14 @@ void ATGL_EVENT_LOOP(ATGL_EVENT *ev) {
         if (ev->key.keycode == KEY_ARROW_RIGHT) { ATGL_IMAGE_PAN(canvas,  8, 0); return; }
     }
 
+    if (ev->handled) return;
+
     /* Right-click drag to pan */
     if (ev->type == ATGL_EVT_MOUSE_DOWN && ev->mouse.btn_right) {
         app_state.panning    = TRUE;
         app_state.pan_last_x = ev->mouse.x;
         app_state.pan_last_y = ev->mouse.y;
+        app_state.painting   = FALSE;
     }
     if (ev->type == ATGL_EVT_MOUSE_UP && !ev->mouse.btn_right) {
         app_state.panning = FALSE;
@@ -295,37 +665,28 @@ void ATGL_EVENT_LOOP(ATGL_EVENT *ev) {
         return;
     }
 
+    if (ev->type == ATGL_EVT_MOUSE_UP && !ev->mouse.btn_left) {
+        app_state.painting = FALSE;
+    }
+
     /* Left-click / drag to paint */
-    if ((ev->type == ATGL_EVT_MOUSE_DOWN || ev->type == ATGL_EVT_MOUSE_MOVE) && ev->mouse.btn_left) {
-        if (ev->mouse.y >= (I32)app_state.header_height) {
-            VBE_COLOUR colour;
-            if (app_state.eraser_mode)
-                colour = RGB(255, 255, 255);
-            else
-                colour = get_active_color();
+    if ((ev->type == ATGL_EVT_MOUSE_DOWN || ev->type == ATGL_EVT_MOUSE_MOVE) &&
+        ev->mouse.btn_left && ev->mouse.y >= (I32)app_state.header_height) {
+        VBE_COLOUR colour = app_state.eraser_mode
+                            ? RGB(255, 255, 255)
+                            : get_active_color();
 
+        if (!app_state.painting || ev->type == ATGL_EVT_MOUSE_DOWN) {
             paint_at_screen(ev->mouse.x, ev->mouse.y, colour);
+            app_state.painting = TRUE;
+        } else {
+            paint_line_screen(app_state.paint_last_x, app_state.paint_last_y,
+                              ev->mouse.x, ev->mouse.y, colour);
         }
+
+        app_state.paint_last_x = ev->mouse.x;
+        app_state.paint_last_y = ev->mouse.y;
     }
-
-    /* Update colour from sliders every event */
-    {
-        U32 r = (U32)ATGL_SLIDER_GET_VALUE(red_slider);
-        U32 g = (U32)ATGL_SLIDER_GET_VALUE(green_slider);
-        U32 b = (U32)ATGL_SLIDER_GET_VALUE(blue_slider);
-        VBE_COLOUR c = RGB(r, g, b);
-
-        if (app_state.primary_color_selected)
-            app_state.primary_color = c;
-        else
-            app_state.secondary_color = c;
-
-        update_color_preview();
-    }
-
-    app_state.brush_size = (U32)ATGL_SLIDER_GET_VALUE(brush_size_slider);
-
-    ATGL_DISPATCH_EVENT(ATGL_GET_SCREEN_ROOT_NODE(), ev);
 }
 
 /* ================================================================ */

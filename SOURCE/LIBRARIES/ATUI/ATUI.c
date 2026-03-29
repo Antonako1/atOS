@@ -597,9 +597,8 @@ PS2_KB_DATA* ATUI_GETCH_NB() {
         if (result >= 0 && result < 256) {
             ATUI_ADDCH(result);
         }
+        ATUI_REFRESH();
     }
-    
-    ATUI_REFRESH();
 
     return kp;
 }

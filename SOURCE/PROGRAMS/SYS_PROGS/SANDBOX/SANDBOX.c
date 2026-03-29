@@ -74,7 +74,7 @@ U32 ATGL_MAIN(U32 argc, PPU8 argv)
                        "Hello!", on_hello_click);
     ATGL_CREATE_BUTTON(root, (ATGL_RECT){120, 48, 100, 24},
                        "Quit", on_quit_click);
-
+    
     /* ---- Separator ---- */
     ATGL_CREATE_SEPARATOR(root, (ATGL_RECT){10, 82, 300, 4});
 
@@ -112,6 +112,11 @@ U32 ATGL_MAIN(U32 argc, PPU8 argv)
     ATGL_LISTBOX_ADD_ITEM(list, "Item 4");
     ATGL_LISTBOX_ADD_ITEM(list, "Item 5");
 
+    PATGL_NODE image = ATGL_CREATE_IMAGE_FROM_FILE(root, (ATGL_RECT){10, 400, 0, 0}, "/HOME/TEST.TGI");
+    if(!image) {
+        ATGL_CREATE_LABEL(root, (ATGL_RECT){10, 400, 200, 16},
+                          "Failed to load image.", VBE_RED, VBE_SEE_THROUGH);
+    }
     return 0;
 }
 

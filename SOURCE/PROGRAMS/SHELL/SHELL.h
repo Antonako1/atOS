@@ -43,6 +43,7 @@ typedef enum ACTIVE_KEYBINDS {
 } ACTIVE_KEYBINDS;
 
 typedef struct {
+    U32 type; // 1
     U32 focused_pid; // PID of the currently focused process.
     U32 previously_focused_pid;
     U32 self_pid;

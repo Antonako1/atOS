@@ -92,7 +92,7 @@ Blue min-max:  0-255
     } while (0)
 
 // Unique sentinel — not a real colour, used for transparency
-#define VBE_SEE_THROUGH ((U32)0x00010203)
+#define VBE_SEE_THROUGH ((U32)0x40010203)
 
 // Reds
 #define VBE_RED           VBE_COLOUR(255,   0,   0)

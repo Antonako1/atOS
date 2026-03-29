@@ -21,6 +21,10 @@ static TERM_OUTPUT     *tout  ATTRIB_DATA = NULLPTR;
 static U32 vis_rows ATTRIB_DATA = 0;
 static U32 vis_cols ATTRIB_DATA = 0;
 
+/* ---- Output batching: when > 0, defer render_visible calls ---- */
+static U32 batch_depth ATTRIB_DATA = 0;
+static BOOL batch_dirty ATTRIB_DATA = FALSE;
+
 /* ================================================================== */
 /*  Initialization                                                     */
 /* ================================================================== */
@@ -59,6 +63,10 @@ VOID INIT_TOUTPUT(TSHELL_INSTANCE *sh, ATUI_WINDOW *win) {
 
     /* ANSI parser */
     ANSI_RESET(tout);
+
+    /* Cursor blink */
+    tout->cursor_visible    = TRUE;
+    tout->cursor_blink_tick = 0;
 
     /* Window dimensions */
     vis_cols = win->w;
@@ -133,7 +141,14 @@ static VOID render_visible(VOID) {
     /* Clamp so we don't go negative */
     I32 bottom_sb = (I32)tout->scrollback.write_row - (I32)offset;
 
-    /* OPTIMIZED: Redraw using differential tracking to minimize ATUI dirtying */
+    /* Move window cursor to (0,0) and redraw full screen */
+    ATUI_WMOVE(win, 0, 0);
+
+    /* Cursor overlay coordinates (prompt_row in scrollback, column) */
+    U32 cur_sb_row = tout->prompt_row;
+    U32 cur_col    = tout->prompt_length + tout->edit_pos;
+    if (cur_col >= vis_cols) cur_col = vis_cols - 1;
+
     for (U32 vr = 0; vr < vis_rows; vr++) {
         I32 sb_idx = bottom_sb - (I32)(vis_rows - 1) + (I32)vr;
 
@@ -143,23 +158,49 @@ static VOID render_visible(VOID) {
 
         for (U32 vc = 0; vc < vis_cols; vc++) {
             SCROLLBACK_CELL *cell = &tout->scrollback.cells[sb_idx][vc];
-            SCROLLBACK_CELL *last = &tout->scrollback.last_render[vr][vc];
+            VBE_COLOUR fg = cell->fg;
+            VBE_COLOUR bg = cell->bg;
 
-            /* Only update ATUI if the cell content or color has changed from last render */
-            if (cell->c != last->c || cell->fg != last->fg || cell->bg != last->bg) {
-                ATUI_WSET_COLOR(win, cell->fg, cell->bg);
-                ATUI_WMOVE(win, vr, vc);
-                ATUI_WADDCH(win, cell->c);
-                
-                /* Update last render state */
-                last->c  = cell->c;
-                last->fg = cell->fg;
-                last->bg = cell->bg;
+            /* Cursor overlay — invert fg/bg at cursor position */
+            if (tout->cursor_visible &&
+                (U32)sb_idx == cur_sb_row && vc == cur_col) {
+                VBE_COLOUR tmp = fg;
+                fg = bg;
+                bg = tmp;
             }
+
+            ATUI_WSET_COLOR(win, fg, bg);
+            ATUI_WMOVE(win, vr, vc);
+            ATUI_WADDCH(win, cell->c);
         }
     }
 
     ATUI_WREFRESH(win);
+}
+
+/* ================================================================== */
+/*  Output batching — suppress renders during bulk output              */
+/* ================================================================== */
+
+VOID TPUT_BEGIN(VOID) {
+    batch_depth++;
+}
+
+VOID TPUT_END(VOID) {
+    if (batch_depth > 0) batch_depth--;
+    if (batch_depth == 0 && batch_dirty) {
+        batch_dirty = FALSE;
+        render_visible();
+    }
+}
+
+/* Wrapper: call render_visible only if not batching */
+static VOID maybe_render(VOID) {
+    if (batch_depth > 0) {
+        batch_dirty = TRUE;
+    } else {
+        render_visible();
+    }
 }
 
 VOID TPUT_REFRESH(VOID) {
@@ -179,7 +220,7 @@ VOID TPUT_CHAR(CHAR c) {
         sb_newline();
         if (tout->scrollback.scroll_offset > 0)
             tout->scrollback.scroll_offset = 0; /* snap to bottom on output */
-        render_visible();
+        maybe_render();
         return;
     }
     if (c == '\r') {
@@ -202,10 +243,10 @@ VOID TPUT_CHAR(CHAR c) {
 VOID TPUT_STRING(PU8 str) {
     if (!str) return;
 
-    BOOL last_off = (tout->scrollback.scroll_offset == 0);
+    /* Temporarily suppress per-character renders */
+    batch_depth++;
 
     while (*str) {
-        /* Inline TPUT_CHAR logic minus redundant refreshes per character */
         CHAR c = *str++;
         if (ANSI_FEED(c, tout)) continue;
 
@@ -215,10 +256,7 @@ VOID TPUT_STRING(PU8 str) {
                 tout->scrollback.scroll_offset = 0;
             continue;
         }
-        if (c == '\r') {
-            tout->cursor_col = 0;
-            continue;
-        }
+        if (c == '\r') { tout->cursor_col = 0; continue; }
         if (c == '\t') {
             U32 spaces = 4 - (tout->cursor_col % 4);
             for (U32 i = 0; i < spaces; i++) sb_putc(' ');
@@ -228,12 +266,12 @@ VOID TPUT_STRING(PU8 str) {
             if (tout->cursor_col > 0) tout->cursor_col--;
             continue;
         }
-
         sb_putc(c);
     }
 
-    /* Batch refresh after the entire string is processed */
-    if (last_off)
+    batch_depth--;
+    /* Single render after the entire string is processed */
+    if (batch_depth == 0 && tout->scrollback.scroll_offset == 0)
         render_visible();
 }
 
@@ -259,7 +297,7 @@ VOID TPUT_NEWLINE(VOID) {
     sb_newline();
     if (tout->scrollback.scroll_offset > 0)
         tout->scrollback.scroll_offset = 0;
-    render_visible();
+    maybe_render();
 }
 
 /* ================================================================== */
@@ -275,21 +313,14 @@ VOID TPUT_SET_BG(VBE_COLOUR c) { tout->bg = c; }
 
 VOID TPUT_SCROLL_UP(U32 n) {
     U32 max_off = 0;
-    
-    /* Current occupied lines are (total_lines + 1) or limited by buffer size */
-    U32 total_content = tout->scrollback.total_lines + 1;
-    if (total_content > SCROLLBACK_LINES) total_content = SCROLLBACK_LINES;
-
-    if (total_content > vis_rows) {
-        max_off = total_content - vis_rows;
-    } else {
-        max_off = 0;
-    }
+    if (tout->scrollback.total_lines + 1 > vis_rows)
+        max_off = tout->scrollback.total_lines + 1 - vis_rows;
+    if (max_off > SCROLLBACK_LINES - vis_rows)
+        max_off = SCROLLBACK_LINES - vis_rows;
 
     tout->scrollback.scroll_offset += n;
     if (tout->scrollback.scroll_offset > max_off)
         tout->scrollback.scroll_offset = max_off;
-        
     render_visible();
 }
 
@@ -317,12 +348,6 @@ VOID TPUT_CLS(VOID) {
             tout->scrollback.cells[r][c].c  = ' ';
             tout->scrollback.cells[r][c].fg = tout->fg;
             tout->scrollback.cells[r][c].bg = tout->bg;
-        }
-    }
-    /* Also clear last_render so next render forces a full redraw */
-    for (U32 r = 0; r < AMOUNT_OF_ROWS; r++) {
-        for (U32 c = 0; c < AMOUNT_OF_COLS; c++) {
-            tout->scrollback.last_render[r][c].c = 0;
         }
     }
     tout->cursor_col = 0;
@@ -414,6 +439,10 @@ VOID REDRAW_CURRENT_LINE(VOID) {
     /* Update cursor position */
     tout->cursor_col = pl + tout->edit_pos;
 
+    /* Reset cursor to visible on edit (restart blink timer) */
+    tout->cursor_visible    = TRUE;
+    tout->cursor_blink_tick = GET_PIT_TICKS();
+
     render_visible();
 }
 
@@ -422,41 +451,14 @@ VOID REDRAW_CURRENT_LINE(VOID) {
 /* ================================================================== */
 
 VOID BLINK_CURSOR(VOID) {
-    /* In ATUI mode cursor is handled by the cell highlighting.
-       We use a simple underline indicator on the current edit cell. */
-    U32 pr = tout->prompt_row;
-    U32 col = tout->prompt_length + tout->edit_pos;
-    if (col >= vis_cols) col = vis_cols - 1;
-
-    /* Highlight cursor cell by inverting colors */
-    static BOOL cursor_visible ATTRIB_DATA = TRUE;
-    static U32 last_tick ATTRIB_DATA = 0;
+    /* Toggle cursor visibility every 500 ms.
+       The actual inversion is done as an overlay in render_visible(),
+       so we never corrupt scrollback cells. */
     U32 now = GET_PIT_TICKS();
-
-    if (now - last_tick >= 500) {
-        last_tick = now;
-        cursor_visible = !cursor_visible;
-
-        if (pr < SCROLLBACK_LINES && col < AMOUNT_OF_COLS) {
-            SCROLLBACK_CELL *cell = &tout->scrollback.cells[pr][col];
-            if (cursor_visible) {
-                /* Invert */
-                VBE_COLOUR tmp = cell->fg;
-                cell->fg = cell->bg;
-                cell->bg = tmp;
-            } else {
-                /* Restore — recompute from current_line */
-                if (tout->edit_pos < STRLEN(tout->current_line)) {
-                    cell->c  = tout->current_line[tout->edit_pos];
-                } else {
-                    cell->c  = ' ';
-                }
-                cell->fg = tout->fg;
-                cell->bg = tout->bg;
-            }
-        }
-        render_visible();
-    }
+    if (now - tout->cursor_blink_tick < 500) return;
+    tout->cursor_blink_tick = now;
+    tout->cursor_visible = !tout->cursor_visible;
+    render_visible();
 }
 
 /* ================================================================== */

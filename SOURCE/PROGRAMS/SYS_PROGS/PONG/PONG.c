@@ -7,10 +7,12 @@
 
 
 CMAIN() {
+    DISABLE_SHELL_KEYBOARD();
     ATUI_INITIALIZE(NULLPTR, ATUIC_RAW); 
     ATUI_CURSOR_SET(FALSE);
     ATUI_SET_COLOR(VBE_LIME, VBE_BLACK);
-    DISABLE_SHELL_KEYBOARD();
+    ON_EXIT(ATUI_DESTROY);
+    ON_EXIT(ENABLE_SHELL_KEYBOARD);
     BOOL8 singleplayer = ATUI_MSGBOX_YESNO("Single Player?", "Do you want to play against the AI? (Yes for singleplayer, No for 2-player)");
     ATUI_DISPLAY *d = GET_DISPLAY();
     U32 screen_w = d->cols;

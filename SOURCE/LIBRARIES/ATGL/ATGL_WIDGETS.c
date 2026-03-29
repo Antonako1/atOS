@@ -19,11 +19,25 @@ DESCRIPTION
 #include <STD/GRAPHICS.h>
 #include <STD/MEM.h>
 #include <STD/STRING.h>
+#include <STD/FS_DISK.h>
 #include <STD/IO.h>
 
 /* ================================================================ */
 /*                       RENDER FUNCTIONS                           */
 /* ================================================================ */
+
+/* Walk up the parent chain to find the nearest non-transparent bg.
+   Used so that widgets with SEE_THROUGH bg can clear their area
+   before re-drawing text (prevents old text ghosting). */
+static VBE_COLOUR resolve_bg(PATGL_NODE node)
+{
+    PATGL_NODE n = node->parent;
+    while (n) {
+        if (n->bg != VBE_SEE_THROUGH) return n->bg;
+        n = n->parent;
+    }
+    return atgl.theme.bg;
+}
 
 /* ----------------------------- Label ----------------------------- */
 
@@ -32,14 +46,16 @@ static VOID render_label(PATGL_NODE node)
     ATGL_RECT  *r = &node->abs_rect;
     VBE_COLOUR  fg = (node->fg != VBE_SEE_THROUGH) ? node->fg : atgl.theme.fg;
 
-    if (node->bg != VBE_SEE_THROUGH) {
-        DRAW_FILLED_RECTANGLE(r->x, r->y, r->w, r->h, node->bg);
-    }
+    /* Always clear the label area so old text is erased.
+       Use the node's own bg, or walk up parents to find one. */
+    VBE_COLOUR clear_bg = (node->bg != VBE_SEE_THROUGH)
+                          ? node->bg : resolve_bg(node);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, clear_bg);
 
     if (node->text[0]) {
         I32 text_y = r->y + (r->h - (I32)atgl.theme.char_h) / 2;
         ATGL_DRAW_TEXT_CLIPPED(r->x, text_y, r->w,
-                               (PU8)node->text, fg, node->bg);
+                               (PU8)node->text, fg, clear_bg);
     }
 }
 
@@ -61,7 +77,7 @@ static VOID render_button(PATGL_NODE node)
     VBE_COLOUR text_fg = node->enabled ? t->btn_fg : t->btn_disabled_fg;
 
     /* Face fill */
-    DRAW_FILLED_RECTANGLE(r->x, r->y, r->w, r->h, face);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, face);
 
     /* 3-D border */
     if (bd->pressed) ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
@@ -79,8 +95,8 @@ static VOID render_button(PATGL_NODE node)
 
     /* Focus dotted ring (simple rectangle outline) */
     if (node->focused) {
-        DRAW_RECTANGLE(r->x - 3, r->y - 3,
-                       r->w + 6, r->h + 6, t->focus_ring);
+        atgl_fb_rect(r->x - 3, r->y - 3,
+                     r->w + 6, r->h + 6, t->focus_ring);
     }
 }
 
@@ -96,7 +112,7 @@ static VOID render_checkbox(PATGL_NODE node)
     I32 box_y  = r->y + (r->h - (I32)box_sz) / 2;
 
     /* Box */
-    DRAW_FILLED_RECTANGLE(r->x, box_y, box_sz, box_sz, t->check_bg);
+    atgl_fb_fill(r->x, box_y, box_sz, box_sz, t->check_bg);
     ATGL_DRAW_SUNKEN(r->x, box_y, box_sz, box_sz);
 
     /* Check mark (X shape) */
@@ -110,16 +126,19 @@ static VOID render_checkbox(PATGL_NODE node)
     /* Label */
     if (node->text[0]) {
         VBE_COLOUR fg = node->enabled ? t->fg : t->btn_disabled_fg;
+        VBE_COLOUR cbg = resolve_bg(node);
         I32 text_x = r->x + (I32)box_sz + 4;
         I32 text_y = r->y + (r->h - (I32)t->char_h) / 2;
-        ATGL_DRAW_TEXT(text_x, text_y, (PU8)node->text,
-                       fg, VBE_SEE_THROUGH);
+        /* Clear label area so old text doesn't ghost */
+        atgl_fb_fill(text_x, text_y,
+                     r->w - (I32)box_sz - 4, (I32)t->char_h, cbg);
+        ATGL_DRAW_TEXT(text_x, text_y, (PU8)node->text, fg, cbg);
     }
 
     /* Focus ring */
     if (node->focused) {
-        DRAW_RECTANGLE(r->x - 1, box_y - 1,
-                       box_sz + 2, box_sz + 2, t->focus_ring);
+        atgl_fb_rect(r->x - 1, box_y - 1,
+                     box_sz + 2, box_sz + 2, t->focus_ring);
     }
 }
 
@@ -130,18 +149,28 @@ static VOID render_radio(PATGL_NODE node)
     ATGL_RECT       *r  = &node->abs_rect;
     ATGL_THEME      *t  = &atgl.theme;
     ATGL_RADIO_DATA *rd = &node->data.radio;
+    VBE_COLOUR       bg = (node->bg != VBE_SEE_THROUGH)
+                          ? node->bg : resolve_bg(node);
+
 
     U32 circle_sz = 12;
+    U32 border_w = 2; // Border thickness
     I32 cx = r->x + (I32)circle_sz / 2;
     I32 cy = r->y + r->h / 2;
 
-    /* Outer ring */
+    // Clear the whole control area so old ring/dot pixels are erased
+    atgl_fb_fill(r->x, r->y, r->w, r->h, bg);
+
+    // Draw border (outer ellipse)
     DRAW_ELLIPSE(cx, cy, circle_sz / 2, circle_sz / 2, t->widget_border);
 
-    /* Inner dot when selected */
+    // Draw body (slightly smaller filled ellipse)
+    ATGL_DRAW_FILLED_ELLIPSE((U32)cx, (U32)cy,
+        (circle_sz - border_w) / 2, (circle_sz - border_w) / 2, t->check_bg);
+
+    // Draw inner dot when selected (well inside the body)
     if (rd->selected) {
-        DRAW_ELLIPSE(cx, cy, 3, 3, t->check_mark);
-        DRAW_ELLIPSE(cx, cy, 2, 2, t->check_mark);
+        ATGL_DRAW_FILLED_ELLIPSE((U32)cx, (U32)cy, 3, 3, t->check_mark);
     }
 
     /* Label */
@@ -149,15 +178,17 @@ static VOID render_radio(PATGL_NODE node)
         VBE_COLOUR fg = node->enabled ? t->fg : t->btn_disabled_fg;
         I32 text_x = r->x + (I32)circle_sz + 4;
         I32 text_y = r->y + (r->h - (I32)t->char_h) / 2;
-        ATGL_DRAW_TEXT(text_x, text_y, (PU8)node->text,
-                       fg, VBE_SEE_THROUGH);
+        /* Clear label area so old text doesn't ghost */
+        atgl_fb_fill(text_x, text_y,
+                     r->w - (I32)circle_sz - 4, (I32)t->char_h, bg);
+        ATGL_DRAW_TEXT(text_x, text_y, (PU8)node->text, fg, bg);
     }
 
     /* Focus ring */
     if (node->focused) {
-        DRAW_RECTANGLE(r->x - 1,
-                       r->y + (r->h - (I32)circle_sz) / 2 - 1,
-                       circle_sz + 2, circle_sz + 2, t->focus_ring);
+        atgl_fb_rect(r->x - 1,
+                     r->y + (r->h - (I32)circle_sz) / 2 - 1,
+                     circle_sz + 2, circle_sz + 2, t->focus_ring);
     }
 }
 
@@ -170,12 +201,12 @@ static VOID render_textinput(PATGL_NODE node)
     ATGL_TEXTINPUT_DATA *td = &node->data.textinput;
 
     /* Background */
-    DRAW_FILLED_RECTANGLE(r->x, r->y, r->w, r->h, t->input_bg);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, t->input_bg);
 
     /* Border */
     ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
     if (node->focused) {
-        DRAW_RECTANGLE(r->x, r->y, r->w, r->h, t->input_focus);
+        atgl_fb_rect(r->x, r->y, r->w, r->h, t->input_focus);
     }
 
     I32 text_x       = r->x + 3;
@@ -291,8 +322,7 @@ static VOID render_textinput(PATGL_NODE node)
     if (node->focused) {
         U32 cursor_screen = td->cursor - td->scroll_offset;
         I32 cur_x = text_x + (I32)(cursor_screen * t->char_w);
-        DRAW_LINE(cur_x, text_y, cur_x, text_y + (I32)t->char_h - 1,
-                  t->input_fg);
+        atgl_fb_vline(cur_x, text_y, (I32)t->char_h, t->input_fg);
     }
 }
 
@@ -303,35 +333,45 @@ static VOID render_slider(PATGL_NODE node)
     ATGL_RECT        *r  = &node->abs_rect;
     ATGL_THEME       *t  = &atgl.theme;
     ATGL_SLIDER_DATA *sd = &node->data.slider;
+    VBE_COLOUR        bg = (node->bg != VBE_SEE_THROUGH)
+                          ? node->bg : resolve_bg(node);
 
     I32 track_h = 4;
     I32 track_y = r->y + (r->h - track_h) / 2;
     I32 thumb_w = 10;
     I32 thumb_h = r->h - 4;
+    I32 usable_w = r->w - thumb_w;
+
+    if (usable_w < 0) usable_w = 0;
+
+    /* Clear the full control area so old thumb positions are erased */
+    atgl_fb_fill(r->x, r->y, r->w, r->h, bg);
 
     /* Track */
-    DRAW_FILLED_RECTANGLE(r->x, track_y, r->w, track_h, t->slider_track);
+    atgl_fb_fill(r->x, track_y, r->w, track_h, t->slider_track);
     ATGL_DRAW_SUNKEN(r->x, track_y, r->w, track_h);
 
     /* Filled portion */
     I32 range = sd->max - sd->min;
     if (range <= 0) range = 1;
-    I32 fill_w = ((sd->value - sd->min) * (r->w - thumb_w)) / range;
+    I32 fill_w = ((sd->value - sd->min) * usable_w) / range;
+    if (fill_w < 0) fill_w = 0;
+    if (fill_w > usable_w) fill_w = usable_w;
     if (fill_w > 0) {
-        DRAW_FILLED_RECTANGLE(r->x + 1, track_y + 1,
-                              fill_w, track_h - 2, t->slider_fill);
+        atgl_fb_fill(r->x + 1, track_y + 1,
+                     fill_w, track_h - 2, t->slider_fill);
     }
 
     /* Thumb */
     I32 thumb_x = r->x + fill_w;
     I32 thumb_y = r->y + 2;
-    DRAW_FILLED_RECTANGLE(thumb_x, thumb_y, thumb_w, thumb_h, t->btn_bg);
+    atgl_fb_fill(thumb_x, thumb_y, thumb_w, thumb_h, t->slider_thumb);
     ATGL_DRAW_RAISED(thumb_x, thumb_y, thumb_w, thumb_h);
 
     /* Focus ring */
     if (node->focused) {
-        DRAW_RECTANGLE(r->x - 1, r->y - 1,
-                       r->w + 2, r->h + 2, t->focus_ring);
+        atgl_fb_rect(r->x - 1, r->y - 1,
+                     r->w + 2, r->h + 2, t->focus_ring);
     }
 }
 
@@ -344,16 +384,16 @@ static VOID render_progressbar(PATGL_NODE node)
     ATGL_PROGRESS_DATA *pd = &node->data.progress;
 
     /* Background */
-    DRAW_FILLED_RECTANGLE(r->x, r->y, r->w, r->h, t->progress_bg);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, t->progress_bg);
     ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
 
     /* Fill bar */
     U32 max_val = pd->max ? pd->max : 1;
     I32 fill_w  = (I32)((pd->value * (U32)(r->w - 4)) / max_val);
     if (fill_w > r->w - 4) fill_w = r->w - 4;
-    if (fill_w >= 0) {
-        DRAW_FILLED_RECTANGLE(r->x + 2, r->y + 2,
-                              fill_w, r->h - 4, t->progress_fill);
+    if (fill_w > 0) {
+        atgl_fb_fill(r->x + 2, r->y + 2,
+                     fill_w, r->h - 4, t->progress_fill);
     }
 
     /* Percentage text */
@@ -364,8 +404,11 @@ static VOID render_progressbar(PATGL_NODE node)
         U32 tw = STRLEN((PU8)buf) * t->char_w;
         I32 tx = r->x + (r->w - (I32)tw) / 2;
         I32 ty = r->y + (r->h - (I32)t->char_h) / 2;
-        ATGL_DRAW_TEXT(tx, ty, (PU8)buf, t->progress_text,
-                       VBE_SEE_THROUGH);
+        /* Use the fill or bg color behind the text so it reads cleanly */
+        VBE_COLOUR text_bg = (fill_w > 0 && tx >= r->x + 2 &&
+                              tx < r->x + 2 + fill_w)
+                             ? t->progress_fill : t->progress_bg;
+        ATGL_DRAW_TEXT(tx, ty, (PU8)buf, t->progress_text, text_bg);
     }
 }
 
@@ -374,28 +417,26 @@ static VOID render_progressbar(PATGL_NODE node)
 static VOID render_panel(PATGL_NODE node)
 {
     ATGL_RECT *r = &node->abs_rect;
+    VBE_COLOUR pbg = (node->bg != VBE_SEE_THROUGH)
+                     ? node->bg : resolve_bg(node);
 
-    /* Background fill */
-    if (node->bg != VBE_SEE_THROUGH) {
-        DRAW_FILLED_RECTANGLE(r->x, r->y, r->w, r->h, node->bg);
-    }
+    /* Always clear the full panel area so old borders/titles disappear */
+    atgl_fb_fill(r->x, r->y, r->w, r->h, pbg);
 
     /* Border with optional title (GroupBox style) */
     if (node->text[0]) {
         I32 half_ch = (I32)atgl.theme.char_h / 2;
-        DRAW_RECTANGLE(r->x, r->y + half_ch,
-                       r->w, r->h - half_ch,
-                       atgl.theme.widget_border);
+        atgl_fb_rect(r->x, r->y + half_ch,
+                     r->w, r->h - half_ch,
+                     atgl.theme.widget_border);
 
         /* Title text with gap */
         U32 title_w = STRLEN((PU8)node->text) * atgl.theme.char_w + 4;
-        if (node->bg != VBE_SEE_THROUGH) {
-            DRAW_FILLED_RECTANGLE(r->x + 8, r->y,
-                                  (I32)title_w, (I32)atgl.theme.char_h,
-                                  node->bg);
-        }
+        atgl_fb_fill(r->x + 8, r->y,
+                     (I32)title_w, (I32)atgl.theme.char_h,
+                     pbg);
         ATGL_DRAW_TEXT(r->x + 10, r->y, (PU8)node->text,
-                       atgl.theme.fg, VBE_SEE_THROUGH);
+                       atgl.theme.fg, pbg);
     }
 }
 
@@ -408,7 +449,7 @@ static VOID render_listbox(PATGL_NODE node)
     ATGL_LISTBOX_DATA *ld = &node->data.listbox;
 
     /* Background */
-    DRAW_FILLED_RECTANGLE(r->x, r->y, r->w, r->h, t->list_bg);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, t->list_bg);
     ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
 
     /* Items */
@@ -424,7 +465,7 @@ static VOID render_listbox(PATGL_NODE node)
         VBE_COLOUR ibg = sel ? t->list_sel_bg : t->list_bg;
         VBE_COLOUR ifg = sel ? t->list_sel_fg : t->list_fg;
 
-        DRAW_FILLED_RECTANGLE(r->x + 2, iy, r->w - 4, (I32)item_h, ibg);
+        atgl_fb_fill(r->x + 2, iy, r->w - 4, (I32)item_h, ibg);
         ATGL_DRAW_TEXT_CLIPPED(r->x + 4, iy + 1, r->w - 8,
                                (PU8)ld->items[idx], ifg, ibg);
     }
@@ -440,14 +481,14 @@ static VOID render_listbox(PATGL_NODE node)
             (I32)(ld->scroll_offset * (U32)(sb_h - thumb_h)) /
             (I32)(ld->item_count - ld->visible_rows);
 
-        DRAW_FILLED_RECTANGLE(sb_x, r->y + 2, 8, sb_h, t->widget_bg);
-        DRAW_FILLED_RECTANGLE(sb_x, thumb_y, 8, thumb_h, t->shadow);
+        atgl_fb_fill(sb_x, r->y + 2, 8, sb_h, t->widget_bg);
+        atgl_fb_fill(sb_x, thumb_y, 8, thumb_h, t->shadow);
     }
 
     /* Focus ring */
     if (node->focused) {
-        DRAW_RECTANGLE(r->x - 1, r->y - 1,
-                       r->w + 2, r->h + 2, t->focus_ring);
+        atgl_fb_rect(r->x - 1, r->y - 1,
+                     r->w + 2, r->h + 2, t->focus_ring);
     }
 }
 
@@ -461,13 +502,13 @@ static VOID render_separator(PATGL_NODE node)
     if (r->w >= r->h) {
         /* Horizontal */
         I32 y = r->y + r->h / 2;
-        DRAW_LINE(r->x, y,     r->x + r->w - 1, y,     t->shadow);
-        DRAW_LINE(r->x, y + 1, r->x + r->w - 1, y + 1, t->highlight);
+        atgl_fb_hline(r->x, y,     r->w, t->shadow);
+        atgl_fb_hline(r->x, y + 1, r->w, t->highlight);
     } else {
         /* Vertical */
         I32 x = r->x + r->w / 2;
-        DRAW_LINE(x,     r->y, x,     r->y + r->h - 1, t->shadow);
-        DRAW_LINE(x + 1, r->y, x + 1, r->y + r->h - 1, t->highlight);
+        atgl_fb_vline(x,     r->y, r->h, t->shadow);
+        atgl_fb_vline(x + 1, r->y, r->h, t->highlight);
     }
 }
 
@@ -524,8 +565,9 @@ static VOID render_image(PATGL_NODE node)
                     if (pixels[row_off + nx] != c) break;
                     sx++;
                 }
-                DRAW_LINE(r->x + (I32)run_start, r->y + (I32)sy,
-                          r->x + (I32)(sx - 1),  r->y + (I32)sy, c);
+                /* Direct framebuffer horizontal run — no syscall */
+                atgl_fb_hline(r->x + (I32)run_start, r->y + (I32)sy,
+                              (I32)(sx - run_start), c);
             }
         }
     } else {
@@ -571,9 +613,8 @@ static VOID render_image(PATGL_NODE node)
                 if (screen_x + total_w > r->x + (I32)view_w)
                     total_w = r->x + (I32)view_w - screen_x;
 
-                /* Single syscall instead of scale × run DRAW_LINE calls */
-                DRAW_FILLED_RECTANGLE(screen_x, screen_y,
-                                      total_w, block_h, c);
+                /* Direct framebuffer fill — no syscalls */
+                atgl_fb_fill(screen_x, screen_y, total_w, block_h, c);
                 ix += run;
             }
         }
@@ -586,13 +627,13 @@ static VOID render_image(PATGL_NODE node)
             for (U32 ix = 0; ix <= vis_img_w && (I32)(ix * scale) <= (I32)view_w; ix++) {
                 I32 lx = r->x + (I32)(ix * scale);
                 if (lx >= r->x + (I32)view_w) break;
-                DRAW_LINE(lx, r->y, lx, r->y + (I32)view_h - 1, gc);
+                atgl_fb_vline(lx, r->y, (I32)view_h, gc);
             }
             /* Horizontal grid lines */
             for (U32 iy = 0; iy <= vis_img_h && (I32)(iy * scale) <= (I32)view_h; iy++) {
                 I32 ly = r->y + (I32)(iy * scale);
                 if (ly >= r->y + (I32)view_h) break;
-                DRAW_LINE(r->x, ly, r->x + (I32)view_w - 1, ly, gc);
+                atgl_fb_hline(r->x, ly, (I32)view_w, gc);
             }
         }
     }
@@ -964,9 +1005,17 @@ static VOID event_slider(PATGL_NODE node, ATGL_EVENT *ev)
     if ((ev->type == ATGL_EVT_MOUSE_MOVE ||
          ev->type == ATGL_EVT_MOUSE_DOWN) && sd->dragging)
     {
-        I32 rel_x   = ev->mouse.x - node->abs_rect.x;
+        I32 thumb_w = 10;
+        I32 usable_w = node->abs_rect.w - thumb_w;
+        I32 rel_x   = ev->mouse.x - node->abs_rect.x - thumb_w / 2;
         I32 range   = sd->max - sd->min;
-        I32 new_val = sd->min + (rel_x * range) / node->abs_rect.w;
+
+        if (usable_w <= 0) usable_w = 1;
+        if (range <= 0) range = 1;
+        if (rel_x < 0) rel_x = 0;
+        if (rel_x > usable_w) rel_x = usable_w;
+
+        I32 new_val = sd->min + (rel_x * range) / usable_w;
 
         if (new_val < sd->min) new_val = sd->min;
         if (new_val > sd->max) new_val = sd->max;
@@ -1680,4 +1729,86 @@ VOID ATGL_IMAGE_SET_GRID_COLOUR(PATGL_NODE node, VBE_COLOUR colour)
     IMG_CHECK(node);
     node->data.image.grid_colour = colour;
     ATGL_NODE_INVALIDATE(node);
+}
+
+BOOL ATGL_IMAGE_SAVE(PATGL_NODE node, const CHAR *filename) {
+    IMG_CHECK_RET(node, FALSE);
+    ATGL_IMAGE_DATA *id = &node->data.image;
+    if (!id->pixels) return FALSE;
+
+    if(FILE_EXISTS(filename)) {
+        if (FILE_DELETE(filename) != 0) {
+            return FALSE;
+        }
+    }
+    FILE_CREATE(filename);
+    FILE *f = FOPEN(filename, MODE_FA);
+    if (!f) return FALSE;
+    ATGL_IMAGE_HEADER header;
+    MEMSET(&header, 0, sizeof(ATGL_IMAGE_HEADER));
+    MEMCPY(header.signature, "ATGL", 4);
+    header.version = 1;
+    header.width   = id->img_w;
+    header.height  = id->img_h;
+    header.data_offset = sizeof(ATGL_IMAGE_HEADER);
+    header.data_size   = id->img_w * id->img_h * sizeof(U32);
+    header.bpp      = 32;
+    if (FWRITE(f, &header, sizeof(header)) != sizeof(header)) {
+        FCLOSE(f);
+        return FALSE;
+    }
+    if (FWRITE(f, id->pixels, header.data_size) != header.data_size) {
+        FCLOSE(f);
+        return FALSE;
+    }
+    FCLOSE(f);
+    return TRUE;
+}
+
+PATGL_NODE ATGL_CREATE_IMAGE_FROM_FILE(PATGL_NODE parent, ATGL_RECT rect,
+                             const CHAR *filename) 
+{
+    FILE *f = FOPEN(filename, MODE_FR);
+    if (!f) return NULLPTR;
+    DEBUG_PRINTF("Loading image from file: %s\n", filename);
+    ATGL_IMAGE_HEADER header;
+    if (FREAD(f, &header, sizeof(ATGL_IMAGE_HEADER)) != sizeof(header)) {
+        FCLOSE(f);
+        return NULLPTR;
+    }
+    DEBUG_PRINTF("Image header: w=%u h=%u data_offset=%u data_size=%u bpp=%u\n",
+                 header.width, header.height, header.data_offset,
+                 header.data_size, header.bpp);
+    if (header.data_offset < sizeof(ATGL_IMAGE_HEADER) ||
+        header.data_size != header.width * header.height * sizeof(U32) ||
+        header.bpp != 32 ||
+        STRNCMP(header.signature, "ATGL", 4) != 0) {
+        FCLOSE(f);
+        return NULLPTR;
+    }
+    DEBUG_PRINTF("Image header is valid, loading pixel data...\n");
+    PU8 pixels = (PU8)MAlloc(header.data_size);
+    if (!pixels) {
+        FCLOSE(f);
+        return NULLPTR;
+    }
+    DEBUG_PRINTF("Allocated %u bytes for pixel data\n", header.data_size);
+    U32 read = 0;
+    if ((read = FREAD(f, pixels, header.data_size)) == 0) {
+        MFree(pixels);
+        FCLOSE(f);
+        return NULLPTR;
+    }
+    DEBUG_PRINTF("Read %u bytes of pixel data\n", read);
+    FCLOSE(f);
+    rect.w = rect.w ? rect.w : header.width;
+    rect.h = rect.h ? rect.h : header.height;
+    PATGL_NODE node = ATGL_CREATE_IMAGE(parent, rect, pixels, header.width, header.height);
+    DEBUG_PRINTF("Created image node: %p\n", node);
+    if (!node) {
+        MFree(pixels);
+        return NULLPTR;
+    }
+    node->data.image.owns_pixels = TRUE;
+    return node;
 }

@@ -21,6 +21,9 @@ Most are borrowed from https://gist.github.com/rothwerx/700f275d078b3483509f
 */
 #define INVISIBLE_CHARACTER {0, 0, 0, 0, 0, 0, 0, 0}
 #define CHARACTER(...) { __VA_ARGS__ }
+#ifdef KERNEL_ENTRY
+VBE_LETTERS_TYPE VBE_LETTERS[1][1] = { 0 };
+#else
 VBE_LETTERS_TYPE VBE_LETTERS[VBE_MAX_CHARS][VBE_CHAR_HEIGHT] = {
     CHARACTER(
         0b00110000,
@@ -967,5 +970,5 @@ VBE_LETTERS_TYPE VBE_LETTERS[VBE_MAX_CHARS][VBE_CHAR_HEIGHT] = {
         0b00000000,
     ), // ~
 };
-
+#endif // KERNEL_ENTRY
 #endif // FONT8x8_H

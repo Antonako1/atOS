@@ -19,10 +19,10 @@ typedef struct _BATSH_INSTANCE BATSH_INSTANCE;
 #define SCREEN_HEIGHT 768
 #define CHAR_WIDTH    8
 #define CHAR_HEIGHT   16
-#define CHAR_SPACING  2
-
-#define AMOUNT_OF_COLS  (SCREEN_WIDTH / (CHAR_WIDTH + CHAR_SPACING))
-#define AMOUNT_OF_ROWS  (SCREEN_HEIGHT / (CHAR_HEIGHT + CHAR_SPACING))
+/* ATUI handles glyph layout with no inter-character gaps, so
+   column/row counts must match the ATUI grid (no spacing).       */
+#define AMOUNT_OF_COLS  (SCREEN_WIDTH  / CHAR_WIDTH)
+#define AMOUNT_OF_ROWS  (SCREEN_HEIGHT / CHAR_HEIGHT)
 #define CUR_LINE_MAX_LENGTH (AMOUNT_OF_ROWS * AMOUNT_OF_COLS)
 #define CMD_LINE_HISTORY 25
 
@@ -96,6 +96,10 @@ typedef struct {
 
     U8   yank_buffer[CUR_LINE_MAX_LENGTH];
 
+    /* Cursor blink state (overlay, not stored in scrollback) */
+    BOOL cursor_visible;
+    U32  cursor_blink_tick;
+
     /* ANSI parser state */
     U8   ansi_state;
     U8   ansi_params[16];
@@ -106,6 +110,7 @@ typedef struct {
 
 /* ---- Main shell instance ---- */
 typedef struct {
+    U32 type; // 2
     U32             focused_pid;
     U32             previously_focused_pid;
     U32             self_pid;
@@ -142,6 +147,8 @@ VOID TPUT_HEX(U32 n);
 VOID TPUT_BIN(U32 n);
 VOID TPUT_NEWLINE(VOID);
 VOID TPUT_REFRESH(VOID);
+VOID TPUT_BEGIN(VOID);
+VOID TPUT_END(VOID);
 VOID TPUT_SCROLL_UP(U32 n);
 VOID TPUT_SCROLL_DOWN(U32 n);
 VOID TPUT_SCROLL_TO_BOTTOM(VOID);

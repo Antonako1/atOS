@@ -55,7 +55,7 @@ This makes atOS ideal for learning, experimentation, and low-level programming w
 - 🛠️ **Custom Language Support** — integrated experimental [BATSH](DOCS/BATSH.md) shell language for scripting.
 - 🔓 **No Safety Barriers** — Ring 0, no protection layers or user/kernel enforcement, making it ideal for exploration.
 - 🗄️ **File System Support** — ISO9660 for CD-ROM images and FAT32 for local storage.
-- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries.
+- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries. Examples are SANDBOX.BIN, PAINT.BIN and TSHELL.BIN
 - 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), and Serial ports.
 - 🐢 **Multitasking** — simple cooperative scheduler for handling multiple processes.
 - 🐚 **Shell Environment** — a feature-rich command-line shell with path support and environment variables.
@@ -142,12 +142,6 @@ The project uses `make` with simple targets:
 
   ```bash
   make iso run
-  ```
-
-* **Build and launch atOS with ethernet driver:**
-
-  ```bash
-  sudo make iso runn
   ```
 
 CMake is used for processes and libraries

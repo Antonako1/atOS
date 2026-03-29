@@ -61,7 +61,7 @@ U32 SYS_VBE_DRAW_STRING(U32 x, U32 y, U32 str, U32 fg, U32 bg) {
     return (U32)VBE_DRAW_STRING(x, y, (U8*)str, (VBE_PIXEL_COLOUR)fg, (VBE_PIXEL_COLOUR)bg);
 }
 U32 SYS_VBE_DRAW_FILLED_RECTANGLE(U32 x, U32 y, U32 width, U32 height, U32 colour) {
-    return (U32)VBE_DRAW_FILLED_RECTANGLE(x, y, width, height, (VBE_PIXEL_COLOUR)colour);
+    return (U32)VBE_DRAW_RECTANGLE_FILLED(x, y, width, height, (VBE_PIXEL_COLOUR)colour);
 }
 U32 SYS_VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, U32 colour) {
     return (U32)VBE_DRAW_TRIANGLE(x1, y1, x2, y2, x3, y3, (VBE_PIXEL_COLOUR)colour);

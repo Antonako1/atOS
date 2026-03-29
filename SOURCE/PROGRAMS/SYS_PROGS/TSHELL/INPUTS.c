@@ -71,7 +71,4 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
         }
         break;
     }
-
-    /* Always refresh cursor after any key */
-    BLINK_CURSOR();
 }

@@ -31,12 +31,18 @@ VOID INIT_TSHELL(VOID) {
     shndl->stdout_count = 0;
     for(U32 i = 0; i < MAX_STDOUT_BUFFS; i++)
         shndl->stdouts[i] = NULLPTR;
-
+    shndl->type = 2;
     shndl->focused_pid = shndl->self_pid;
     shndl->previously_focused_pid = shndl->focused_pid;
     shndl->active_kb = TRUE;
     shndl->active_keybinds = TAK_DEFAULT;
     shndl->state = TSTATE_EDIT_LINE;
+    TCB *tcb = GET_CURRENT_TCB();
+    if (tcb) {
+        tcb->info.state |= TCB_STATE_INFO_CHILD_PROC_HANDLER;
+        PROC_MESSAGE msg = CREATE_PROC_MSG(KERNEL_PID, PROC_RECHECK_STATE, NULL, 0, tcb->info.state);
+        SEND_MESSAGE(&msg);
+    }
 }
 
 /* ===================================================
@@ -93,7 +99,7 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     PROC_MESSAGE msg;
     U32 self_pid = shndl->self_pid;
 
-    if (GET_TCB_BY_PID(pid)->info.state == TCB_STATE_INFO_CHILD_PROC_HANDLER)
+    if (GET_TCB_BY_PID(pid)->info.state & TCB_STATE_INFO_CHILD_PROC_HANDLER)
         return;
 
     /* Flush any remaining STDOUT */
@@ -124,6 +130,8 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     U8 buf[32];
     ITOA_U(exit_code, buf, 10);
     SET_VAR("ERRORLEVEL", buf);
+    TPUT_NEWLINE();
+    PUT_SHELL_START();
 }
 
 /* ===================================================
@@ -145,7 +153,9 @@ static U0 EDIT_LINE_STDOUT_LOOP(VOID) {
                 out->buf_end   = 0;
                 out->buf[0]    = NULLT;
             }
-            PRINTNEWLINE();
+            
+            TPUT_NEWLINE();
+            PUT_SHELL_START();
         }
     }
 
@@ -275,7 +285,6 @@ CMAIN() {
     /* --- Initialise ATUI in raw mode (no echo) --- */
     ATUI_INITIALIZE(NULLPTR, ATUIC_RAW);
     ATUI_CURSOR_SET(FALSE);
-    DISABLE_SHELL_KEYBOARD();
 
     /* --- Create full-screen window --- */
     ATUI_DISPLAY *disp = GET_DISPLAY();

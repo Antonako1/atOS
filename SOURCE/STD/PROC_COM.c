@@ -5,7 +5,6 @@
 #include <PROC/PROC.h>
 #include <STD/DEBUG.h>
 
-static STDOUT *stdout = NULLPTR;
 static TCB process ATTRIB_DATA = {0};
 static BOOLEAN process_fetched ATTRIB_DATA = FALSE;
 static TCB *master ATTRIB_DATA = NULL;
@@ -18,11 +17,27 @@ static U8 ___keyboard_access_granted = FALSE;
 static U8 ___draw_access_granted = FALSE;
 static U8 ___STDOUT_CREATED = FALSE;
 static U8 ___INFO_ARR = FALSE;
-static SHELL_INSTANCE *SHNDL;
 
-STDOUT *GET_PROC_STDOUT() {
+#ifndef __SHELL__
+static TSHELL_INSTANCE *TSHNDL;
+static STDOUT_BUF *stdout = NULLPTR;
+
+STDOUT_BUF *GET_PROC_STDOUT() {
     return stdout;
 }
+TSHELL_INSTANCE *GET_SHELL_HANDLE() {
+    return TSHNDL;
+}   
+
+VOID DISABLE_SHELL_KEYBOARD() {
+    // SHNDL->active_kb = FALSE;
+    TSHNDL->active_kb = FALSE;
+}
+VOID ENABLE_SHELL_KEYBOARD() {
+    // SHNDL->active_kb = TRUE;
+    TSHNDL->active_kb = TRUE;
+}
+#endif
 
 U32 MESSAGE_AMOUNT() {
     U32 res  = (U32 *)SYSCALL(SYSCALL_MESSAGE_AMOUNT, 0, 0, 0, 0, 0);
@@ -160,12 +175,7 @@ U32 CPU_SLEEP(U32 ms) {
     return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
 }
 
-VOID DISABLE_SHELL_KEYBOARD() {
-    SHNDL->active_kb = FALSE;
-}
-VOID ENABLE_SHELL_KEYBOARD() {
-    SHNDL->active_kb = TRUE;
-}
+
 
 VOID EXIT(U32 n) {
     PROC_MESSAGE msg;
@@ -199,22 +209,27 @@ void PRIC_INIT_GRAPHICAL() {
     SEND_MESSAGE(&msg);
     #endif
 
+    #ifndef RUNTIME_NO_SHELL_INTERACTION
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_CREATE_STDOUT, NULL, 0, 0);
     SEND_MESSAGE(&msg);
-
+    
     // Shell focus for now
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_SHELL_FOCUS, NULL, 0, 0);
     SEND_MESSAGE(&msg);
 
+    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_INFO_ARRAYS, NULL, 0, 0);
+    SEND_MESSAGE(&msg);
+    ___STDOUT_CREATED = FALSE;
+    ___INFO_ARR = FALSE;
+    #else
+    ___STDOUT_CREATED = TRUE; // If we are not interacting with the shell, we can consider stdout "created" for the purposes of IS_PROC_GUI_INITIALIZED
+    ___INFO_ARR = TRUE; // Same for info arrays, we won't be using them if we are not interacting with the shell
+    #endif
+
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, PROC_GETPID());
     SEND_MESSAGE(&msg);
 
-    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_INFO_ARRAYS, NULL, 0, 0);
-    SEND_MESSAGE(&msg);
-
     ___draw_access_granted = FALSE;
-    ___STDOUT_CREATED = FALSE;
-    ___INFO_ARR = FALSE;
     DEBUG_PRINTF("[PROC_COM] Messages sent succesfully by: %s, pid 0x%x\n", process.info.name, process.info.pid);
 }
 BOOLEAN IS_PROC_GUI_INITIALIZED() {
@@ -225,29 +240,33 @@ BOOLEAN IS_PROC_GUI_INITIALIZED() {
                 ___draw_access_granted = TRUE;
                 break;
 
+            #ifndef __SHELL__
             case SHELL_RES_INFO_ARRAYS: {
                 // Expect actual SHELL_INSTANCE contents, not a pointer
-                if (msg->raw_data && msg->raw_data_size == sizeof(SHELL_INSTANCE)) {
-                    SHNDL = (SHELL_INSTANCE*)msg->raw_data;
+                if (msg->raw_data && msg->raw_data_size == sizeof(TSHELL_INSTANCE)) {
+                    // SHNDL = (SHELL_INSTANCE*)msg->raw_data;
+                    TSHNDL = (TSHELL_INSTANCE*)msg->raw_data;
                     ___INFO_ARR = TRUE;
                 } else {
-                    SHNDL = NULLPTR;
+                    // SHNDL = NULLPTR;
+                    TSHNDL = NULLPTR;
                 }
             } break;
 
             case SHELL_RES_STDOUT_CREATED: {
-                if (msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
-                    stdout = (STDOUT*)msg->raw_data;
+                if (msg->raw_data && msg->raw_data_size == sizeof(STDOUT_BUF*)) {
+                    stdout = (STDOUT_BUF*)msg->raw_data;
                     ___STDOUT_CREATED = TRUE;
                 } else {
                     EXIT(U16_MAX);
                 }
             } break;
+            #endif
 
             case SHELL_RES_INFO_ARRAYS_FAILED:
             case SHELL_RES_STDOUT_FAILED:
                 DEBUG_PRINTF("[PROC_COM] Failed to create");
-                DEBUG_PRINTF(msg->type == SHELL_RES_INFO_ARRAYS_FAILED  ?"INFO ARRAY" : "STDOUT");
+                DEBUG_PRINTF(msg->type == SHELL_RES_INFO_ARRAYS_FAILED  ?"INFO ARRAY" : "STDOUT_BUF");
                 DEBUG_PRINTF("\n");
                 EXIT(U8_MAX);
                 break;
@@ -304,30 +323,31 @@ BOOLEAN IS_PROC_INITIALIZED() {
             case PROC_FRAMEBUFFER_GRANTED:
                 ___draw_access_granted = TRUE;
                 break;
-
+            #ifndef __SHELL__
             case SHELL_RES_INFO_ARRAYS: {
-                // Expect actual SHELL_INSTANCE contents, not a pointer
-                if (msg->raw_data && msg->raw_data_size == sizeof(SHELL_INSTANCE)) {
-                    SHNDL = (SHELL_INSTANCE*)msg->raw_data;
+                // Expect actual TSHNDL contents, not a pointer
+                if (msg->raw_data && msg->raw_data_size == sizeof(TSHELL_INSTANCE)) {
+                    TSHNDL = (TSHELL_INSTANCE*)msg->raw_data;
                     ___INFO_ARR = TRUE;
                 } else {
-                    SHNDL = NULLPTR;
+                    // SHNDL = NULLPTR;
+                    TSHNDL = NULLPTR;
                 }
             } break;
 
             case SHELL_RES_STDOUT_CREATED: {
-                if (msg->raw_data && msg->raw_data_size == sizeof(STDOUT*)) {
-                    stdout = (STDOUT*)msg->raw_data;
+                if (msg->raw_data && msg->raw_data_size == sizeof(STDOUT_BUF*)) {
+                    stdout = (STDOUT_BUF*)msg->raw_data;
                     ___STDOUT_CREATED = TRUE;
                 } else {
                     EXIT(U16_MAX);
                 }
             } break;
-
+            #endif
             case SHELL_RES_INFO_ARRAYS_FAILED:
             case SHELL_RES_STDOUT_FAILED:
                 DEBUG_PRINTF("[PROC_COM] Failed to create");
-                DEBUG_PRINTF(msg->type == SHELL_RES_INFO_ARRAYS_FAILED  ?"INFO ARRAY" : "STDOUT");
+                DEBUG_PRINTF(msg->type == SHELL_RES_INFO_ARRAYS_FAILED  ?"INFO ARRAY" : "STDOUT_BUF");
                 DEBUG_PRINTF("\n");
                 EXIT(U8_MAX);
                 break;
@@ -345,9 +365,6 @@ BOOLEAN IS_PROC_INITIALIZED() {
     );
 }
 
-SHELL_INSTANCE *GET_SHELL_HANDLE() {
-    return SHNDL;
-}
 BOOLEAN START_PROCESS(
     U8 *proc_name, 
     VOIDPTR file, 

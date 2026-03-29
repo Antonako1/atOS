@@ -39,18 +39,22 @@ VOID CMD_TAIL(PU8 raw_line) {
             line_count++;
             if (line_count > TAIL_LINE_COUNT) {
                 buffer[i] = '\0';
+                TPUT_BEGIN();
                 PUTS("\n");
                 PUTS(&buffer[i]);
                 PUTS("\n");
+                TPUT_END();
                 MFree(buffer);
                 return;
             }
         }
     }
 
+    TPUT_BEGIN();
     PUTS("\n");
     PUTS(buffer);
     PUTS("\n");
+    TPUT_END();
 
     MFree(buffer);
 }

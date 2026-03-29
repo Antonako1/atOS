@@ -8,8 +8,6 @@
  *   - All output via TPUT_* macros (PUTS/PUTC/PUT_DEC/etc.)
  */
 
-#include "TSHELL.h"
-#include "BATSH.h"
 #include <PROC/PROC.h>
 #include <STD/FS_DISK.h>
 #include <STD/STRING.h>
@@ -17,6 +15,8 @@
 #include <STD/MEM.h>
 #include <STD/PROC_COM.h>
 #include <STD/DEBUG.h>
+#include <PROGRAMS/SYS_PROGS/TSHELL/TSHELL.h>
+#include <PROGRAMS/SYS_PROGS/TSHELL/BATSH.h>
 
 /* ===================================================
  * Internal Shell State
@@ -186,8 +186,8 @@ static const ShellCommand shell_commands[] ATTRIB_RODATA = {
     { "cd",        CMD_CD,            "Change directory" },
     { "cd..",      CMD_CD_BACKWARDS,  "Change directory backwards" },
     { "dir",       CMD_DIR,           "List directory contents" },
-    { "mkdir",     CMD_MKDIR,         "Create a directory, -h for help" },
-    { "rmdir",     CMD_RMDIR,         "Remove a directory, -h for help" },
+    { "mkdir",     CMD_NONE,         "Create a directory, -h for help" },
+    { "rmdir",     CMD_NONE,         "Remove a directory, -h for help" },
     { "type",      CMD_TYPE,          "Print file contents" },
     { "tail",      CMD_TAIL,          "Print tail of file contents" },
     { "colour",    CMD_COLOUR,        "Change console colour: colour <fg> <bg> [-h] [-q]" },
@@ -1385,8 +1385,6 @@ VOID DESTROY_BATSH_INSTANCE(BATSH_INSTANCE *inst) {
 #include "CMD/AC97.c"
 #include "CMD/CD.c"
 #include "CMD/DIR.c"
-#include "CMD/MKDIR.c"
-#include "CMD/RMDIR.c"
 #include "CMD/TYPE.c"
 #include "CMD/TAIL.c"
 #include "CMD/COLOUR.c"

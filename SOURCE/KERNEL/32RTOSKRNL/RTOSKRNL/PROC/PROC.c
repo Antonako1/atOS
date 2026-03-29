@@ -1194,6 +1194,26 @@ void handle_kernel_messages(void) {
                 }
 
             } break;
+            case PROC_RECHECK_STATE: {
+                TCB *t = get_tcb_by_pid(msg->sender_pid);
+                t->info.state = msg->signal;
+                if(t) {
+                    if(IS_FLAG_SET(t->info.state, TCB_STATE_KILL)) {
+                        KDEBUG_PUTS("[proc_msg] Process marked for kill, killing...\n");
+                        KILL_PROCESS(t->info.pid);
+                    } else if(IS_FLAG_SET(t->info.state, TCB_STATE_INFO_CHILD_PROC_HANDLER)) {
+                        current_shell = t;
+                        // let it run as normal
+                    } else if(IS_FLAG_SET(t->info.state, TCB_STATE_ACTIVE)) {
+                        // do nothing, let it run
+                    } else {
+                        // unknown state, set to active by default
+                        KDEBUG_PUTS("[proc_msg] Process in unknown state, setting to active...\n");
+                        t->info.state = TCB_STATE_ACTIVE;
+                    }
+                }
+                break;
+            }
             case PROC_AUTO_FLUSH_FRAMEBUFFER: {
                 TCB *t = get_tcb_by_pid(msg->sender_pid);
                 if(t) {

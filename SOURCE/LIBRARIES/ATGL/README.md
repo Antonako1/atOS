@@ -188,6 +188,8 @@ High-level factory functions for built-in UI components.
   Creates a 3D-styled horizontal or vertical separator line.
 - `PATGL_NODE ATGL_CREATE_IMAGE(PATGL_NODE parent, ATGL_RECT rect, PU8 pixels, U32 img_w, U32 img_h);`
   Creates a widget that renders a flat buffer of image pixels.
+- `PATGL_NODE ATGL_CREATE_IMAGE_FROM_FILE(PATGL_NODE parent, ATGL_RECT rect, const CHAR *filename);`
+  Creates an image widget by loading pixel data from a .TGI file.
 - `PATGL_NODE ATGL_CREATE_BLANK_IMAGE(PATGL_NODE parent, ATGL_RECT rect, U32 img_w, U32 img_h, VBE_COLOUR fill);`
   Creates an image widget with a freshly allocated blank canvas.
 
@@ -248,7 +250,8 @@ Advanced functions for drawing and manipulating pixel buffers within an Image wi
   Toggles the visibility of a pixel grid (typically visible at high zoom levels).
 - `VOID ATGL_IMAGE_SET_GRID_COLOUR(PATGL_NODE node, VBE_COLOUR colour);`
   Sets the color used for the pixel grid.
-
+- `BOOL ATGL_IMAGE_SAVE(PATGL_NODE node, const CHAR *filename);`
+  Saves the current image buffer to a file in .TGI format.
 ### 7. Event System
 - `BOOL ATGL_POLL_EVENTS(ATGL_EVENT *ev);`
   Pops the next pending event (mouse/keyboard) from the OS message queue. Returns FALSE if the queue is empty.

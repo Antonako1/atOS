@@ -80,7 +80,9 @@ VOID ATGL_INIT(VOID)
         atgl.bpp = (mode->BitsPerPixel + 7) / 8;
         DEBUG_PRINTF("[ATGL] VBE mode detected: %dx%d, %d bpp, BytesPerScanLine: %d\n",
                      mode->XResolution, mode->YResolution, mode->BitsPerPixel, mode->BytesPerScanLine);
-        atgl.cursor.stride = mode->BytesPerScanLine;
+        atgl.cursor.stride = mode->BytesPerScanLineLinear
+                           ? mode->BytesPerScanLineLinear
+                           : mode->BytesPerScanLine;
         atgl.width = mode->XResolution;
         atgl.height = mode->YResolution;
     } else {
@@ -140,6 +142,151 @@ VOID ATGL_QUIT(VOID)        { atgl.quit = TRUE;  }
 BOOL ATGL_SHOULD_QUIT(VOID) { return atgl.quit;  }
 
 /* ================================================================ */
+/*              DIRECT FRAMEBUFFER RENDERING                        */
+/* ================================================================ */
+/* All helpers write to the per-process framebuffer obtained from
+   TCB during ATGL_INIT.  They perform clipping against the screen
+   dimensions and support 3-byte and 4-byte pixel formats.          */
+
+static inline VOID fb_write_pixel_at(U8 *fb, U32 offset, VBE_COLOUR c, U32 bpp)
+{
+    if (bpp == 4) {
+        *(U32 *)(fb + offset) = c;
+    } else {
+        fb[offset]     = (U8)(c & 0xFF);
+        fb[offset + 1] = (U8)((c >> 8) & 0xFF);
+        fb[offset + 2] = (U8)((c >> 16) & 0xFF);
+    }
+}
+
+static inline VOID fb_fill_span24(U8 *dst, I32 pixels, VBE_COLOUR colour)
+{
+    U8 b0 = (U8)(colour & 0xFF);
+    U8 b1 = (U8)((colour >> 8) & 0xFF);
+    U8 b2 = (U8)((colour >> 16) & 0xFF);
+    U32 bytes = (U32)pixels * 3;
+
+    if (b0 == b1 && b1 == b2) {
+        MEMSET_OPT(dst, b0, bytes);
+        return;
+    }
+
+    {
+        U8 pattern[192];
+        U32 chunk = (U32)sizeof(pattern);
+        for (U32 i = 0; i < chunk; i += 3) {
+            pattern[i]     = b0;
+            pattern[i + 1] = b1;
+            pattern[i + 2] = b2;
+        }
+
+        while (bytes) {
+            U32 copy = (bytes > chunk) ? chunk : bytes;
+            MEMCPY_OPT(dst, pattern, copy);
+            dst   += copy;
+            bytes -= copy;
+        }
+    }
+}
+
+VOID atgl_fb_hline(I32 x, I32 y, I32 w, VBE_COLOUR colour)
+{
+    if (colour == VBE_SEE_THROUGH) return;
+    U8 *fb = (U8 *)atgl.cursor.framebuffer;
+    if (!fb) { DRAW_LINE(x, y, x + w - 1, y, colour); return; }
+
+    /* Clip */
+    if (y < 0 || (U32)y >= atgl.height || w <= 0) return;
+    if (x < 0) { w += x; x = 0; }
+    if (w <= 0) return;
+    if ((U32)(x + w) > atgl.width) w = (I32)atgl.width - x;
+    if (w <= 0) return;
+
+    U32 bpp    = atgl.bpp;
+    U32 stride = atgl.cursor.stride;
+    U32 offset = (U32)y * stride + (U32)x * bpp;
+
+    if (bpp == 4) {
+        U32 *row = (U32 *)(fb + offset);
+        MEMSET32_OPT(row, colour, (U32)w);
+    } else {
+        fb_fill_span24(fb + offset, w, colour);
+    }
+}
+
+VOID atgl_fb_vline(I32 x, I32 y, I32 h, VBE_COLOUR colour)
+{
+    if (colour == VBE_SEE_THROUGH) return;
+    U8 *fb = (U8 *)atgl.cursor.framebuffer;
+    if (!fb) { DRAW_LINE(x, y, x, y + h - 1, colour); return; }
+
+    if (x < 0 || (U32)x >= atgl.width || h <= 0) return;
+    if (y < 0) { h += y; y = 0; }
+    if (h <= 0) return;
+    if ((U32)(y + h) > atgl.height) h = (I32)atgl.height - y;
+    if (h <= 0) return;
+
+    U32 bpp    = atgl.bpp;
+    U32 stride = atgl.cursor.stride;
+    U32 base   = (U32)y * stride + (U32)x * bpp;
+
+    if (bpp == 4) {
+        for (I32 i = 0; i < h; i++) {
+            *(U32 *)(fb + base) = colour;
+            base += stride;
+        }
+    } else {
+        U8 b0 = (U8)(colour & 0xFF);
+        U8 b1 = (U8)((colour >> 8) & 0xFF);
+        U8 b2 = (U8)((colour >> 16) & 0xFF);
+        for (I32 i = 0; i < h; i++) {
+            fb[base] = b0; fb[base+1] = b1; fb[base+2] = b2;
+            base += stride;
+        }
+    }
+}
+
+VOID atgl_fb_fill(I32 x, I32 y, I32 w, I32 h, VBE_COLOUR colour)
+{
+    if (colour == VBE_SEE_THROUGH) return;
+    U8 *fb = (U8 *)atgl.cursor.framebuffer;
+    if (!fb) { DRAW_FILLED_RECTANGLE(x, y, w, h, colour); return; }
+
+    /* Clip */
+    if (w <= 0 || h <= 0) return;
+    if (x < 0) { w += x; x = 0; }
+    if (y < 0) { h += y; y = 0; }
+    if (w <= 0 || h <= 0) return;
+    if ((U32)(x + w) > atgl.width)  w = (I32)atgl.width  - x;
+    if ((U32)(y + h) > atgl.height) h = (I32)atgl.height - y;
+    if (w <= 0 || h <= 0) return;
+
+    U32 bpp    = atgl.bpp;
+    U32 stride = atgl.cursor.stride;
+
+    if (bpp == 4) {
+        for (I32 row = 0; row < h; row++) {
+            U32 *p = (U32 *)(fb + (U32)(y + row) * stride) + x;
+            MEMSET32_OPT(p, colour, (U32)w);
+        }
+    } else {
+        for (I32 row = 0; row < h; row++) {
+            U8 *p = fb + (U32)(y + row) * stride + (U32)x * 3;
+            fb_fill_span24(p, w, colour);
+        }
+    }
+}
+
+VOID atgl_fb_rect(I32 x, I32 y, I32 w, I32 h, VBE_COLOUR colour)
+{
+    if (w <= 0 || h <= 0) return;
+    atgl_fb_hline(x, y, w, colour);               /* top    */
+    atgl_fb_hline(x, y + h - 1, w, colour);       /* bottom */
+    atgl_fb_vline(x, y + 1, h - 2, colour);       /* left   */
+    atgl_fb_vline(x + w - 1, y + 1, h - 2, colour); /* right */
+}
+
+/* ================================================================ */
 /*                     DRAWING HELPERS                              */
 /* ================================================================ */
 
@@ -150,17 +297,17 @@ VOID ATGL_DRAW_RAISED(I32 x, I32 y, I32 w, I32 h)
     VBE_COLOUR dk = atgl.theme.dark_shadow;
 
     /* Outer highlight: top and left */
-    DRAW_LINE(x, y, x + w - 1, y, hi);
-    DRAW_LINE(x, y, x, y + h - 1, hi);
+    atgl_fb_hline(x, y, w, hi);
+    atgl_fb_vline(x, y, h, hi);
 
     /* Outer shadow: bottom and right */
-    DRAW_LINE(x + w - 1, y, x + w - 1, y + h - 1, dk);
-    DRAW_LINE(x, y + h - 1, x + w - 1, y + h - 1, dk);
+    atgl_fb_vline(x + w - 1, y, h, dk);
+    atgl_fb_hline(x, y + h - 1, w, dk);
 
     /* Inner shadow (1 px inset, bottom-right) */
     if (w > 2 && h > 2) {
-        DRAW_LINE(x + w - 2, y + 1, x + w - 2, y + h - 2, sh);
-        DRAW_LINE(x + 1, y + h - 2, x + w - 2, y + h - 2, sh);
+        atgl_fb_vline(x + w - 2, y + 1, h - 2, sh);
+        atgl_fb_hline(x + 1, y + h - 2, w - 2, sh);
     }
 }
 
@@ -171,18 +318,18 @@ VOID ATGL_DRAW_SUNKEN(I32 x, I32 y, I32 w, I32 h)
     VBE_COLOUR dk = atgl.theme.dark_shadow;
 
     /* Outer shadow: top and left */
-    DRAW_LINE(x, y, x + w - 1, y, sh);
-    DRAW_LINE(x, y, x, y + h - 1, sh);
+    atgl_fb_hline(x, y, w, sh);
+    atgl_fb_vline(x, y, h, sh);
 
     /* Inner dark (1 px inset, top-left) */
     if (w > 2 && h > 2) {
-        DRAW_LINE(x + 1, y + 1, x + w - 2, y + 1, dk);
-        DRAW_LINE(x + 1, y + 1, x + 1, y + h - 2, dk);
+        atgl_fb_hline(x + 1, y + 1, w - 2, dk);
+        atgl_fb_vline(x + 1, y + 1, h - 2, dk);
     }
 
     /* Outer highlight: bottom and right */
-    DRAW_LINE(x + w - 1, y, x + w - 1, y + h - 1, hi);
-    DRAW_LINE(x, y + h - 1, x + w - 1, y + h - 1, hi);
+    atgl_fb_vline(x + w - 1, y, h, hi);
+    atgl_fb_hline(x, y + h - 1, w, hi);
 }
 
 VOID ATGL_DRAW_TEXT(I32 x, I32 y, PU8 text, VBE_COLOUR fg, VBE_COLOUR bg)
@@ -264,23 +411,37 @@ VOID ATGL_CENTER_IN_SCREEN(PATGL_NODE node)
 }
 
 VOID ATGL_DRAW_PIXEL(U32 x, U32 y, VBE_COLOUR colour) {
-    DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x, y, colour));
+    if (atgl.cursor.framebuffer && x < atgl.width && y < atgl.height) {
+        fb_write_pixel_at((U8 *)atgl.cursor.framebuffer,
+                          y * atgl.cursor.stride + x * atgl.bpp,
+                          colour, atgl.bpp);
+    } else {
+        DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x, y, colour));
+    }
 }
 VOID ATGL_DRAW_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour) {
-    DRAW_RECTANGLE(x, y, w, h, colour);
+    atgl_fb_rect((I32)x, (I32)y, (I32)w, (I32)h, colour);
 }
 VOID ATGL_DRAW_FILLED_RECTANGLE(U32 x, U32 y, U32 w, U32 h, VBE_COLOUR colour) {
-    DRAW_FILLED_RECTANGLE(x, y, w, h, colour);
+    atgl_fb_fill((I32)x, (I32)y, (I32)w, (I32)h, colour);
 }
-VOID ATGL_DRAW_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour) {
-    DRAW_ELLIPSE(x, y, rx, ry, colour);
+VOID ATGL_DRAW_LINE(U32 x1, U32 y1, U32 x2, U32 y2, VBE_COLOUR colour) {
+    if (y1 == y2) {
+        I32 x = (x1 < x2) ? (I32)x1 : (I32)x2;
+        I32 w = (I32)((x1 < x2) ? x2 - x1 : x1 - x2) + 1;
+        atgl_fb_hline(x, (I32)y1, w, colour);
+    } else if (x1 == x2) {
+        I32 y = (y1 < y2) ? (I32)y1 : (I32)y2;
+        I32 h = (I32)((y1 < y2) ? y2 - y1 : y1 - y2) + 1;
+        atgl_fb_vline((I32)x1, y, h, colour);
+    } else {
+        DRAW_LINE(x1, y1, x2, y2, colour);
+    }
 }
 VOID ATGL_DRAW_FILLED_ELLIPSE(U32 x, U32 y, U32 rx, U32 ry, VBE_COLOUR colour) {
     DRAW_FILLED_ELLIPSE(x, y, rx, ry, colour);
 }
-VOID ATGL_DRAW_LINE(U32 x1, U32 y1, U32 x2, U32 y2, VBE_COLOUR colour) {
-    DRAW_LINE(x1, y1, x2, y2, colour);
-}
+
 
 VOID ATGL_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_COLOUR colour) {
     DRAW_TRIANGLE(x1, y1, x2, y2, x3, y3, colour);
