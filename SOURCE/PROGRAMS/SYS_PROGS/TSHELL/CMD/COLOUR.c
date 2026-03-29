@@ -78,26 +78,37 @@ VOID CMD_COLOUR(PU8 raw_line) {
         PUTS("----------------------------\n");
 
         for (U32 i = 0; i < COLOUR_COUNT; i += 2) {
+            CHAR line[128];
+            CHAR *p = line;
             CHAR id_buf[10];
-            ITOA_U(colour_table[i].id, id_buf, 10);
-            PUTS_PADDED(id_buf, 5);
-
-            /* Show color name in its own color */
             U8 esc[16];
+
+            ITOA_U(colour_table[i].id, id_buf, 10);
+            I32 len = STRLEN(id_buf);
+            MEMCPY(p, id_buf, len); p += len;
+            for (I32 j = len; j < 5; j++) *p++ = ' ';
+
             SPRINTF(esc, "\x1B[%dm", colour_table[i].ansi_fg);
-            PUTS(esc);
-            PUTS_PADDED(colour_table[i].name, 14);
-            PUTS("\x1B[0m");
+            len = STRLEN(esc); MEMCPY(p, esc, len); p += len;
+            len = STRLEN(colour_table[i].name); MEMCPY(p, colour_table[i].name, len); p += len;
+            for (I32 j = len; j < 14; j++) *p++ = ' ';
+            MEMCPY(p, "\x1B[0m", 4); p += 4;
 
             if (i + 1 < COLOUR_COUNT) {
                 ITOA_U(colour_table[i+1].id, id_buf, 10);
-                PUTS_PADDED(id_buf, 5);
+                len = STRLEN(id_buf);
+                for (I32 j = 0; j < 5 - len; j++) *p++ = ' ';
+                MEMCPY(p, id_buf, len); p += len;
+
                 SPRINTF(esc, "\x1B[%dm", colour_table[i+1].ansi_fg);
-                PUTS(esc);
-                PUTS_PADDED(colour_table[i+1].name, 14);
-                PUTS("\x1B[0m");
+                len = STRLEN(esc); MEMCPY(p, esc, len); p += len;
+                len = STRLEN(colour_table[i+1].name); MEMCPY(p, colour_table[i+1].name, len); p += len;
+                for (I32 j = len; j < 14; j++) *p++ = ' ';
+                MEMCPY(p, "\x1B[0m", 4); p += 4;
             }
-            PUTS("\n");
+            *p++ = '\n';
+            *p = 0;
+            PUTS(line);
         }
     } else {
         VBE_COLOUR new_fg = FIND_VBE_COLOUR(arr.argv[1], inst->tout->fg);

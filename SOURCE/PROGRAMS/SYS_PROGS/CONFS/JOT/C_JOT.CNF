@@ -1,0 +1,29 @@
+#!ATRC
+
+# JOT Editor Colour Theme
+# Values are in R,G,B format (0-255 per channel).
+
+[COLOUR]
+# Main text area
+FG_TEXT=255,255,255
+BG_TEXT=0,0,0
+
+# Title bar and status bar
+FG_BAR=0,0,0
+BG_BAR=255,255,255
+
+# Shortcut bar
+FG_SHORTCUT_KEY=255,255,255
+BG_SHORTCUT=0,0,0
+FG_SHORTCUT_DESC=180,180,180
+
+# Line number gutter
+FG_LINE_NUMBER=180,150,50
+
+# Status messages
+FG_STATUS=255,255,255
+
+# Syntax highlighting
+FG_COMMENT=128,128,128
+FG_STRING=100,220,100
+FG_NUMBER=100,200,220

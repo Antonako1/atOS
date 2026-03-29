@@ -1,0 +1,39 @@
+#!ATRC
+
+# JOT Editor Settings
+# Modify these values to customize the editor behaviour.
+
+[SETTINGS]
+TAB_SIZE=4
+AUTO_INDENT=TRUE
+LINE_NUMBERS=TRUE
+SOFT_WRAP=FALSE
+SYNTAX=TRUE
+CASE_SENSITIVE_SEARCH=FALSE
+COMMENT_START=//
+
+[KEYBINDS]
+# Keybinds are currently hardcoded in JOT.
+# Future versions will allow remapping here.
+# EXIT=^X
+# SAVE=^O
+# CUT=^K
+# UNCUT=^U
+# SEARCH=^W
+# REPLACE=^\
+# HELP=^G
+# UNDO=^Z
+# TOP=^T
+# BOTTOM=^B
+# GOTO_LINE=^_
+# POSITION=^C
+# REFRESH=^L
+# READ_FILE=^R
+
+[SYNTAX_KEYWORDS]
+# Define custom syntax highlighting rules.
+# Format:  RULE_N = R,G,B:keyword1,keyword2,...
+# Example: RULE_0 = 100,200,100:int,char,void,float,double
+#
+# Built-in rules exist for .C/.H, .ASM/.INC, .SH, .CNF files.
+# Custom rules here override built-in rules.

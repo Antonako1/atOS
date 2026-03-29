@@ -325,6 +325,7 @@ VOID FCLOSE(FILE *file) {
     file->sz = 0;
     file->mode = 0;
     file->read_ptr = 0;
+
     MFree(file);
 }
 

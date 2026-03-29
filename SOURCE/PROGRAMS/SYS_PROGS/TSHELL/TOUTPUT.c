@@ -25,6 +25,10 @@ static U32 vis_cols ATTRIB_DATA = 0;
 static U32 batch_depth ATTRIB_DATA = 0;
 static BOOL batch_dirty ATTRIB_DATA = FALSE;
 
+U32 get_vis_rows() {
+    return vis_rows;
+}
+
 /* ================================================================== */
 /*  Initialization                                                     */
 /* ================================================================== */
@@ -161,9 +165,26 @@ static VOID render_visible(VOID) {
             VBE_COLOUR fg = cell->fg;
             VBE_COLOUR bg = cell->bg;
 
-            /* Cursor overlay — invert fg/bg at cursor position */
-            if (tout->cursor_visible &&
-                (U32)sb_idx == cur_sb_row && vc == cur_col) {
+            /* Selection / Cursor overlay */
+            BOOL is_selected = FALSE;
+            if ((U32)sb_idx == cur_sb_row) {
+                if (tout->selection_active) {
+                    U32 s_start = tout->selection_start;
+                    U32 s_end   = tout->edit_pos;
+                    if (s_start > s_end) { U32 t = s_start; s_start = s_end; s_end = t; }
+                    
+                    U32 col_idx = vc - tout->prompt_length;
+                    if (vc >= tout->prompt_length && col_idx >= s_start && col_idx < s_end) {
+                        is_selected = TRUE;
+                    }
+                }
+                
+                if (vc == cur_col && tout->cursor_visible) {
+                    is_selected = !is_selected; /* Invert if cursor is on it */
+                }
+            }
+
+            if (is_selected) {
                 VBE_COLOUR tmp = fg;
                 fg = bg;
                 bg = tmp;
@@ -468,6 +489,7 @@ VOID BLINK_CURSOR(VOID) {
 VOID HANDLE_LE_ENTER(VOID) {
     U32 len = STRNLEN(tout->current_line, CUR_LINE_MAX_LENGTH);
     tout->current_line[len] = '\0';
+    tout->selection_active = FALSE;
 
     push_history(tout->current_line);
 
@@ -487,26 +509,105 @@ VOID HANDLE_LE_ENTER(VOID) {
 VOID HANDLE_LE_BACKSPACE(VOID) {
     if (tout->edit_pos == 0) return;
 
-    tout->edit_pos--;
-    U32 len = STRLEN(tout->current_line);
-    for (U32 i = tout->edit_pos; i < len; i++)
-        tout->current_line[i] = tout->current_line[i + 1];
+    if (tout->selection_active) {
+        U32 s_start = tout->selection_start;
+        U32 s_end   = tout->edit_pos;
+        if (s_start > s_end) { U32 t = s_start; s_start = s_end; s_end = t; }
+        
+        U32 len = STRLEN(tout->current_line);
+        U32 count = s_end - s_start;
+        for (U32 i = s_start; i <= len - count; i++)
+            tout->current_line[i] = tout->current_line[i + count];
+        
+        tout->edit_pos = s_start;
+        tout->selection_active = FALSE;
+    } else {
+        tout->edit_pos--;
+        U32 len = STRLEN(tout->current_line);
+        for (U32 i = tout->edit_pos; i < len; i++)
+            tout->current_line[i] = tout->current_line[i + 1];
+    }
+    REDRAW_CURRENT_LINE();
+}
 
+VOID HANDLE_LE_CTRL_BACKSPACE(VOID) {
+    if (tout->edit_pos == 0) return;
+    U32 end = tout->edit_pos;
+    while (tout->edit_pos > 0 && tout->current_line[tout->edit_pos - 1] == ' ')
+        tout->edit_pos--;
+    while (tout->edit_pos > 0 && tout->current_line[tout->edit_pos - 1] != ' ')
+        tout->edit_pos--;
+    
+    U32 start = tout->edit_pos;
+    U32 count = end - start;
+    U32 len = STRLEN(tout->current_line);
+    for (U32 i = start; i <= len - count; i++)
+        tout->current_line[i] = tout->current_line[i + count];
+    
+    tout->selection_active = FALSE;
     REDRAW_CURRENT_LINE();
 }
 
 VOID HANDLE_LE_DELETE(VOID) {
     U32 len = STRLEN(tout->current_line);
-    if (tout->edit_pos >= len) return;
+    if (tout->selection_active) {
+        U32 s_start = tout->selection_start;
+        U32 s_end   = tout->edit_pos;
+        if (s_start > s_end) { U32 t = s_start; s_start = s_end; s_end = t; }
+        
+        U32 count = s_end - s_start;
+        for (U32 i = s_start; i <= len - count; i++)
+            tout->current_line[i] = tout->current_line[i + count];
+        
+        tout->edit_pos = s_start;
+        tout->selection_active = FALSE;
+    } else {
+        if (tout->edit_pos >= len) return;
+        for (U32 i = tout->edit_pos; i < len; i++)
+            tout->current_line[i] = tout->current_line[i + 1];
+    }
+    REDRAW_CURRENT_LINE();
+}
 
-    for (U32 i = tout->edit_pos; i < len; i++)
-        tout->current_line[i] = tout->current_line[i + 1];
+VOID HANDLE_LE_CTRL_DELETE(VOID) {
+    U32 start = tout->edit_pos;
+    U32 len = STRLEN(tout->current_line);
+    if (start >= len) return;
 
+    U32 end = start;
+    while (end < len && tout->current_line[end] != ' ')
+        end++;
+    while (end < len && tout->current_line[end] == ' ')
+        end++;
+    
+    U32 count = end - start;
+    for (U32 i = start; i <= len - count; i++)
+        tout->current_line[i] = tout->current_line[i + count];
+    
+    tout->selection_active = FALSE;
     REDRAW_CURRENT_LINE();
 }
 
 VOID HANDLE_LE_ARROW_LEFT(VOID) {
+    if (tout->selection_active) {
+        U32 s_start = tout->selection_start;
+        U32 s_end   = tout->edit_pos;
+        tout->edit_pos = (s_start < s_end) ? s_start : s_end;
+        tout->selection_active = FALSE;
+    } else {
+        if (tout->edit_pos == 0) return;
+        tout->edit_pos--;
+    }
+    tout->cursor_col = tout->prompt_length + tout->edit_pos;
+    REDRAW_CURRENT_LINE();
+}
+
+VOID HANDLE_LE_SHIFT_ARROW_LEFT(VOID) {
     if (tout->edit_pos == 0) return;
+    if (!tout->selection_active) {
+        tout->selection_active = TRUE;
+        tout->selection_start = tout->edit_pos;
+    }
     tout->edit_pos--;
     tout->cursor_col = tout->prompt_length + tout->edit_pos;
     REDRAW_CURRENT_LINE();
@@ -514,7 +615,26 @@ VOID HANDLE_LE_ARROW_LEFT(VOID) {
 
 VOID HANDLE_LE_ARROW_RIGHT(VOID) {
     U32 len = STRLEN(tout->current_line);
+    if (tout->selection_active) {
+        U32 s_start = tout->selection_start;
+        U32 s_end   = tout->edit_pos;
+        tout->edit_pos = (s_start > s_end) ? s_start : s_end;
+        tout->selection_active = FALSE;
+    } else {
+        if (tout->edit_pos >= len) return;
+        tout->edit_pos++;
+    }
+    tout->cursor_col = tout->prompt_length + tout->edit_pos;
+    REDRAW_CURRENT_LINE();
+}
+
+VOID HANDLE_LE_SHIFT_ARROW_RIGHT(VOID) {
+    U32 len = STRLEN(tout->current_line);
     if (tout->edit_pos >= len) return;
+    if (!tout->selection_active) {
+        tout->selection_active = TRUE;
+        tout->selection_start = tout->edit_pos;
+    }
     tout->edit_pos++;
     tout->cursor_col = tout->prompt_length + tout->edit_pos;
     REDRAW_CURRENT_LINE();
@@ -560,6 +680,20 @@ VOID HANDLE_LE_DEFAULT(KEYPRESS *kp, MODIFIERS *mod) {
     if (tout->prompt_length + len >= vis_cols - 1) return;
     if (len >= CUR_LINE_MAX_LENGTH - 1) return;
 
+    if (tout->selection_active) {
+        U32 s_start = tout->selection_start;
+        U32 s_end   = tout->edit_pos;
+        if (s_start > s_end) { U32 t = s_start; s_start = s_end; s_end = t; }
+        
+        U32 count = s_end - s_start;
+        for (U32 i = s_start; i <= len - count; i++)
+            tout->current_line[i] = tout->current_line[i + count];
+        
+        tout->edit_pos = s_start;
+        tout->selection_active = FALSE;
+        len = STRLEN(tout->current_line); /* Re-calculate length after deletion */
+    }
+
     /* Shift right for insertion */
     for (U32 i = len + 1; i > tout->edit_pos; i--)
         tout->current_line[i] = tout->current_line[i - 1];
@@ -584,6 +718,7 @@ VOID HANDLE_LE_END(VOID) {
 
 VOID HANDLE_LE_CTRL_LEFT(VOID) {
     if (tout->edit_pos == 0) return;
+    tout->selection_active = FALSE;
 
     while (tout->edit_pos > 0 && tout->current_line[tout->edit_pos - 1] == ' ')
         tout->edit_pos--;
@@ -597,6 +732,7 @@ VOID HANDLE_LE_CTRL_LEFT(VOID) {
 VOID HANDLE_LE_CTRL_RIGHT(VOID) {
     U32 len = STRLEN(tout->current_line);
     if (tout->edit_pos >= len) return;
+    tout->selection_active = FALSE;
 
     while (tout->edit_pos < len && tout->current_line[tout->edit_pos] != ' ')
         tout->edit_pos++;

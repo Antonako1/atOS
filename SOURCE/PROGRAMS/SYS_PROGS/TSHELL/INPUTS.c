@@ -19,8 +19,14 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
 
     switch (kp->keycode) {
     case KEY_ENTER:     HANDLE_LE_ENTER(); break;
-    case KEY_BACKSPACE: HANDLE_LE_BACKSPACE(); break;
-    case KEY_DELETE:    HANDLE_LE_DELETE(); break;
+    case KEY_BACKSPACE: 
+        if (mod->ctrl) HANDLE_LE_CTRL_BACKSPACE();
+        else           HANDLE_LE_BACKSPACE(); 
+        break;
+    case KEY_DELETE:    
+        if (mod->ctrl) HANDLE_LE_CTRL_DELETE();
+        else           HANDLE_LE_DELETE(); 
+        break;
     case KEY_HOME:      HANDLE_LE_HOME(); break;
     case KEY_END:       HANDLE_LE_END(); break;
 
@@ -32,25 +38,23 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
         break;
 
     case KEY_ARROW_LEFT:
-        if (mod->ctrl) HANDLE_LE_CTRL_LEFT();
-        else           HANDLE_LE_ARROW_LEFT();
+        if (mod->shift) HANDLE_LE_SHIFT_ARROW_LEFT();
+        else if (mod->ctrl) HANDLE_LE_CTRL_LEFT();
+        else                HANDLE_LE_ARROW_LEFT();
         break;
 
     case KEY_ARROW_RIGHT:
-        if (mod->ctrl) HANDLE_LE_CTRL_RIGHT();
-        else           HANDLE_LE_ARROW_RIGHT();
+        if (mod->shift) HANDLE_LE_SHIFT_ARROW_RIGHT();
+        else if (mod->ctrl) HANDLE_LE_CTRL_RIGHT();
+        else                HANDLE_LE_ARROW_RIGHT();
         break;
 
     case KEY_PAGEUP:
-        if (mod->shift) {
-            TPUT_SCROLL_UP(AMOUNT_OF_ROWS / 2);
-        }
+        TPUT_SCROLL_UP(get_vis_rows() / 2);
         break;
 
     case KEY_PAGEDOWN:
-        if (mod->shift) {
-            TPUT_SCROLL_DOWN(AMOUNT_OF_ROWS / 2);
-        }
+        TPUT_SCROLL_DOWN(get_vis_rows() / 2);
         break;
 
     default:
