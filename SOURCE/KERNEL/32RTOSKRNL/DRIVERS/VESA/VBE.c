@@ -78,6 +78,7 @@ void flush_focused_framebuffer() {
     
     U32 copy_size = mode->BytesPerScanLineLinear * mode->YResolution;
     if (copy_size == 0) return;
+    if (copy_size > FRAMEBUFFER_SIZE) copy_size = FRAMEBUFFER_SIZE;
 
     if (early_mode) {
         // If early mode uses identity mapping or kernel mapping, use that:
@@ -144,7 +145,8 @@ void debug_vram_dump() {
 
 BOOLEAN VBE_DRAW_CHARACTER(U32 x, U32 y, U8 c, VBE_PIXEL_COLOUR fg, VBE_PIXEL_COLOUR bg) {
     VBE_MODEINFO* mode = GET_VBE_MODE();
-    if (x >= (U32)(mode->XResolution + VBE_CHAR_WIDTH) || y >= (U32)(mode->YResolution + VBE_CHAR_HEIGHT)) return FALSE;
+    if (!mode) return FALSE;
+    if (x >= (U32)mode->XResolution || y >= (U32)mode->YResolution) return FALSE;
 
     c -= UNUSABLE_CHARS; // Align char according to VBE_MAX_CHARS
     if(c >= (U32)VBE_MAX_CHARS) return FALSE; // Invalid character
@@ -247,8 +249,7 @@ BOOLEAN VBE_DRAW_FRAMEBUFFER(U32 pos, VBE_PIXEL_COLOUR colour) {
     if (!framebuffer || !mode) return FALSE;
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
     if (pos + bytes_per_pixel > mode->BytesPerScanLineLinear * mode->YResolution) return FALSE;
-    if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
-
+    // if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
     switch (bytes_per_pixel) {
         case 1:
             framebuffer[pos] = (U8)(colour & 0xFF);
@@ -286,17 +287,380 @@ BOOLEAN VBE_DRAW_PIXEL(VBE_PIXEL_INFO pixel_info) {
     if (!mode) return FALSE;
     
     if ((I32)pixel_info.X < 0 || (I32)pixel_info.Y < 0) return FALSE;
-    if ((U32)pixel_info.X >= SCREEN_WIDTH || (U32)pixel_info.Y >= SCREEN_HEIGHT) return FALSE;
+    if ((U32)pixel_info.X >= (U32)mode->XResolution || (U32)pixel_info.Y >= (U32)mode->YResolution) return FALSE;
     
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
     U32 pos = (pixel_info.Y * mode->BytesPerScanLineLinear) + (pixel_info.X * bytes_per_pixel);
     
-    return VBE_DRAW_FRAMEBUFFER(pos, pixel_info.Colour);
+    return VBE_DRAW_FRAMEBUFFER(pos, (VBE_PIXEL_COLOUR)pixel_info.Colour);
+}
+
+BOOLEAN VBE_DRAW_FILLED_RECTANGLE(U32 x0, U32 y0, U32 x1, U32 y1, VBE_PIXEL_COLOUR fill_colours);
+
+BOOLEAN VBE_DRAW_ELLIPSE(U32 x0, U32 y0, U32 a, U32 b, VBE_PIXEL_COLOUR fill_colours) {
+    if (a == 0 || b == 0) return FALSE;
+
+    I32 x = 0;
+    I32 y = (I32)b;
+    I32 a2 = (I32)(a * a);
+    I32 b2 = (I32)(b * b);
+    I32 err = b2 - (2 * b2 * x) + a2 * b2;
+    I32 err2;
+
+    BOOLEAN any = FALSE;
+
+    do {
+        if (x0 + x < SCREEN_WIDTH && y0 + y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + x, y0 + y, fill_colours));
+            any = TRUE;
+        }
+        if (x0 - x < SCREEN_WIDTH && y0 + y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 - x, y0 + y, fill_colours));
+            any = TRUE;
+        }
+        if (x0 - x < SCREEN_WIDTH && y0 - y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 - x, y0 - y, fill_colours));
+            any = TRUE;
+        }
+        if (x0 + x < SCREEN_WIDTH && y0 - y < SCREEN_HEIGHT) {
+            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO(x0 + x, y0 - y, fill_colours));
+            any = TRUE;
+        }
+
+        err2 = 2 * err;
+        if (err2 > -(2 * a2 * y)) {
+            err -= 2 * a2 * --y;
+        }
+        if (err2 < (2 * b2 * x)) {
+            err += 2 * b2 * ++x;
+        }
+    } while (y >= 0);
+}
+BOOLEAN VBE_DRAW_LINE(U32 x0_in, U32 y0_in, U32 x1_in, U32 y1_in, VBE_PIXEL_COLOUR colour) {
+    VBE_MODEINFO* mode = GET_VBE_MODE();
+    if (!mode) return FALSE;
+
+    #ifdef __RTOS__
+    U8* framebuffer = (U8*)current_frambuffer;
+    #else
+    U8* framebuffer = (U8*)(FRAMEBUFFER_ADDRESS);
+    #endif
+    if (!framebuffer) return FALSE;
+
+    U32 bpp = (mode->BitsPerPixel + 7) / 8;
+    U32 pitch = mode->BytesPerScanLineLinear;
+
+    /* ---- FAST PATH: horizontal line (most common in text rendering) ---- */
+    if (y0_in == y1_in) {
+        U32 y = y0_in;
+        if (y >= (U32)mode->YResolution) return FALSE;
+        U32 xa = x0_in < x1_in ? x0_in : x1_in;
+        U32 xb = x0_in > x1_in ? x0_in : x1_in;
+        if (xa >= (U32)mode->XResolution) return FALSE;
+        if (xb >= (U32)mode->XResolution) xb = (U32)mode->XResolution - 1;
+
+        U8 *row = framebuffer + y * pitch;
+        if (bpp == 4) {
+            U32 *row32 = (U32 *)(row) + xa;
+            U32 cnt = xb - xa + 1;
+            for (U32 i = 0; i < cnt; i++) row32[i] = colour;
+        } else if (bpp == 3) {
+            U8 b0 = (U8)(colour & 0xFF);
+            U8 b1 = (U8)((colour >> 8) & 0xFF);
+            U8 b2 = (U8)((colour >> 16) & 0xFF);
+            U8 *p = row + xa * 3;
+            for (U32 xx = xa; xx <= xb; xx++) {
+                *p++ = b0; *p++ = b1; *p++ = b2;
+            }
+        } else {
+            for (U32 xx = xa; xx <= xb; xx++)
+                VBE_DRAW_FRAMEBUFFER(y * pitch + xx * bpp, colour);
+        }
+        return TRUE;
+    }
+
+    /* ---- FAST PATH: vertical line ---- */
+    if (x0_in == x1_in) {
+        U32 x = x0_in;
+        if (x >= (U32)mode->XResolution) return FALSE;
+        U32 ya = y0_in < y1_in ? y0_in : y1_in;
+        U32 yb = y0_in > y1_in ? y0_in : y1_in;
+        if (ya >= (U32)mode->YResolution) return FALSE;
+        if (yb >= (U32)mode->YResolution) yb = (U32)mode->YResolution - 1;
+
+        for (U32 yy = ya; yy <= yb; yy++) {
+            U8 *p = framebuffer + yy * pitch + x * bpp;
+            if (bpp == 4) {
+                *(U32 *)p = colour;
+            } else if (bpp == 3) {
+                p[0] = (U8)(colour & 0xFF);
+                p[1] = (U8)((colour >> 8) & 0xFF);
+                p[2] = (U8)((colour >> 16) & 0xFF);
+            } else {
+                VBE_DRAW_FRAMEBUFFER(yy * pitch + x * bpp, colour);
+            }
+        }
+        return TRUE;
+    }
+
+    /* ---- General Bresenham for diagonal lines ---- */
+    I32 x0 = (I32)x0_in;
+    I32 y0 = (I32)y0_in;
+    I32 x1 = (I32)x1_in;
+    I32 y1 = (I32)y1_in;
+
+    I32 dx = abs(x1 - x0);
+    I32 sx = (x0 < x1) ? 1 : -1;
+    I32 dy = -abs(y1 - y0);
+    I32 sy = (y0 < y1) ? 1 : -1;
+    I32 err = dx + dy;
+
+    I32 max_iters = dx + abs(dy) + 4;
+    if (max_iters < 0) max_iters = FRAMEBUFFER_SIZE;
+    I32 iters = 0;
+
+    while (1) {
+        if ((U32)x0 < (U32)mode->XResolution && (U32)y0 < (U32)mode->YResolution) {
+            U8 *p = framebuffer + y0 * pitch + x0 * bpp;
+            if (bpp == 4) {
+                *(U32 *)p = colour;
+            } else if (bpp == 3) {
+                p[0] = (U8)(colour & 0xFF);
+                p[1] = (U8)((colour >> 8) & 0xFF);
+                p[2] = (U8)((colour >> 16) & 0xFF);
+            } else {
+                VBE_DRAW_FRAMEBUFFER(y0 * pitch + x0 * bpp, colour);
+            }
+        }
+
+        if (x0 == x1 && y0 == y1) break;
+        if (++iters > max_iters) return FALSE;
+
+        I32 e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; }
+        if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+
+    return TRUE;
+}
+BOOLEAN VBE_CLEAR_SCREEN(VBE_PIXEL_COLOUR colour) {
+    VBE_MODEINFO* mode = GET_VBE_MODE();
+    if (!mode) return FALSE;
+
+    #ifdef __RTOS__
+    U8* framebuffer = (U8*)current_frambuffer;
+    #else
+    U8* framebuffer = (U8*)(FRAMEBUFFER_ADDRESS);
+    #endif
+    if (!framebuffer) return FALSE;
+
+    U32 bpp = (mode->BitsPerPixel + 7) / 8;
+    U32 width = mode->XResolution;
+    U32 height = mode->YResolution;
+    U32 pitch = mode->BytesPerScanLineLinear;
+
+    if (bpp == 4) {
+        for (U32 y = 0; y < height; y++) {
+            U32 *fb32 = (U32 *)(framebuffer + y * pitch);
+            for (U32 x = 0; x < width; x++) fb32[x] = colour;
+        }
+    } else if (bpp == 3) {
+        U8 b0 = (U8)(colour & 0xFF);
+        U8 b1 = (U8)((colour >> 8) & 0xFF);
+        U8 b2 = (U8)((colour >> 16) & 0xFF);
+        for (U32 y = 0; y < height; y++) {
+            U8 *p = framebuffer + y * pitch;
+            for (U32 x = 0; x < width; x++) {
+                *p++ = b0; *p++ = b1; *p++ = b2;
+            }
+        }
+    } else {
+        U32 pos = 0;
+        for (U32 y = 0; y < height; y++) {
+            pos = y * pitch;
+            for (U32 x = 0; x < width; x++) {
+                VBE_DRAW_FRAMEBUFFER(pos, colour);
+                pos += bpp;
+            }
+        }
+    }
+
+    return TRUE;
 }
 
 
 
-BOOLEAN VBE_DRAW_ELLIPSE(U32 x0, U32 y0, U32 a, U32 b, VBE_PIXEL_COLOUR fill_colours) {
+
+BOOLEAN VBE_DRAW_RECTANGLE(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL_COLOUR colours) {
+    U32 errcnt = 0;
+    errcnt += !VBE_DRAW_LINE(x, y, x + width - 1, y, colours);
+    errcnt += !VBE_DRAW_LINE(x + width - 1, y, x + width - 1, y + height - 1, colours);
+    errcnt += !VBE_DRAW_LINE(x + width - 1, y + height - 1, x, y + height - 1, colours);
+    errcnt += !VBE_DRAW_LINE(x, y + height - 1, x, y, colours);
+    return errcnt == 0;
+}
+BOOLEAN VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
+    U32 errcnt = 0;
+    errcnt += !VBE_DRAW_LINE(x1, y1, x2, y2, colours);
+    errcnt += !VBE_DRAW_LINE(x2, y2, x3, y3, colours);
+    errcnt += !VBE_DRAW_LINE(x3, y3, x1, y1, colours);
+    return errcnt == 0;
+}
+
+BOOLEAN VBE_DRAW_RECTANGLE_FILLED(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL_COLOUR colours) {
+    if (width == 0 || height == 0) return FALSE;
+
+    /* calculate clipping boundaries */
+    U32 x0 = x;
+    U32 y0 = y;
+    U32 x1 = x + width;   /* exclusive */
+    U32 y1 = y + height;  /* exclusive */
+
+    /* clip to screen */
+    VBE_MODEINFO* mode = GET_VBE_MODE();
+    if (!mode) return FALSE;
+    if (x0 >= (U32)mode->XResolution || y0 >= (U32)mode->YResolution) return FALSE;
+    if (x1 > (U32)mode->XResolution) x1 = (U32)mode->XResolution;
+    if (y1 > (U32)mode->YResolution) y1 = (U32)mode->YResolution;
+
+    if (x0 >= x1 || y0 >= y1) return FALSE;
+
+    /* Delegate to the optimized VBE_DRAW_FILLED_RECTANGLE */
+    return VBE_DRAW_FILLED_RECTANGLE(x0, y0, x1, y1, colours);
+}
+
+
+BOOLEAN VBE_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
+    /* Compute bounding box (inclusive) */
+    U32 minx = x1;
+    if (x2 < minx) minx = x2;
+    if (x3 < minx) minx = x3;
+
+    U32 maxx = x1;
+    if (x2 > maxx) maxx = x2;
+    if (x3 > maxx) maxx = x3;
+
+    U32 miny = y1;
+    if (y2 < miny) miny = y2;
+    if (y3 < miny) miny = y3;
+
+    U32 maxy = y1;
+    if (y2 > maxy) maxy = y2;
+    if (y3 > maxy) maxy = y3;
+
+    /* Quick reject if bbox completely off-screen */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+    if (maxx < 0 || maxy < 0) return FALSE; /* defensive, though U32 can't be <0 */
+#pragma GCC diagnostic pop
+    VBE_MODEINFO* mode = GET_VBE_MODE();
+    if (!mode) return FALSE;
+    if (minx >= (U32)mode->XResolution || miny >= (U32)mode->YResolution) return FALSE;
+    /* Clip bounding box to screen */
+    if (minx >= (U32)mode->XResolution) return FALSE;
+    if (miny >= (U32)mode->YResolution) return FALSE;
+
+    U32 bx0 = minx;
+    U32 by0 = miny;
+    U32 bx1 = maxx;
+    U32 by1 = maxy;
+
+    if (bx0 >= (U32)mode->XResolution) bx0 = (U32)mode->XResolution - 1;
+    if (by0 >= (U32)mode->YResolution) by0 = (U32)mode->YResolution - 1;
+    if (bx1 >= (U32)mode->XResolution) bx1 = (U32)mode->XResolution - 1;
+    if (by1 >= (U32)mode->YResolution) by1 = (U32)mode->YResolution - 1;
+
+    /* Use integer edge functions (64-bit to avoid overflow) */
+    const I32 ax = (I32)x1;
+    const I32 ay = (I32)y1;
+    const I32 bx = (I32)x2;
+    const I32 by = (I32)y2;
+    const I32 cx = (I32)x3;
+    const I32 cy = (I32)y3;
+
+    VBE_PIXEL_INFO p;
+    p.Colour = colours;
+    BOOLEAN any = FALSE;
+
+    for (U32 yy = bx0 /* dummy init */; yy <= bx1; ++yy) { /* we will overwrite loops below */
+        break;
+    }
+    /* iterate y then x within clipped bbox */
+    for (U32 yy = by0; yy <= by1; ++yy) {
+        for (U32 xx = bx0; xx <= bx1; ++xx) {
+            /* compute edge functions relative to point (xx, yy) */
+            I32 px = (I32)xx;
+            I32 py = (I32)yy;
+
+            I32 e0 = (bx - ax) * (py - ay) - (by - ay) * (px - ax); /* edge AB */
+            I32 e1 = (cx - bx) * (py - by) - (cy - by) * (px - bx); /* edge BC */
+            I32 e2 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx); /* edge CA */
+
+            /* point is inside if all edge functions have same sign (or zero) */
+            if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0)) {
+                p.X = xx;
+                p.Y = yy;
+                if (VBE_DRAW_PIXEL(p)) any = TRUE;
+            }
+        }
+    }
+
+    return any;
+}
+
+BOOLEAN VBE_DRAW_FILLED_RECTANGLE(U32 x0, U32 y0, U32 x1, U32 y1, VBE_PIXEL_COLOUR fill_colours) {
+    if (x0 >= x1 || y0 >= y1) return FALSE;
+
+    /* clip to screen */
+    VBE_MODEINFO* mode = GET_VBE_MODE();
+    if (!mode) return FALSE;
+
+    if (x0 >= (U32)mode->XResolution || y0 >= (U32)mode->YResolution) return FALSE;
+    if (x1 > (U32)mode->XResolution) x1 = (U32)mode->XResolution;
+    if (y1 > (U32)mode->YResolution) y1 = (U32)mode->YResolution;
+
+    #ifdef __RTOS__
+    U8* framebuffer = (U8*)current_frambuffer;
+    #else
+    U8* framebuffer = (U8*)(FRAMEBUFFER_ADDRESS);
+    #endif
+    if (!framebuffer) return FALSE;
+
+    U32 bpp = (mode->BitsPerPixel + 7) / 8;
+    U32 pitch = mode->BytesPerScanLineLinear;
+    U32 width = x1 - x0;
+
+    if (bpp == 4) {
+        for (U32 yy = y0; yy < y1; ++yy) {
+            U32 *row = (U32 *)(framebuffer + yy * pitch) + x0;
+            for (U32 i = 0; i < width; i++) row[i] = fill_colours;
+        }
+    } else if (bpp == 3) {
+        U8 b0 = (U8)(fill_colours & 0xFF);
+        U8 b1 = (U8)((fill_colours >> 8) & 0xFF);
+        U8 b2 = (U8)((fill_colours >> 16) & 0xFF);
+        for (U32 yy = y0; yy < y1; ++yy) {
+            U8 *p = framebuffer + yy * pitch + x0 * 3;
+            for (U32 i = 0; i < width; i++) {
+                *p++ = b0; *p++ = b1; *p++ = b2;
+            }
+        }
+    } else {
+        /* Fallback for other BPP */
+        VBE_PIXEL_INFO p;
+        p.Colour = fill_colours;
+        for (U32 yy = y0; yy < y1; ++yy) {
+            p.Y = yy;
+            for (U32 xx = x0; xx < x1; ++xx) {
+                p.X = xx;
+                VBE_DRAW_PIXEL(p);
+            }
+        }
+    }
+
+    return TRUE;
+}
+BOOLEAN VBE_DRAW_FILLED_ELLIPSE(U32 x0, U32 y0, U32 a, U32 b, VBE_PIXEL_COLOUR fill_colours) {
     I32 x = 0;
     I32 y = b;
     U32 a2 = a*a;
@@ -338,213 +702,6 @@ BOOLEAN VBE_DRAW_ELLIPSE(U32 x0, U32 y0, U32 a, U32 b, VBE_PIXEL_COLOUR fill_col
     }
     return TRUE;
 }
-BOOLEAN VBE_DRAW_LINE(U32 x0_in, U32 y0_in, U32 x1_in, U32 y1_in, VBE_PIXEL_COLOUR colour) {
-    I32 x0 = (I32)x0_in;
-    I32 y0 = (I32)y0_in;
-    I32 x1 = (I32)x1_in;
-    I32 y1 = (I32)y1_in;
-
-    I32 dx = abs(x1 - x0);
-    I32 sx = (x0 < x1) ? 1 : -1;
-    I32 dy = -abs(y1 - y0);
-    I32 sy = (y0 < y1) ? 1 : -1;
-    I32 err = dx + dy;  // error term
-    
-    // safety: upper-bound on iterations to avoid infinite loops while debugging
-    I32 max_iters = dx + abs(dy) + 4;
-    if (max_iters < 0) max_iters = FRAMEBUFFER_SIZE; // paranoid fallback. Loops should not exceed framebuffer size
-    I32 iters = 0;
-    
-    while (1) {
-        // draw only when inside the screen bounds (VBE_DRAW_PIXEL already checks, but
-        // avoiding the call can be a tiny speedup)
-        if ((U32)x0 < SCREEN_WIDTH && (U32)y0 < SCREEN_HEIGHT) {
-            VBE_DRAW_PIXEL(CREATE_VBE_PIXEL_INFO((U32)x0, (U32)y0, colour));
-        }
-        
-        if (x0 == x1 && y0 == y1) break;
-        if (++iters > max_iters) {
-            // something went wrong — bail out to avoid hang
-            return FALSE;
-        }
-        
-        I32 e2 = 2 * err;
-        if (e2 >= dy) {
-            err += dy;
-            x0 += sx;
-        }
-        if (e2 <= dx) {
-            err += dx;
-            y0 += sy;
-        }
-    }
-
-    return TRUE;
-}
-BOOLEAN VBE_CLEAR_SCREEN(VBE_PIXEL_COLOUR colour) {
-    VBE_MODEINFO* mode = GET_VBE_MODE();
-    if (!mode) return FALSE;
-    U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
-    U32 total_bytes = mode->BytesPerScanLineLinear * mode->YResolution;
-    U32 total_pixels = total_bytes / bytes_per_pixel;
-    U32 pos = 0;
-    
-    for (U32 i = 0; i < total_pixels; i++) {
-        if (!VBE_DRAW_FRAMEBUFFER(pos, colour)) {
-            return FALSE;
-        }
-        pos += bytes_per_pixel;
-    }
-
-    return TRUE;
-}
-
-
-
-
-BOOLEAN VBE_DRAW_RECTANGLE(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL_COLOUR colours) {
-    if (width == 0 || height == 0) {
-        return TRUE;
-    }
-
-    U32 errcnt = 0;
-
-    if(!VBE_DRAW_LINE(x, y, width, y, colours)) errcnt++;
-    if(!VBE_DRAW_LINE(width, y, width, height, colours)) errcnt++;
-    if(!VBE_DRAW_LINE(width, height, x, height, colours)) errcnt++;
-    if(!VBE_DRAW_LINE(x, height, x, y, colours)) errcnt++;
-
-    return errcnt == 0;
-}
-BOOLEAN VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
-    VBE_DRAW_LINE(x1, y1, x2, y2, colours);
-    VBE_DRAW_LINE(x2, y2, x3, y3, colours);
-    VBE_DRAW_LINE(x3, y3, x1, y1, colours);
-    return TRUE;
-}
-
-// #include <stddef.h> /* for NULL if needed */
-
-/* assume these types/macros exist in your codebase */
-// #ifndef TRUE
-// #define TRUE  1
-// #define FALSE 0
-// #endif
-
-/* prototypes already exist in your codebase:
-   BOOLEAN VBE_DRAW_PIXEL(VBE_PIXEL_INFO pixel_info);
-   extern const U32 SCREEN_WIDTH, SCREEN_HEIGHT;
-   VBE_PIXEL_INFO has members: U32 X, Y; VBE_PIXEL_COLOUR Colour;
-*/
-
-BOOLEAN VBE_DRAW_RECTANGLE_FILLED(U32 x, U32 y, U32 width, U32 height, VBE_PIXEL_COLOUR colours) {
-    if (width == 0 || height == 0) return FALSE;
-
-    /* calculate clipping boundaries */
-    U32 x0 = x;
-    U32 y0 = y;
-    U32 x1 = x + width;   /* exclusive */
-    U32 y1 = y + height;  /* exclusive */
-
-    /* clip to screen */
-    if (x0 >= SCREEN_WIDTH || y0 >= SCREEN_HEIGHT) return FALSE;
-    if (x1 > SCREEN_WIDTH) x1 = SCREEN_WIDTH;
-    if (y1 > SCREEN_HEIGHT) y1 = SCREEN_HEIGHT;
-
-    if (x0 >= x1 || y0 >= y1) return FALSE;
-
-    VBE_PIXEL_INFO p;
-    p.Colour = colours;
-    BOOLEAN any = FALSE;
-
-    for (U32 yy = y0; yy < y1; ++yy) {
-        p.Y = yy;
-        for (U32 xx = x0; xx < x1; ++xx) {
-            p.X = xx;
-            if (VBE_DRAW_PIXEL(p)) any = TRUE;
-        }
-    }
-
-    return any;
-}
-
-
-BOOLEAN VBE_DRAW_TRIANGLE_FILLED(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours) {
-    /* Compute bounding box (inclusive) */
-    U32 minx = x1;
-    if (x2 < minx) minx = x2;
-    if (x3 < minx) minx = x3;
-
-    U32 maxx = x1;
-    if (x2 > maxx) maxx = x2;
-    if (x3 > maxx) maxx = x3;
-
-    U32 miny = y1;
-    if (y2 < miny) miny = y2;
-    if (y3 < miny) miny = y3;
-
-    U32 maxy = y1;
-    if (y2 > maxy) maxy = y2;
-    if (y3 > maxy) maxy = y3;
-
-    /* Quick reject if bbox completely off-screen */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wtype-limits"
-    if (maxx < 0 || maxy < 0) return FALSE; /* defensive, though U32 can't be <0 */
-#pragma GCC diagnostic pop
-    if (minx >= SCREEN_WIDTH || miny >= SCREEN_HEIGHT) return FALSE;
-    /* Clip bounding box to screen */
-    if (minx >= SCREEN_WIDTH) return FALSE;
-    if (miny >= SCREEN_HEIGHT) return FALSE;
-
-    U32 bx0 = minx;
-    U32 by0 = miny;
-    U32 bx1 = maxx;
-    U32 by1 = maxy;
-
-    if (bx0 >= SCREEN_WIDTH) bx0 = SCREEN_WIDTH - 1;
-    if (by0 >= SCREEN_HEIGHT) by0 = SCREEN_HEIGHT - 1;
-    if (bx1 >= SCREEN_WIDTH) bx1 = SCREEN_WIDTH - 1;
-    if (by1 >= SCREEN_HEIGHT) by1 = SCREEN_HEIGHT - 1;
-
-    /* Use integer edge functions (64-bit to avoid overflow) */
-    const I32 ax = (I32)x1;
-    const I32 ay = (I32)y1;
-    const I32 bx = (I32)x2;
-    const I32 by = (I32)y2;
-    const I32 cx = (I32)x3;
-    const I32 cy = (I32)y3;
-
-    VBE_PIXEL_INFO p;
-    p.Colour = colours;
-    BOOLEAN any = FALSE;
-
-    for (U32 yy = bx0 /* dummy init */; yy <= bx1; ++yy) { /* we will overwrite loops below */
-        break;
-    }
-    /* iterate y then x within clipped bbox */
-    for (U32 yy = by0; yy <= by1; ++yy) {
-        for (U32 xx = bx0; xx <= bx1; ++xx) {
-            /* compute edge functions relative to point (xx, yy) */
-            I32 px = (I32)xx;
-            I32 py = (I32)yy;
-
-            I32 e0 = (bx - ax) * (py - ay) - (by - ay) * (px - ax); /* edge AB */
-            I32 e1 = (cx - bx) * (py - by) - (cy - by) * (px - bx); /* edge BC */
-            I32 e2 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx); /* edge CA */
-
-            /* point is inside if all edge functions have same sign (or zero) */
-            if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0)) {
-                p.X = xx;
-                p.Y = yy;
-                if (VBE_DRAW_PIXEL(p)) any = TRUE;
-            }
-        }
-    }
-
-    return any;
-}
-
 
 
 /* Saved for later:

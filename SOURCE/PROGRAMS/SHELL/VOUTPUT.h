@@ -44,8 +44,12 @@ OutputHandle GetOutputHandle(void);
 #define LEND "\r\n" // Line end (CR+LF)
 #undef  SCREEN_WIDTH
 #undef  SCREEN_HEIGHT
+#ifndef SCREEN_WIDTH
 #define SCREEN_WIDTH  1024
+#endif
+#ifndef SCREEN_HEIGHT
 #define SCREEN_HEIGHT 768
+#endif
 
 #define CHAR_WIDTH    8
 #define CHAR_HEIGHT   16

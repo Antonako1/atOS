@@ -1,4 +1,4 @@
-Screen driver utilises VESA/VBE screen buffer, allowing 1024x768 resolution with 32 colours
+Screen driver utilises VESA/VBE screen buffer, allowing 1024x768 resolution with 24-bit colour
 
 
  - VESA.h

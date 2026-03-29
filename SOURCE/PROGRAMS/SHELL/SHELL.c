@@ -80,6 +80,7 @@ U0 INITIALIZE_SHELL() {
     shndl->previously_focused_pid = shndl->focused_pid;
     shndl->aborted = FALSE;
     shndl->active_kb = TRUE;
+    shndl->type = 1;
     SWITCH_LINE_EDIT_MODE();
 
     // --- DEBUG ---

@@ -223,6 +223,16 @@ BOOL ATUI_INITIALIZE(PU8 fnt, ATUI_CONF cnf) {
     // colours
     display.fg = VBE_WHITE;
     display.bg = VBE_BLACK;
+    display.current_attrs = ATUI_A_NORMAL;
+
+    // background cell
+    display.bkgd.c = ' ';
+    display.bkgd.fg = VBE_WHITE;
+    display.bkgd.bg = VBE_BLACK;
+    display.bkgd.attrs = ATUI_A_NORMAL;
+
+    // input timeout (default: blocking)
+    display.input_timeout = -1;
 
     ATUI_CLEAR();
 
@@ -294,6 +304,41 @@ VOID ATUI_SET_COLOR(VBE_COLOUR fg, VBE_COLOUR bg) {
     display.bg = bg;
 }
 
+/* ================= ATTRIBUTES ================= */
+
+VOID ATUI_ATTRON(U8 attrs) {
+    INIT_CHECK_VOID();
+    display.current_attrs |= attrs;
+}
+
+VOID ATUI_ATTROFF(U8 attrs) {
+    INIT_CHECK_VOID();
+    display.current_attrs &= ~attrs;
+}
+
+VOID ATUI_ATTRSET(U8 attrs) {
+    INIT_CHECK_VOID();
+    display.current_attrs = attrs;
+}
+
+U8 ATUI_ATTRGET() {
+    INIT_CHECK_RET(0);
+    return display.current_attrs;
+}
+
+/* ================= BACKGROUND CHARACTER ================= */
+
+VOID ATUI_BKGD(CHAR_CELL cell) {
+    INIT_CHECK_VOID();
+    display.bkgd = cell;
+}
+
+CHAR_CELL ATUI_GETBKGD() {
+    CHAR_CELL empty = { 0 };
+    INIT_CHECK_RET(empty);
+    return display.bkgd;
+}
+
 VOID ATUI_ADDCH(CHAR c) {
     INIT_CHECK_VOID();
 
@@ -349,7 +394,8 @@ VOID ATUI_ADDCH(CHAR c) {
     U32 i = y * display.cols + x;
     if(display.back_buffer[i].c == c &&
        display.back_buffer[i].fg == display.fg &&
-       display.back_buffer[i].bg == display.bg) {
+       display.back_buffer[i].bg == display.bg &&
+       display.back_buffer[i].attrs == display.current_attrs) {
         // no change, just move cursor
         atui_cursor_move(y, x + 1);
         return;
@@ -357,6 +403,7 @@ VOID ATUI_ADDCH(CHAR c) {
     display.back_buffer[i].c  = c;
     display.back_buffer[i].fg = display.fg;
     display.back_buffer[i].bg = display.bg;
+    display.back_buffer[i].attrs = display.current_attrs;
     display.dirty[i] = TRUE;
 
     // advance cursor
@@ -374,9 +421,10 @@ VOID ATUI_CLEAR() {
     INIT_CHECK_VOID();
     // Initialize colours to buffer
     for (U32 i = 0; i < display.cols * display.rows; i++) {
-        display.back_buffer[i].c  = ' ';
+        display.back_buffer[i].c  = display.bkgd.c ? display.bkgd.c : ' ';
         display.back_buffer[i].fg = display.fg;
         display.back_buffer[i].bg = display.bg;
+        display.back_buffer[i].attrs = ATUI_A_NORMAL;
         display.dirty[i] = TRUE;
     }
 }
@@ -393,6 +441,7 @@ VOID ATUI_CLRTOEOL() {
         display.back_buffer[pos].c  = ' ';
         display.back_buffer[pos].fg = display.fg;
         display.back_buffer[pos].bg = display.bg;
+        display.back_buffer[pos].attrs = ATUI_A_NORMAL;
         display.dirty[pos] = TRUE;
     }
 }
@@ -410,6 +459,7 @@ VOID ATUI_CLRTOBOT() {
         display.back_buffer[pos].c  = ' ';
         display.back_buffer[pos].fg = display.fg;
         display.back_buffer[pos].bg = display.bg;
+        display.back_buffer[pos].attrs = ATUI_A_NORMAL;
         display.dirty[pos] = TRUE;
     }
 }
@@ -487,6 +537,34 @@ VOID ATUI_MVADDSTR(U32 y, U32 x, CHAR *str) {
 PS2_KB_DATA* ATUI_GETCH() {
     PS2_KB_DATA *kp;
 
+    I32 timeout = display.input_timeout;
+
+    // Non-blocking mode (timeout == 0)
+    if (timeout == 0) {
+        return ATUI_GETCH_NB();
+    }
+
+    // Timed mode (timeout > 0)
+    if (timeout > 0) {
+        U32 deadline = GET_PIT_TICKS() + (U32)timeout;
+        while (GET_PIT_TICKS() < deadline) {
+            kp = kb_poll();
+            if (!kp || !kp->cur.pressed) {
+                YIELD();
+                continue;
+            }
+            INT result = atui_process_key(kp);
+            if (IS_FLAG_SET(display.cnf, ATUIC_ECHO)) {
+                if (result >= 0 && result < 256)
+                    ATUI_ADDCH(result);
+            }
+            ATUI_REFRESH();
+            return kp;
+        }
+        return NULLPTR; // timeout expired
+    }
+
+    // Blocking mode (timeout < 0, default)
     while (1) {
         kp = kb_poll();
         if (!kp) {
@@ -519,9 +597,8 @@ PS2_KB_DATA* ATUI_GETCH_NB() {
         if (result >= 0 && result < 256) {
             ATUI_ADDCH(result);
         }
+        ATUI_REFRESH();
     }
-    
-    ATUI_REFRESH();
 
     return kp;
 }
@@ -580,4 +657,229 @@ ATUI_MOUSE* ATUI_MOUSE_POLL() {
 ATUI_MOUSE* ATUI_MOUSE_GET() {
     INIT_CHECK_RET(NULLPTR);
     return &display.mouse;
+}
+
+/* ================================================================ */
+/*  inch / instr — read characters from screen                      */
+/* ================================================================ */
+
+CHAR_CELL ATUI_INCH() {
+    CHAR_CELL empty = { 0 };
+    INIT_CHECK_RET(empty);
+    U32 idx = display.cursor.row * display.cols + display.cursor.col;
+    return display.back_buffer[idx];
+}
+
+CHAR_CELL ATUI_MVINCH(U32 y, U32 x) {
+    CHAR_CELL empty = { 0 };
+    INIT_CHECK_RET(empty);
+    if (y >= display.rows || x >= display.cols) return empty;
+    return display.back_buffer[y * display.cols + x];
+}
+
+U32 ATUI_INSTR(CHAR *buf, U32 maxlen) {
+    INIT_CHECK_RET(0);
+    if (!buf || maxlen == 0) return 0;
+    U32 row = display.cursor.row;
+    U32 col = display.cursor.col;
+    U32 n = 0;
+    for (U32 x = col; x < display.cols && n < maxlen - 1; x++, n++) {
+        buf[n] = display.back_buffer[row * display.cols + x].c;
+    }
+    buf[n] = '\0';
+    return n;
+}
+
+U32 ATUI_MVINSTR(U32 y, U32 x, CHAR *buf, U32 maxlen) {
+    INIT_CHECK_RET(0);
+    ATUI_MOVE(y, x);
+    return ATUI_INSTR(buf, maxlen);
+}
+
+/* ================================================================ */
+/*  touch / untouch                                                 */
+/* ================================================================ */
+
+VOID ATUI_TOUCHSCREEN() {
+    INIT_CHECK_VOID();
+    MEMSET_OPT(display.dirty, TRUE, display.dirty_sz);
+}
+
+VOID ATUI_UNTOUCHSCREEN() {
+    INIT_CHECK_VOID();
+    MEMSET_OPT(display.dirty, FALSE, display.dirty_sz);
+}
+
+/* ================================================================ */
+/*  cursor_set (expanded: 0=invisible, 1=underline, 2=block)        */
+/* ================================================================ */
+
+VOID ATUI_CURS_SET(U32 visibility) {
+    INIT_CHECK_VOID();
+    switch (visibility) {
+        case 0: // invisible
+            FLAG_UNSET(display.cnf, ATUIC_CURSOR_VISIBLE);
+            break;
+        case 1: // normal (underline)
+            FLAG_SET(display.cnf, ATUIC_CURSOR_VISIBLE);
+            FLAG_UNSET(display.cnf, ATUIC_INSERT_MODE);
+            break;
+        case 2: // very visible (block)
+            FLAG_SET(display.cnf, ATUIC_CURSOR_VISIBLE);
+            FLAG_SET(display.cnf, ATUIC_INSERT_MODE);
+            break;
+    }
+    // Mark cursor position dirty so shape changes immediately
+    display.dirty[display.cursor.row * display.cols + display.cursor.col] = TRUE;
+}
+
+/* ================================================================ */
+/*  timeout — configurable GETCH timeout                            */
+/* ================================================================ */
+
+VOID ATUI_TIMEOUT(I32 ms) {
+    INIT_CHECK_VOID();
+    display.input_timeout = ms;
+}
+
+/* ================================================================ */
+/*  getstr — read a line of input                                   */
+/* ================================================================ */
+
+U32 ATUI_GETSTR(CHAR *buf, U32 maxlen) {
+    INIT_CHECK_RET(0);
+    if (!buf || maxlen == 0) return 0;
+
+    U32 len = 0;
+    while (len < maxlen - 1) {
+        PS2_KB_DATA *kp = ATUI_GETCH();
+        if (!kp) continue;
+
+        U32 code = kp->cur.keycode;
+        if (code == KEY_ENTER) break;
+        if (code == KEY_ESC) { len = 0; break; }
+
+        CHAR c = keypress_to_char(code);
+        if (c == '\b') {
+            if (len > 0) {
+                len--;
+                if (IS_FLAG_SET(display.cnf, ATUIC_ECHO)) {
+                    ATUI_ADDCH('\b');
+                    ATUI_REFRESH();
+                }
+            }
+            continue;
+        }
+        if (c >= 32 && c < 127) {
+            buf[len++] = c;
+            if (IS_FLAG_SET(display.cnf, ATUIC_ECHO)) {
+                ATUI_ADDCH(c);
+                ATUI_REFRESH();
+            }
+        }
+    }
+    buf[len] = '\0';
+    return len;
+}
+
+/* ================================================================ */
+/*  keyname — return string name for a keycode                      */
+/* ================================================================ */
+
+static CHAR keyname_buf[16] ATTRIB_DATA = { 0 };
+
+CHAR* ATUI_KEYNAME(U32 keycode) {
+    switch (keycode) {
+        case KEY_ENTER:       return "KEY_ENTER";
+        case KEY_ESC:         return "KEY_ESC";
+        case KEY_BACKSPACE:   return "KEY_BACKSPACE";
+        case KEY_TAB:         return "KEY_TAB";
+        case KEY_DELETE:      return "KEY_DELETE";
+        case KEY_INSERT:      return "KEY_INSERT";
+        case KEY_HOME:        return "KEY_HOME";
+        case KEY_END:         return "KEY_END";
+        case KEY_PAGEUP:      return "KEY_PGUP";
+        case KEY_PAGEDOWN:    return "KEY_PGDN";
+        case KEY_ARROW_UP:    return "KEY_UP";
+        case KEY_ARROW_DOWN:  return "KEY_DOWN";
+        case KEY_ARROW_LEFT:  return "KEY_LEFT";
+        case KEY_ARROW_RIGHT: return "KEY_RIGHT";
+        case KEY_F1:          return "KEY_F1";
+        case KEY_F2:          return "KEY_F2";
+        case KEY_F3:          return "KEY_F3";
+        case KEY_F4:          return "KEY_F4";
+        case KEY_F5:          return "KEY_F5";
+        case KEY_F6:          return "KEY_F6";
+        case KEY_F7:          return "KEY_F7";
+        case KEY_F8:          return "KEY_F8";
+        case KEY_F9:          return "KEY_F9";
+        case KEY_F10:         return "KEY_F10";
+        case KEY_F11:         return "KEY_F11";
+        case KEY_F12:         return "KEY_F12";
+        default: {
+            CHAR c = keypress_to_char(keycode);
+            if (c >= 32 && c < 127) {
+                keyname_buf[0] = c;
+                keyname_buf[1] = '\0';
+            } else {
+                SPRINTF(keyname_buf, "0x%x", keycode);
+            }
+            return keyname_buf;
+        }
+    }
+}
+
+/* ================================================================ */
+/*  insdelln — insert/delete lines at cursor                        */
+/* ================================================================ */
+
+VOID ATUI_INSDELLN(I32 n) {
+    INIT_CHECK_VOID();
+
+    U32 row = display.cursor.row;
+    U32 cols = display.cols;
+    U32 rows = display.rows;
+
+    if (n > 0) {
+        // Insert n blank lines above cursor, pushing content down
+        for (I32 r = (I32)rows - 1; r >= (I32)row + n; r--) {
+            MEMCPY_OPT(&display.back_buffer[r * cols],
+                        &display.back_buffer[(r - n) * cols],
+                        cols * sizeof(CHAR_CELL));
+            for (U32 c = 0; c < cols; c++)
+                display.dirty[r * cols + c] = TRUE;
+        }
+        // Clear the inserted lines
+        for (I32 r = row; r < (I32)row + n && r < (I32)rows; r++) {
+            for (U32 c = 0; c < cols; c++) {
+                U32 idx = r * cols + c;
+                display.back_buffer[idx].c = ' ';
+                display.back_buffer[idx].fg = display.fg;
+                display.back_buffer[idx].bg = display.bg;
+                display.back_buffer[idx].attrs = ATUI_A_NORMAL;
+                display.dirty[idx] = TRUE;
+            }
+        }
+    } else if (n < 0) {
+        I32 del = -n;
+        // Delete |n| lines at cursor, pulling content up
+        for (U32 r = row; r + del < rows; r++) {
+            MEMCPY_OPT(&display.back_buffer[r * cols],
+                        &display.back_buffer[(r + del) * cols],
+                        cols * sizeof(CHAR_CELL));
+            for (U32 c = 0; c < cols; c++)
+                display.dirty[r * cols + c] = TRUE;
+        }
+        // Clear the vacated lines at the bottom
+        for (U32 r = rows - del; r < rows; r++) {
+            for (U32 c = 0; c < cols; c++) {
+                U32 idx = r * cols + c;
+                display.back_buffer[idx].c = ' ';
+                display.back_buffer[idx].fg = display.fg;
+                display.back_buffer[idx].bg = display.bg;
+                display.back_buffer[idx].attrs = ATUI_A_NORMAL;
+                display.dirty[idx] = TRUE;
+            }
+        }
+    }
 }

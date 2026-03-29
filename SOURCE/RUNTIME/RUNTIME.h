@@ -10,4 +10,8 @@ typedef void (*exit_func_t)(void);
 #endif // MAX_ON_EXIT_FUNCTIONS
 BOOL ON_EXIT(exit_func_t fn);
 
+#ifdef RUNTIME_ATGL
+#include <LIBRARIES/ATGL/ATGL.h>
+#endif // RUNTIME_ATGL
+
 #endif // RUNTIME_H

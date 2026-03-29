@@ -160,7 +160,11 @@ VOIDPTR KMALLOC(U32 size) {
     KHeapBlock *best_fit;
 
     panic_if(!heap_initialized, "KMALLOC on uninitialized heap", 0);
-    panic_if(size == 0, "KMALLOC with size 0", 0);
+    // panic_if(size == 0, "KMALLOC with size 0", 0);
+    if(size == 0) {
+        KDEBUG_PUTS("KMALLOC called with size 0, returning NULLPTR.\n");
+        return NULLPTR;
+    } // silently return NULL for zero-size allocation, like standard malloc()
     ASSERT(sizeof(KHeapBlock) % KHEAP_ALIGN == 0);
 
     aligned_size = ALIGN_UP_U32(size, KHEAP_ALIGN);
@@ -300,7 +304,11 @@ VOID KFREE(VOIDPTR ptr) {
     KHeapBlock *current_block, *block_to_merge_from;
     KHeapBlock *prev_scanner, *next_block;
 
-    panic_if(ptr == NULLPTR, "KFREE: attempt to free null pointer", 0);
+    // panic_if(ptr == NULLPTR, "KFREE: attempt to free null pointer", 0);
+    if(ptr == NULLPTR) {
+        KDEBUG_PUTS("KFREE: attempt to free null pointer, ignoring.\n");    
+        return;
+    } // silently ignore free of null pointer, like standard free()
     panic_if(!heap_initialized, "KFREE on uninitialized heap", 0);
 
     /* Recover header */

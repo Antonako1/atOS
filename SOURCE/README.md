@@ -14,10 +14,7 @@ SOURCE/
 ├── STD/                # Standard library functions or reusable code
 ├── RUNTIME/            # Runtime environment source code
 ├── SYS_SRC/            # Source code files that are part of the internal system. Used by the AstraC compiler.
-├── ATOSH.PATH/         # atOShell default path values 
-├── ATOSHELL.SH/        # atOShell default startup script
-├── ATOSH.ENV_VARS/     # Default environment variables for atOShell
-├── ATOSH.HELP/         # atOShell help message structure
+├── TSHELL.SH/          # TShell default startup script
 └── USER_PROGRAMS       # File list of programs to be compiled and included. See DOCS\DEVELOPING.md
 ```
 

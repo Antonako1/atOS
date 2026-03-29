@@ -22,8 +22,8 @@ REMARKS
     Access VBE struct at memory address VBE_MODE_LOAD_ADDRESS_PHYS,
         or use macro GET_VBE_MODE()
 
-    OS runs in VBE 118h, 1024x768x32bpp.
-     Full 32-bit true colour (8:8:8, 0x00RRGGBB) is used.
+    OS runs in VBE 118h, 1024x768x24bpp.
+     Full 24-bit true colour (8:8:8, 0x00RRGGBB) is used.
 
     When compiling include VBE.c and VESA.c
 
@@ -40,10 +40,12 @@ FUNCTIONS
     BOOLEAN VBE_DRAW_PIXEL(...);            // Draws a pixel on the screen
     BOOLEAN VBE_DRAW_FRAMEBUFFER(...);      // Draws a pixel in the framebuffer
     BOOLEAN VBE_DRAW_ELLIPSE(...);          // Draws an ellipse on the screen
+    BOOLEAN VBE_DRAW_FILLED_ELLIPSE(...);   // Draws a filled ellipse on the screen
     BOOLEAN VBE_DRAW_LINE(...);             // Draws a line on the screen
     BOOLEAN VBE_DRAW_RECTANGLE(...);        // Draws a rectangle on the screen
+    BOOLEAN VBE_DRAW_FILLED_RECTANGLE(...); // Draws a filled rectangle on the screen
     BOOLEAN VBE_DRAW_TRIANGLE(...);         // Draws a triangle on the screen
-    BOOLEAN VBE_DRAW_TRIANGLE_FILLED(...);  // Draws a filled triangle on the screen
+    BOOLEAN VBE_DRAW_FILLED_TRIANGLE(...);  // Draws a filled triangle on the screen
 ---*/
 #ifndef VBE_H
 #define VBE_H
@@ -54,8 +56,6 @@ FUNCTIONS
 #define VBE_MODE_OFFSET (VESA_LOAD_ADDRESS_PHYS + VESA_CTRL_SIZE)
 #define VBE_MODE_LOAD_ADDRESS_PHYS (VBE_MODE_OFFSET)
 #define VBE_MODE_SIZE 256
-
-#define SCREEN_BPP 32
 
 /*
 Framebuffer is located at 0x08562000-0x0B000000
@@ -73,7 +73,7 @@ void update_current_framebuffer();
 void debug_vram_start();
 void debug_vram_dump();
 #endif
-// 8:8:8 (32-bit) color format — 0x00RRGGBB
+// 24-bit colour format: 0x00RRGGBB
 /*
 Usage as follows:
 Red min-max:   0-255
@@ -82,6 +82,7 @@ Blue min-max:  0-255
 */
 #define VBE_COLOUR(r, g, b) \
     (U32)(((U32)(r) << 16) | ((U32)(g) << 8) | (U32)(b))
+#define RGB(r, g, b) VBE_COLOUR(r, g, b)
 
 #define DECONSTRUCT_VBE_COLOUR(colour, r, g, b) \
     do { \
@@ -91,7 +92,7 @@ Blue min-max:  0-255
     } while (0)
 
 // Unique sentinel — not a real colour, used for transparency
-#define VBE_SEE_THROUGH ((U32)0x00010203)
+#define VBE_SEE_THROUGH ((U32)0x40010203)
 
 // Reds
 #define VBE_RED           VBE_COLOUR(255,   0,   0)
@@ -169,9 +170,9 @@ Blue min-max:  0-255
 #define VBE_NOTEPAD_PAPER2 VBE_COLOUR(230, 220, 170) // more muted, aged look
 #define VBE_NOTEPAD_PAPER3 VBE_COLOUR(255, 240, 180) // slightly orange tint
 
-// VBE_COLOUR types — 32-bit 0x00RRGGBB
+// VBE_COLOUR types — 24-bit 0x00RRGGBB
 typedef U32 VBE_PIXEL_COLOUR;
-typedef U32 VBE_COLOUR; // 32-bit true colour
+typedef U32 VBE_COLOUR; // 24-bit true colour
 #define VBE_COLOUR_DEFINED
 
 typedef struct {
@@ -679,7 +680,7 @@ REMARKS
 BOOLEAN VBE_DRAW_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours);
 
 /*+++
-BOOLEAN VBE_DRAW_TRIANGLE_FILLED(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours)
+BOOLEAN VBE_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours)
 
 DESCRIPTION
     Draws a filled triangle on the framebuffer.
@@ -713,6 +714,6 @@ REVISION HISTORY
 REMARKS
     This draws a filled triangle in the framebuffer.
 ---*/
-BOOLEAN VBE_DRAW_TRIANGLE_FILLED(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours);
+BOOLEAN VBE_DRAW_FILLED_TRIANGLE(U32 x1, U32 y1, U32 x2, U32 y2, U32 x3, U32 y3, VBE_PIXEL_COLOUR colours);
 #endif // __RTOS__ || KERNEL_ENTRY
 #endif

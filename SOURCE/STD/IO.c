@@ -8,9 +8,9 @@
 #include <PROGRAMS/SHELL/SHELL.h>
 #include <STD/DEBUG.h>
 #include <STD/ARG.h>
-
+#ifndef __SHELL__
 void putc(U8 c) {
-    STDOUT *stdout = GET_PROC_STDOUT();
+    STDOUT_BUF *stdout = GET_PROC_STDOUT();
     if (!stdout) {
         DEBUG_PRINTF("Print without stdout");
         return;
@@ -25,7 +25,7 @@ void putc(U8 c) {
 }
 
 void puts(U8 *str) {
-    STDOUT *stdout = GET_PROC_STDOUT();
+    STDOUT_BUF *stdout = GET_PROC_STDOUT();
     if (!stdout || !str) return;
     U32 len = STRNLEN(str, STDOUT_MAX_LENGTH);
     U32 space_left = STDOUT_MAX_LENGTH - 1 - stdout->buf_end;
@@ -39,6 +39,16 @@ void puts(U8 *str) {
     
     stdout->proc_seq++;
 }
+#else
+void putc(U8 c) {
+    (void)c;
+    // legacy shell. not in use
+}
+void puts(U8 *str) {
+    (void)str;
+    // legacy shell. not in use
+}
+#endif
 // For printf (direct console)
 VOID console_putch(CHAR c, VOID *ctx) {
     (VOID)ctx;

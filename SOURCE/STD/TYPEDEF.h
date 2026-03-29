@@ -140,6 +140,10 @@ typedef U8           BOOLEAN8;
 #define F32_MIN   (-3.402823466e+38F)
 #define F32_MAX   (3.402823466e+38F)
 
+#ifndef RUNTIME_ATGL
 #define CMAIN() U32 main(U32 argc, PPU8 argv) 
-
+#else
+#define CMAIN() U32 ATGL_MAIN(U32 argc, PPU8 argv)
+#include <RUNTIME/RUNTIME.h>
+#endif
 #endif // TYPEDEF_H

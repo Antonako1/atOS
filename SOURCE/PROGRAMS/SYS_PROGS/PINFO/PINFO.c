@@ -4,6 +4,7 @@
 #include <STD/TIME.h>
 #include <LIBRARIES/ARGHAND/ARGHAND.h>
 #include <RTOSKRNL/PROC/PROC.h>
+#include <STD/BINARY.h>
 
 VOID PRINT_HELP() {
     printf("Usage: pinfo [options]\n"
@@ -75,7 +76,7 @@ U32 main(U32 argc, PPU8 argv) {
                 i->pid, i->name, i->state, 
                 (i->pid == current->info.pid) ? "<SELF>" : 
                 (i->pid == 0) ? "<KERNEL>" :
-                (i->state_info == TCB_STATE_INFO_CHILD_PROC_HANDLER) ? "<SHELL>" :
+                (IS_FLAG_SET(i->state, TCB_STATE_INFO_CHILD_PROC_HANDLER)) ? "<SHELL>" :
                 "");
         }
 

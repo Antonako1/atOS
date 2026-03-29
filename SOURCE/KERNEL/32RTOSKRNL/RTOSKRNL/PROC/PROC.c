@@ -852,9 +852,17 @@ TrapFrame* pit_handler_task_control(TrapFrame *cur) {
     tcks++;
     if(EVERY_HZ(tcks, REFRESH_HZ) || past) {
         past = TRUE;
-        if(current_tcb->info.pid == master_tcb.info.pid || current_tcb->info.pid == focused_task->info.pid) {
-            flush_focused_framebuffer(); 
-            past = FALSE;
+        if(current_tcb->framebuffer_manual_flushing || 
+            (focused_task && focused_task->framebuffer_manual_flushing)) {
+            // if the current task is doing manual flushing, don't flush for it, even if it's focused
+        } else if(current_tcb->info.pid == master_tcb.info.pid || (focused_task && current_tcb->info.pid == focused_task->info.pid)) {
+            //failsafe
+            if(focused_task && focused_task->framebuffer_manual_flushing) {
+                // if focused task is doing manual flushing, don't flush, even if current is master or focused
+            } else {
+                flush_focused_framebuffer(); 
+                past = FALSE;
+            }
         }
     }
 
@@ -1178,6 +1186,41 @@ void handle_kernel_messages(void) {
             case PROC_MSG_TERMINATE_SELF:
                 KILL_PROCESS(msg->sender_pid);
                 break;
+            case PROC_MANUAL_FLUSH_FRAMEBUFFER: {
+                TCB *t = get_tcb_by_pid(msg->sender_pid);
+                KDEBUG_STR_HEX_LN("[proc_msg] Manual flush enabled for PID", msg->sender_pid);
+                if(t) {
+                    t->framebuffer_manual_flushing = TRUE;
+                }
+
+            } break;
+            case PROC_RECHECK_STATE: {
+                TCB *t = get_tcb_by_pid(msg->sender_pid);
+                t->info.state = msg->signal;
+                if(t) {
+                    if(IS_FLAG_SET(t->info.state, TCB_STATE_KILL)) {
+                        KDEBUG_PUTS("[proc_msg] Process marked for kill, killing...\n");
+                        KILL_PROCESS(t->info.pid);
+                    } else if(IS_FLAG_SET(t->info.state, TCB_STATE_INFO_CHILD_PROC_HANDLER)) {
+                        current_shell = t;
+                        // let it run as normal
+                    } else if(IS_FLAG_SET(t->info.state, TCB_STATE_ACTIVE)) {
+                        // do nothing, let it run
+                    } else {
+                        // unknown state, set to active by default
+                        KDEBUG_PUTS("[proc_msg] Process in unknown state, setting to active...\n");
+                        t->info.state = TCB_STATE_ACTIVE;
+                    }
+                }
+                break;
+            }
+            case PROC_AUTO_FLUSH_FRAMEBUFFER: {
+                TCB *t = get_tcb_by_pid(msg->sender_pid);
+                if(t) {
+                    t->framebuffer_manual_flushing = FALSE;
+                }
+                break;
+            }
             case PROC_MSG_SLEEP:
                 master->info.state = TCB_STATE_SLEEPING;
                 break;
@@ -1274,12 +1317,12 @@ void handle_kernel_messages(void) {
             } break;
             case PROC_MSG_CREATE_PROCESS: 
                 {
-                    if(!msg->data_provided || !msg->data || msg->data_size < sizeof(RUN_BINARY_STRUCT)) {
+                    RUN_BINARY_STRUCT *sct = msg->raw_data;
+                    if(!msg->raw_data || msg->raw_data_size < sizeof(RUN_BINARY_STRUCT)) {
                         KDEBUG_PUTS("[proc_msg] No data provided for PROC_MSG_CREATE_PROCESS\n");
                         goto free_create_proc_data;
                     };
                     KDEBUG_PUTS("[proc_msg] Creating new process\n");
-                    RUN_BINARY_STRUCT *sct = msg->data;
                     RUN_BINARY(
                         sct->proc_name,
                         sct->file,
@@ -1291,19 +1334,16 @@ void handle_kernel_messages(void) {
                         sct->argv,
                         sct->argc
                     );
-                    // KDEBUG_PUTS("Freeing args\n");
                     for(U32 i = 0; i < sct->argc; i++) {
                         KDEBUG_HEX32(i);
                         KDEBUG_PUTC('\n');
                         KFREE(sct->argv[i]);
                     }
-                    // KDEBUG_PUTS("To array\n");
                     KFREE(sct->argv);
+                    KDEBUG_PUTS("[proc_msg] New process created\n");
                     free_create_proc_data:
-                    // KDEBUG_PUTS("Freeing data\n");
 
                     KFREE(sct);
-                    KDEBUG_PUTS("[proc_msg] New process created\n");
                 }
                 break;
             case PROC_MSG_KILL_PROCESS:
