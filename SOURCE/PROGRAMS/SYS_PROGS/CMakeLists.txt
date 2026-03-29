@@ -72,7 +72,10 @@ function(add_system_program PROGNAME PROGDIR)
     # --- storage for collected files ---
     set(ALL_SOURCES "")
     set(ATOS_FILES "")
-    list(APPEND ALL_SOURCES "${RUNTIME_DIR}/RUNTIME.c")
+    # if -DNO_RUNTIME is not defined in BDEF, include RUNTIME.c by default
+    if(NOT DEFINED NO_RUNTIME)
+        list(APPEND ALL_SOURCES "${RUNTIME_DIR}/RUNTIME.c")
+    endif()
 
     # 1. Load program source files
     load_rows(PROG_SOURCES "${SOURCES_FILE}")

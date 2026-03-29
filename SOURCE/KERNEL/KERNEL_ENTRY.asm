@@ -488,7 +488,7 @@ read_done_for_kernel:
     jne VESA_ERROR1
 
     mov ax, 4F02h              ; VBE: Set VBE Mode
-    mov bx, 0x4000 | VESA_TARGET_MODE  ; Bit 14 = 1, mode = 0x117
+    mov bx, 0x4000 | VESA_TARGET_MODE  ; Bit 14 = 1, mode = 0x118
     int 10h
     cmp al, 4Fh
     jne VESA_ERROR2              ; Check for error

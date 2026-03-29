@@ -49,4 +49,5 @@
     { "mv",    CMD_NONE,    "Kills a process with the given pid. -h for help"},
     { "touch",    CMD_NONE,    "Kills a process with the given pid. -h for help"},
     { "del",    CMD_NONE,    "Kills a process with the given pid. -h for help"},
+    { "tshell",  CMD_NONE,    "Launch ATUI terminal shell" },
     

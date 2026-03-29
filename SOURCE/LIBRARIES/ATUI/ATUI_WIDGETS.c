@@ -30,6 +30,7 @@ static VOID wput(ATUI_WINDOW *win, U32 row, U32 col,
     win->buffer[idx].c  = c;
     win->buffer[idx].fg = fg;
     win->buffer[idx].bg = bg;
+    win->buffer[idx].attrs = ATUI_A_NORMAL;
     win->dirty[idx]     = TRUE;
 }
 

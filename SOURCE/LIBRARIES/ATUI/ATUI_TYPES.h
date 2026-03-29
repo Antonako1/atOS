@@ -6,11 +6,22 @@
 #include <PROC/PROC.h>
 #include <STD/FS_DISK.h>
 
+/* ================= CELL ATTRIBUTES ================= */
+
+#define ATUI_A_NORMAL    0x00
+#define ATUI_A_BOLD      0x01
+#define ATUI_A_UNDERLINE 0x02
+#define ATUI_A_REVERSE   0x04
+#define ATUI_A_DIM       0x08
+#define ATUI_A_BLINK     0x10
+#define ATUI_A_STANDOUT  (ATUI_A_REVERSE | ATUI_A_BOLD)
+
 /// @brief A character cell
 typedef struct _CHAR_CELL {
     VBE_COLOUR fg; 
     VBE_COLOUR bg;
     CHAR c;
+    U8 attrs;
 } ATTRIB_PACKED CHAR_CELL, *PCHAR_CELL;
 
 /// @brief Configurations for ATUI
@@ -25,8 +36,10 @@ typedef enum _ATUI_CONF {
     ATUIC_DEFAULT_MOUSE = ATUIC_DEFAULT | ATUIC_MOUSE_ENABLED,
 } ATUI_CONF;
 
-#define ATUI_MAX_WINDOWS 32
-#define ATUI_MAX_WIDGETS 32
+#define ATUI_MAX_WINDOWS  32
+#define ATUI_MAX_WIDGETS  32
+#define ATUI_MAX_PANELS   32
+#define ATUI_MAX_MENU_ITEMS 64
 
 /* ================= BOX-DRAWING CHARACTERS ================= */
 /* Codepage 437 / ASCII 255 box-drawing glyphs               */
@@ -66,6 +79,25 @@ typedef enum _ATUI_CONF {
 #define ATUI_CHECK_MARK     251  /* checkmark    √  */
 #define ATUI_BULLET         7    /* bullet       •  */
 #define ATUI_DIAMOND        4    /* diamond      ♦  */
+
+/* ================= ACS (Alternate Char Set) MACROS ================= */
+/* ncurses-compatible names mapped to CP437 box-drawing codepoints     */
+
+#define ATUI_ACS_ULCORNER   ATUI_BOX_TL     /* ┌  */
+#define ATUI_ACS_URCORNER   ATUI_BOX_TR     /* ┐  */
+#define ATUI_ACS_LLCORNER   ATUI_BOX_BL     /* └  */
+#define ATUI_ACS_LRCORNER   ATUI_BOX_BR     /* ┘  */
+#define ATUI_ACS_HLINE      ATUI_BOX_H      /* ─  */
+#define ATUI_ACS_VLINE      ATUI_BOX_V      /* │  */
+#define ATUI_ACS_PLUS       ATUI_BOX_CROSS  /* ┼  */
+#define ATUI_ACS_LTEE       ATUI_BOX_TEE_L  /* ├  */
+#define ATUI_ACS_RTEE       ATUI_BOX_TEE_R  /* ┤  */
+#define ATUI_ACS_TTEE       ATUI_BOX_TEE_T  /* ┬  */
+#define ATUI_ACS_BTEE       ATUI_BOX_TEE_B  /* ┴  */
+#define ATUI_ACS_DIAMOND    ATUI_DIAMOND    /* ♦  */
+#define ATUI_ACS_CKBOARD    ATUI_SHADE_MED  /* ▒  */
+#define ATUI_ACS_BLOCK      ATUI_BLOCK_FULL /* █  */
+#define ATUI_ACS_BULLET     ATUI_BULLET     /* •  */
 
 /* ================= WIDGET TYPES ================= */
 
@@ -181,6 +213,7 @@ typedef struct _ATUI_WINDOW {
 
     VBE_COLOUR fg;
     VBE_COLOUR bg;
+    U8 current_attrs;       // current attribute state for output
 
     BOOL boxed;
     BOOL scroll;
@@ -197,6 +230,19 @@ typedef struct _ATUI_WINDOW {
     U32 focused_widget;
 
     BOOL needs_full_redraw;
+
+    // --- subwindow support ---
+    struct _ATUI_WINDOW *parent;  // NULL for top-level windows
+    BOOL is_subwin;               // TRUE = buffer points into parent's buffer
+    BOOL is_derwin;               // TRUE = coords relative to parent interior
+    U32 par_y, par_x;             // offset within parent
+
+    // --- scroll region ---
+    U32 scroll_top;               // top of scrolling region (0-based interior row)
+    U32 scroll_bot;               // bottom of scrolling region (0-based interior row)
+
+    // --- background character ---
+    CHAR_CELL bkgd;               // background cell used for clearing
 
 } ATUI_WINDOW;
 
@@ -236,7 +282,8 @@ typedef struct _ATUI_DISPLAY {
     U32 rows;
     
     VBE_COLOUR fg; 
-    VBE_COLOUR bg; 
+    VBE_COLOUR bg;
+    U8 current_attrs;        // current attribute state for output
     
     struct {
         U32 col;
@@ -255,6 +302,10 @@ typedef struct _ATUI_DISPLAY {
     BOOL8 *dirty;
     U32 buffer_sz;
     U32 dirty_sz;
+
+    CHAR_CELL bkgd;          // background cell used for clearing
+
+    I32 input_timeout;       // GETCH timeout: <0=blocking, 0=non-blocking, >0=ms
     
     ATUI_MOUSE mouse;
     

@@ -903,6 +903,10 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
         }
 
         switch (*fmt) {
+            case '%': {
+                putch('%', ctx);
+                break;
+            }
             case 'f': {
                 F32 val = (F32)va_arg(args, double);
 

@@ -43,8 +43,8 @@ static inline VOID DRAW_CELL_BG_RUN(U32 col, U32 row, U32 len, VBE_PIXEL_COLOUR 
     U32 x = COL_TO_PIX(col);
     U32 y = ROW_TO_PIX(row);
     U32 cell_adv = CHAR_WIDTH + CHAR_SPACING;
-    U32 w = len * cell_adv - CHAR_SPACING; // include inner spacings, not trailing gap
-    DRAW_FILLED_RECTANGLE(x, y, w, CHAR_HEIGHT, bg);
+    U32 w = len * cell_adv;
+    DRAW_FILLED_RECTANGLE(x, y, x + w, y + CHAR_HEIGHT, bg);
 }
 
 

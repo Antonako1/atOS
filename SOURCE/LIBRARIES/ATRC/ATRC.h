@@ -621,7 +621,7 @@ done:
     return result;
 }
 
-/* ---------------- CREATE/READ/DESTROY ATC ----------------- */
+/* ---------------- CREATE/READ/DESTROY ATRC ----------------- */
 PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode) {
     DEBUG_PRINTF("Create atrcfd for file: %s\n", filepath);
     PATRC_FD fd = MAlloc(sizeof(ATRCFD));

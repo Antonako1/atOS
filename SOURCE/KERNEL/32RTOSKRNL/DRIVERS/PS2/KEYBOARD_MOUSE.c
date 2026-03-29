@@ -33,7 +33,7 @@ VOID UPDATE_KP_MOUSE_DATA(void) {
         g_input.kb.cur  = ev.key;
 
         update_modifiers(&g_input.kb.cur, &g_input.kb.mods);
-
+        g_input.kb.cur.ASCII = KEYPRESS_TO_CHARS(g_input.kb.cur.keycode);
         g_input.kb.seq++;
         g_input.kb_event = TRUE;
     }
@@ -404,11 +404,12 @@ static PS2_EVENT ps2_decode_next(void) {
                 ev.mouse.mouse2 = (status & 0x2) ? TRUE : FALSE; // Right
                 ev.mouse.mouse3 = (status & 0x4) ? TRUE : FALSE; // Middle
 
+
                 I32 rel_x = (status & 0x10) ? (I32)((I8)dec.mouse_bytes[1]) : (I32)dec.mouse_bytes[1];
                 I32 rel_y = (status & 0x20) ? (I32)((I8)dec.mouse_bytes[2]) : (I32)dec.mouse_bytes[2];
 
                 ev.mouse.x += rel_x;
-                ev.mouse.y -= rel_y; 
+                ev.mouse.y -= rel_y;
 
                 if ((I32)ev.mouse.x < 0) ev.mouse.x = 0;
                 if ((I32)ev.mouse.y < 0) ev.mouse.y = 0;

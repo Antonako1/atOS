@@ -1,0 +1,6 @@
+./TSHELL.c
+./TOUTPUT.c
+./ANSI.c
+./BATSH.c
+./DIR.c
+./INPUTS.c

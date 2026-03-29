@@ -637,8 +637,7 @@ BOOLEAN DIR_CREATE(PU8 path) {
             MFree(parent);
             return FALSE;
         }
-        // Same note as FILE_CREATE: real implementation should extract parent cluster.
-        parent_cluster = FAT32_GET_ROOT_CLUSTER();
+        parent_cluster = GET_FULL_CLUSTER(parent_ent.entry.HIGH_CLUSTER_BITS, parent_ent.entry.LOW_CLUSTER_BITS);
     }
 
     U32 out_cluster = 0;

@@ -51,17 +51,16 @@ This makes atOS ideal for learning, experimentation, and low-level programming w
 
 ## Features
 
-- 🖥️ **32-bit x86 Architecture** — runs on legacy and virtualized hardware (Not tested).
-- 🛠️ **Custom Language Support** — an integrated experimental language for writing applications.
-- 🔓 **No Safety Barriers** — Ring0, no protection layers or user/kernel enforcement, making it ideal for exploration and teaching.
-- 📖 **Open Source** — licensed under MIT, free to use, modify, and extend.
-- 🐧 **Educational Focus** — designed as a learning tool for understanding OS concepts, not for production use.
-- 🧩 **Modular Design** — components like memory management, file systems, and drivers are separated for easier study and modification.
-- 🖥️ **Graphical Output** — basic VBE graphics support for simple GUIs and visual applications.
-- 🗄️ **File System Support** — ISO9660 for CD-ROM images, FAT32 for hard drives.
-- 🖱️ **Input Handling** — keyboard and mouse drivers for user interaction.
-- 🐢 **Multitasking** — cooperative multitasking with a simple scheduler.
-- 🐚 **Shell Environment** — a basic command-line shell for interacting with the OS
+- 🖥️ **32-bit x86 Architecture** — runs on legacy and virtualized hardware.
+- 🛠️ **Custom Language Support** — integrated experimental [BATSH](DOCS/BATSH.md) shell language for scripting.
+- 🔓 **No Safety Barriers** — Ring 0, no protection layers or user/kernel enforcement, making it ideal for exploration.
+- 🗄️ **File System Support** — ISO9660 for CD-ROM images and FAT32 for local storage.
+- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries. Examples are SANDBOX.BIN, PAINT.BIN and TSHELL.BIN
+- 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), and Serial ports.
+- 🐢 **Multitasking** — simple cooperative scheduler for handling multiple processes.
+- 🐚 **Shell Environment** — a feature-rich command-line shell with path support and environment variables.
+- 🎮 **System Programs** — suite of utilities including `PAINT`, `CLOCK`, `PIANO`, and games like `PONG`.
+- 📖 **Open Source** — licensed under MIT, designed as a learning tool for systems programming.
 
 ---
 
@@ -145,12 +144,6 @@ The project uses `make` with simple targets:
   make iso run
   ```
 
-* **Build and launch atOS with ethernet driver:**
-
-  ```bash
-  sudo make iso runn
-  ```
-
 CMake is used for processes and libraries
 
 ### Debugging
@@ -168,12 +161,14 @@ Use `SOURCE/STD/DEBUG.h` or `SOURCE/KERNEL/32RTOSKRNL/DEBUG/KDEBUG.h`
 
 Planned and in-progress features for atOS:
 
-* [ ] Text editor
-* [ ] Dynamic libraries
-* [ ] GUI and TUI libraries
-* [ ] Assembler
-* [ ] Dissasembler
-* [ ] Compiler
+* [x] [ATUI](SOURCE/LIBRARIES/ATUI/README.md) & [ATGL](SOURCE/LIBRARIES/ATGL/README.md) UI/Graphics Libraries
+* [x] [BATSH](DOCS/BATSH.md) Scripting Language
+* [ ] Text Editor (Ironclad WIP)
+* [ ] Dynamic Library Loading
+* [ ] Assembler / Disassembler
+* [ ] C Compiler implementation
+* [ ] Improved ACPI & Power Management
+* [ ] Network Stack refinement (TCP/IP)
 
 *This roadmap is tentative and may evolve as the project grows.*
 

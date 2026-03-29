@@ -630,6 +630,7 @@ typedef enum {
 typedef struct _KEYPRESS{
     KEYCODES keycode;
     BOOLEAN pressed; // TRUE if key is pressed, FALSE if released
+    U8 ASCII;
 } KEYPRESS;
 
 typedef struct _MODIFIERS{

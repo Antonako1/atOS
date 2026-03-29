@@ -1535,8 +1535,15 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     // ---------------------------------------------------------------------
     if (STRICMP(ext, "BIN") == 0) {
         U32 pid = PROC_GETPID();
-        U32 res = START_PROCESS(abs_path_buf, data, file_size,
+        U32 res = 0;
+        DEBUG_PRINTF("Starting process: %s with args:", abs_path_buf);
+        if(STRICMP(abs_path_buf, "/ATOS/TSHELL.BIN") == 0) {
+            res = START_PROCESS(abs_path_buf, data, file_size, 
+                                TCB_STATE_ACTIVE | TCB_STATE_INFO_CHILD_PROC_HANDLER, 0, argv, argc);
+        } else {
+            res = START_PROCESS(abs_path_buf, data, file_size,
                                 TCB_STATE_ACTIVE, pid, argv, argc);
+        }
         if (res) PRINTNEWLINE();
         result = (res != 0);
     }
