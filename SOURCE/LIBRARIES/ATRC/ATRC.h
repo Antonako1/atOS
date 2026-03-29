@@ -115,9 +115,9 @@ BOOL ATRC_TO_BOOL(PU8 val); // Accepts: TRUE, 1, ON, FALSE, 0, 0FF. case-insensi
 #include <STD/FS_DISK.h>
 #ifdef ATRC_DEBUG
 #include <STD/DEBUG.h>
-#define DEBUG_PRINTF(...) DEBUG_PRINTF(__VA_ARGS__)
+#define DEBUG_PRINT(...) DEBUG_PRINTF("[ATRC] " __VA_ARGS__)
 #else
-#define DEBUG_PRINTF(...)
+#define DEBUG_PRINT(...) ((void)0)
 #endif
 /* --------- Helper: find key_value by name ---------- */
 PKEY_VALUE GET_KEY_VALUE(PKEY_VALUE_ARR arr, PU8 name) {
@@ -225,7 +225,7 @@ PU8 PARSE_VALUE(PU8 val, PKEY_VALUE_ARR vars) {
 
     out[out_pos] = '\0';
     str_trim(out);
-    DEBUG_PRINTF("Parsed value: '%s'\n", out);
+    DEBUG_PRINT("[ATRC] Parsed value: '%s'\n", out);
     return out;
 }
 
@@ -374,14 +374,14 @@ BOOL PARSE_ATRC(PATRC_FD fd)
     vars->len = 0;
 
     /* Create blockless block " " */
-    DEBUG_PRINTF("Creating default block\n");
+    DEBUG_PRINT("[ATRC] Creating default block\n");
     if (!ADD_BLOCK(blocks, " "))
         return FALSE;
 
     PBLOCK current_block = blocks->blocks[0];
 
     U8 line[1024];
-    DEBUG_PRINTF("Opening ATRC file: %s\n", fd->filepath);
+    DEBUG_PRINT("[ATRC] Opening ATRC file: %s\n", fd->filepath);
     file = FOPEN(fd->filepath, MODE_FR);
     if (!file)
         goto fail;
@@ -394,13 +394,13 @@ BOOL PARSE_ATRC(PATRC_FD fd)
     BOOL have_raw_target = FALSE;         // whether we currently have a %name% target to append into
 
     U32 ln = 0;
-    DEBUG_PRINTF("Starting to parse ATRC file: %s\n", fd->filepath);
+    DEBUG_PRINT("[ATRC] Starting to parse ATRC file: %s\n", fd->filepath);
     while (FILE_GET_LINE(file, line, sizeof(line)))
     {
         ln++;
         str_trim(line);
         U32 len = STRLEN(line);
-        DEBUG_PRINTF("ATRC: Line %d: '%s'\n", ln, line);
+        DEBUG_PRINT("[ATRC] ATRC: Line %d: '%s'\n", ln, line);
         /* First line must be #!ATRC */
         if (ln == 1) {
             if (STRICMP(line, "#!ATRC") != 0)
@@ -422,6 +422,7 @@ BOOL PARSE_ATRC(PATRC_FD fd)
            PREPROCESSOR / COMMENTS
         ============================ */
         if (line[0] == '#') {
+            DEBUG_PRINT("[ATRC] Line %d is a preprocessor or comment line\n", ln);
             if (line[1] == '.') {
                 PREPROC_DATA dt = {0};
                 U32 ptype = PARSE_PREPROCESSOR_TAG(line, len, &dt);
@@ -542,7 +543,7 @@ BOOL PARSE_ATRC(PATRC_FD fd)
            (normal non-raw-mode variables)
         ============================ */
         if (line[0] == '%') {
-            DEBUG_PRINTF("Parsing variable assignment line: %s\n", line);
+            DEBUG_PRINT("[ATRC] Parsing variable assignment line: %s\n", line);
             PU8 first_pct = line + 0;
             PU8 second_pct = STRCHR(first_pct + 1, '%');
             if (!second_pct) goto fail;
@@ -569,7 +570,7 @@ BOOL PARSE_ATRC(PATRC_FD fd)
            BLOCK HEADER  [block]
         ============================ */
         if (line[0] == '[') {
-            DEBUG_PRINTF("Parsing block header line: %s\n", line);
+            DEBUG_PRINT("[ATRC] Parsing block header line: %s\n", line);
             PU8 end = STRRCHR(line, ']');
             if (!end) goto fail;
             *end = '\0';
@@ -584,7 +585,7 @@ BOOL PARSE_ATRC(PATRC_FD fd)
            NORMAL KEY = VALUE
         ============================ */
         {
-            DEBUG_PRINTF("Parsing key/value line: %s\n", line);
+            DEBUG_PRINT("[ATRC] Parsing key/value line: %s\n", line);
             PU8 eq = STRCHR(line, '=');
             if (!eq) goto fail;
 
@@ -593,7 +594,7 @@ BOOL PARSE_ATRC(PATRC_FD fd)
             PU8 value_str = eq + 1;
             PU8 parsed = PARSE_VALUE(value_str, vars);
             if (!parsed) goto fail;
-            DEBUG_PRINTF("Adding key '%s' with value '%s' to block '%s'\n", key, parsed, current_block->name);
+            DEBUG_PRINT("[ATRC] Adding key '%s' with value '%s' to block '%s'\n", key, parsed, current_block->name);
             if (!ADD_KEY_VALUE(&current_block->keys, key, parsed)) {
                 MFree(parsed);
                 goto fail;
@@ -607,14 +608,14 @@ BOOL PARSE_ATRC(PATRC_FD fd)
     if (in_raw_string) goto fail;
 
     result = TRUE;
-    DEBUG_PRINTF("Successfully parsed ATRC file: %s\n", fd->filepath);
+    DEBUG_PRINT("[ATRC] Successfully parsed ATRC file: %s\n", fd->filepath);
     goto done;
 
 fail:
-    DEBUG_PRINTF("Failed to parse ATRC file: %s\n", fd->filepath);
+    DEBUG_PRINT("[ATRC] Failed to parse ATRC file: %s\n", fd->filepath);
     result = FALSE;
     DESTROY_ATRCFD(fd);
-
+    DEBUG_PRINT("[ATRC] Destroyed ATRCFD due to parse failure\n");
 done:
     if (file) FCLOSE(file);
     file = NULLPTR;
@@ -623,7 +624,7 @@ done:
 
 /* ---------------- CREATE/READ/DESTROY ATRC ----------------- */
 PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode) {
-    DEBUG_PRINTF("Create atrcfd for file: %s\n", filepath);
+    DEBUG_PRINT("[ATRC] Create atrcfd for file: %s\n", filepath);
     PATRC_FD fd = MAlloc(sizeof(ATRCFD));
     if(!fd) return NULLPTR;
     fd->filepath = NULLPTR;
@@ -634,12 +635,13 @@ PATRC_FD CREATE_ATRCFD(PU8 filepath, READMODES mode) {
     fd->vars.len = 0;
     if(!READ_ATRCFD(fd, filepath, mode)) {
         DESTROY_ATRCFD(fd);
+        DEBUG_PRINT("[ATRC] Failed to create ATRCFD for file: %s\n", filepath);
         return NULLPTR;
     }
     return fd;
 }
 BOOL READ_ATRCFD(PATRC_FD fd, PU8 filepath, READMODES mode) {
-    DEBUG_PRINTF("Reading atrcfd for file: %s\n", filepath);
+    DEBUG_PRINT("[ATRC] Reading atrcfd for file: %s\n", filepath);
     if(!filepath) return FALSE;
     if(!fd) CREATE_ATRCFD(filepath, mode);
     if(fd->filepath) { MFree(fd->filepath); fd->filepath = NULLPTR; }
@@ -647,7 +649,7 @@ BOOL READ_ATRCFD(PATRC_FD fd, PU8 filepath, READMODES mode) {
     fd->mode = mode;
     fd->blocks.len = 0;
     fd->vars.len = 0;
-    DEBUG_PRINTF("Parsing ATRC file: %s\n", fd->filepath);
+    DEBUG_PRINT("[ATRC] Parsing ATRC file: %s\n", fd->filepath);
     return PARSE_ATRC(fd);
 }
 VOID DESTROY_ATRCFD(PATRC_FD fd) {

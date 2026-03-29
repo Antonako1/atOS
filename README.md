@@ -59,7 +59,7 @@ This makes atOS ideal for learning, experimentation, and low-level programming w
 - 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), and Serial ports.
 - 🐢 **Multitasking** — simple cooperative scheduler for handling multiple processes.
 - 🐚 **Shell Environment** — a feature-rich command-line shell with path support and environment variables.
-- 🎮 **System Programs** — suite of utilities including `PAINT`, `CLOCK`, `PIANO`, and games like `PONG`.
+- 🎮 **System Programs** — suite of utilities including `PAINT`, `CLOCK`, `JOT (text editor)`, and games like `PONG`.
 - 📖 **Open Source** — licensed under MIT, designed as a learning tool for systems programming.
 
 ---
