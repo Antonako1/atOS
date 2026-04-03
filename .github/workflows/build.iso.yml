@@ -13,6 +13,8 @@ jobs:
       contents: write
 
     steps:
+      - name: Set build start time
+        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -28,10 +30,13 @@ jobs:
       # Build timing + summary
       # -------------------------
       - name: Set build end time
+        run: echo "END_TIME=$(date +%s)" >> $GITHUB_ENV
+      - name: Calculate build duration
         run: |
-          END_TIME=$(date +%s)
           START_TIME=${START_TIME}
+          END_TIME=${END_TIME}
           DURATION=$((END_TIME - START_TIME))
+          echo "DURATION=${DURATION}" >> $GITHUB_ENV
 
           echo "Build started at: $(date -d @$START_TIME)"
           echo "Build finished at: $(date -d @$END_TIME)"
