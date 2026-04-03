@@ -139,3 +139,8 @@ U8 keypress_to_char(U32 kcode) {
     U8 c = (U8)SYSCALL(SYSCALL_KEYPRESS_TO_CHARS, kcode, 0, 0, 0, 0);
     return c;
 }
+
+U32 char_to_keycode(U8 c) {
+    U32 kcode = SYSCALL(SYSCALL_CHAR_TO_KEYCODE, c, 0, 0, 0, 0);
+    return kcode;
+}

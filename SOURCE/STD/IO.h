@@ -91,5 +91,5 @@ PS2_MOUSE_DATA *mouse_peek(void); // returns mouse data gotten after last poll
 PS2_MOUSE_DATA *mouse_last(void); // return previous mouse data
 
 U8 keypress_to_char(U32 kcode);
-
+U32 char_to_keycode(U8 c);
 #endif // IO_H

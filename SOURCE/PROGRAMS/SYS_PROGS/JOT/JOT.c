@@ -22,7 +22,7 @@
         ^B  Go to bottom
 ---*/
 
-// #define ATRC_IMPLEMENTATION
+// #define ATRC_IMPLEMENTATION// defined in ATUI
 #include <STD/TYPEDEF.h>
 #include <STD/STRING.h>
 #include <STD/MEM.h>
@@ -31,6 +31,7 @@
 #include <STD/DEBUG.h>
 #include <STD/PROC_COM.h>
 #include <LIBRARIES/ATUI/ATUI.h>
+#include <LIBRARIES/ATUI/ATUI_WIDGETS.h>
 #include <LIBRARIES/ATRC/ATRC.h>
 
 /* ====== Configuration ====== */
@@ -46,7 +47,9 @@
 #define MAX_SYNTAX_KWS    64
 #define MAX_KW_LEN        32
 #define CONFIG_PATH       "/ATOS/CONFS/JOT/JOT.CNF"
-#define COLOUR_PATH       "/ATOS/CONFS/JOT/C_JOT.CNF"
+#define SYNTAX_BASE_PATH  "/ATOS/CONFS/JOT/"
+#define MAX_SYNTAX_EXT_MAP 16
+#define MAX_AUTO_PAIRS     8
 
 /* ====== Editor data structures ====== */
 
@@ -80,6 +83,43 @@ typedef struct {
     U32       kw_count;
     VBE_COLOUR colour;
 } SYNTAX_RULE;
+
+/* Keybinding actions */
+typedef enum {
+    JOT_ACT_EXIT = 0,
+    JOT_ACT_SAVE,
+    JOT_ACT_CUT,
+    JOT_ACT_UNCUT,
+    JOT_ACT_SEARCH,
+    JOT_ACT_REPLACE,
+    JOT_ACT_HELP,
+    JOT_ACT_UNDO,
+    JOT_ACT_TOP,
+    JOT_ACT_BOTTOM,
+    JOT_ACT_GOTO_LINE,
+    JOT_ACT_POSITION,
+    JOT_ACT_REFRESH,
+    JOT_ACT_READ_FILE,
+    JOT_ACT_HOME,
+    JOT_ACT_END,
+    JOT_ACT_COUNT
+} JOT_ACTION;
+
+typedef struct {
+    KEYCODES key;
+    BOOL     need_ctrl;
+    BOOL     need_shift;
+} JOT_KEYBIND;
+
+typedef struct {
+    CHAR open;
+    CHAR close;
+} AUTO_PAIR;
+
+typedef struct {
+    CHAR ext[16];
+    CHAR syntax[16];
+} SYNTAX_EXT_MAP;
 
 /* Main editor state */
 typedef struct {
@@ -122,12 +162,24 @@ typedef struct {
 
     /* Config */
     PATRC_FD  config;
-    PATRC_FD  colour_config;
     U32       tab_size;
     BOOL      auto_indent;
     BOOL      show_line_numbers;
     BOOL      soft_wrap;
     BOOL      syntax_enabled;
+    BOOL      tab_as_spaces;
+
+    /* Syntax file config */
+    PATRC_FD       syntax_config;
+    SYNTAX_EXT_MAP syntax_ext_map[MAX_SYNTAX_EXT_MAP];
+    U32            syntax_ext_map_count;
+
+    /* Keybindings */
+    JOT_KEYBIND keybinds[JOT_ACT_COUNT];
+
+    /* Autocomplete */
+    AUTO_PAIR auto_pairs[MAX_AUTO_PAIRS];
+    U32       auto_pair_count;
 
     /* Colours */
     VBE_COLOUR fg_text;
@@ -147,6 +199,9 @@ typedef struct {
     VBE_COLOUR  syntax_string_colour;
     VBE_COLOUR  syntax_number_colour;
     CHAR        syntax_comment_start[8];
+    CHAR        syntax_block_comment_start[8];
+    CHAR        syntax_block_comment_end[8];
+    VBE_COLOUR  syntax_bracket_colours[4];
 
     /* Modes */
     BOOL      running;
@@ -344,7 +399,7 @@ static VOID scroll_to_cursor(VOID) {
         ed.scroll_y = ed.cur_row - ed.edit_rows + 1;
 
     /* Horizontal */
-    U32 gutter = ed.show_line_numbers ? 6 : 0;
+    U32 gutter = ed.show_line_numbers ? 5 : 0;
     U32 text_cols = ed.screen_cols > gutter ? ed.screen_cols - gutter : 1;
     if (ed.cur_col < ed.scroll_x)
         ed.scroll_x = ed.cur_col;
@@ -388,33 +443,277 @@ static VOID load_colours(VOID) {
     ed.syntax_string_colour  = VBE_LIGHT_GREEN;
     ed.syntax_number_colour  = VBE_LIGHT_CYAN;
 
-    if (!ed.colour_config) return;
+    /* Bracket colour defaults (rainbow) */
+    ed.syntax_bracket_colours[0] = VBE_LIGHT_RED;
+    ed.syntax_bracket_colours[1] = VBE_LIGHT_GREEN;
+    ed.syntax_bracket_colours[2] = VBE_LIGHT_CYAN;
+    ed.syntax_bracket_colours[3] = VBE_LIGHT_MAGENTA;
+
+    if (!ed.config) return;
 
     PU8 v;
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_TEXT");
+    v = READ_KEY(ed.config, "COLOUR", "FG_TEXT");
     if (v) ed.fg_text = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "BG_TEXT");
+    v = READ_KEY(ed.config, "COLOUR", "BG_TEXT");
     if (v) ed.bg_text = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_BAR");
+    v = READ_KEY(ed.config, "COLOUR", "FG_BAR");
     if (v) ed.fg_bar = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "BG_BAR");
+    v = READ_KEY(ed.config, "COLOUR", "BG_BAR");
     if (v) ed.bg_bar = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_SHORTCUT_KEY");
+    v = READ_KEY(ed.config, "COLOUR", "FG_SHORTCUT_KEY");
     if (v) ed.fg_shortcut_key = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "BG_SHORTCUT");
+    v = READ_KEY(ed.config, "COLOUR", "BG_SHORTCUT");
     if (v) ed.bg_shortcut = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_SHORTCUT_DESC");
+    v = READ_KEY(ed.config, "COLOUR", "FG_SHORTCUT_DESC");
     if (v) ed.fg_shortcut_desc = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_LINE_NUMBER");
+    v = READ_KEY(ed.config, "COLOUR", "FG_LINE_NUMBER");
     if (v) ed.fg_line_number = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_STATUS");
+    v = READ_KEY(ed.config, "COLOUR", "FG_STATUS");
     if (v) ed.fg_status = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_COMMENT");
+    v = READ_KEY(ed.config, "COLOUR", "FG_COMMENT");
     if (v) ed.syntax_comment_colour = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_STRING");
+    v = READ_KEY(ed.config, "COLOUR", "FG_STRING");
     if (v) ed.syntax_string_colour = parse_colour_val(v);
-    v = READ_KEY(ed.colour_config, "COLOUR", "FG_NUMBER");
+    v = READ_KEY(ed.config, "COLOUR", "FG_NUMBER");
     if (v) ed.syntax_number_colour = parse_colour_val(v);
+}
+
+/* ====== Autocomplete helper ====== */
+
+static CHAR get_pair_close(CHAR open) {
+    switch (open) {
+        case '(': return ')';
+        case '{': return '}';
+        case '[': return ']';
+        case '"': return '"';
+        case '\'': return '\'';
+        case '<': return '>';
+        default: return NULLT;
+    }
+}
+
+/* ====== Keybinding helpers ====== */
+
+static VOID set_keybind(JOT_ACTION act, KEYCODES key, BOOL ctrl, BOOL shift) {
+    ed.keybinds[act].key        = key;
+    ed.keybinds[act].need_ctrl  = ctrl;
+    ed.keybinds[act].need_shift = shift;
+}
+
+static VOID init_default_keybinds(VOID) {
+    set_keybind(JOT_ACT_EXIT,      KEY_X,         TRUE, FALSE);
+    set_keybind(JOT_ACT_SAVE,      KEY_O,         TRUE, FALSE);
+    set_keybind(JOT_ACT_CUT,       KEY_K,         TRUE, FALSE);
+    set_keybind(JOT_ACT_UNCUT,     KEY_U,         TRUE, FALSE);
+    set_keybind(JOT_ACT_SEARCH,    KEY_W,         TRUE, FALSE);
+    set_keybind(JOT_ACT_REPLACE,   KEY_BACKSLASH, TRUE, FALSE);
+    set_keybind(JOT_ACT_HELP,      KEY_G,         TRUE, FALSE);
+    set_keybind(JOT_ACT_UNDO,      KEY_Z,         TRUE, FALSE);
+    set_keybind(JOT_ACT_TOP,       KEY_T,         TRUE, FALSE);
+    set_keybind(JOT_ACT_BOTTOM,    KEY_B,         TRUE, FALSE);
+    set_keybind(JOT_ACT_GOTO_LINE, KEY_SLASH,     TRUE, TRUE);
+    set_keybind(JOT_ACT_POSITION,  KEY_C,         TRUE, FALSE);
+    set_keybind(JOT_ACT_REFRESH,   KEY_L,         TRUE, FALSE);
+    set_keybind(JOT_ACT_READ_FILE, KEY_R,         TRUE, FALSE);
+    set_keybind(JOT_ACT_HOME,      KEY_A,         TRUE, FALSE);
+    set_keybind(JOT_ACT_END,       KEY_E,         TRUE, FALSE);
+}
+
+static VOID parse_keybind_str(PU8 str, JOT_ACTION action) {
+    if (!str || !str[0]) return;
+    BOOL ctrl = FALSE, shift = FALSE;
+    PU8 p = str;
+    if (*p == '^') { ctrl = TRUE; p++; }
+    if (!*p) return;
+    CHAR ch = *p;
+    if (ch == '_') shift = TRUE;
+    KEYCODES key = char_to_keycode(ch);
+    if (key) set_keybind(action, key, ctrl, shift);
+}
+
+static VOID load_keybinds(VOID) {
+    init_default_keybinds();
+    if (!ed.config) return;
+    if (!DOES_EXIST_BLOCK(ed.config, "KEYBINDS")) return;
+
+    PU8 v;
+    typedef struct { PU8 name; JOT_ACTION action; } KB_MAP;
+    KB_MAP map[] = {
+        {"EXIT",      JOT_ACT_EXIT},
+        {"SAVE",      JOT_ACT_SAVE},
+        {"CUT",       JOT_ACT_CUT},
+        {"UNCUT",     JOT_ACT_UNCUT},
+        {"SEARCH",    JOT_ACT_SEARCH},
+        {"REPLACE",   JOT_ACT_REPLACE},
+        {"HELP",      JOT_ACT_HELP},
+        {"UNDO",      JOT_ACT_UNDO},
+        {"TOP",       JOT_ACT_TOP},
+        {"BOTTOM",    JOT_ACT_BOTTOM},
+        {"GOTO_LINE", JOT_ACT_GOTO_LINE},
+        {"POSITION",  JOT_ACT_POSITION},
+        {"REFRESH",   JOT_ACT_REFRESH},
+        {"READ_FILE", JOT_ACT_READ_FILE},
+        {"HOME",      JOT_ACT_HOME},
+        {"END",       JOT_ACT_END},
+    };
+    for (U32 i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+        v = READ_KEY(ed.config, "KEYBINDS", map[i].name);
+        if (v) parse_keybind_str(v, map[i].action);
+    }
+}
+
+/* ====== Syntax extension map ====== */
+
+static VOID load_syntax_extension_map(VOID) {
+    ed.syntax_ext_map_count = 0;
+    if (!ed.config) return;
+    if (!DOES_EXIST_BLOCK(ed.config, "SYNTAX_FILES")) return;
+
+    /* Iterate the SYNTAX_FILES block keys directly */
+    for (U32 b = 0; b < ed.config->blocks.len; b++) {
+        PBLOCK block = ed.config->blocks.blocks[b];
+        if (!block || STRICMP(block->name, "SYNTAX_FILES") != 0) continue;
+
+        for (U32 k = 0; k < block->keys.len && ed.syntax_ext_map_count < MAX_SYNTAX_EXT_MAP; k++) {
+            PKEY_VALUE kv = block->keys.key_value_pairs[k];
+            if (!kv || !kv->name || !kv->value) continue;
+            if (STRICMP(kv->name, "FILES") == 0) continue;
+
+            SYNTAX_EXT_MAP *m = &ed.syntax_ext_map[ed.syntax_ext_map_count];
+            STRNCPY(m->ext, kv->name, sizeof(m->ext) - 1);
+            STRNCPY(m->syntax, kv->value, sizeof(m->syntax) - 1);
+            ed.syntax_ext_map_count++;
+        }
+        break;
+    }
+}
+
+/* ====== Load syntax-specific config for a file extension ====== */
+
+static PU8 get_file_extension(PU8 filepath) {
+    if (!filepath) return NULLPTR;
+    PU8 dot = NULLPTR;
+    for (PU8 p = filepath; *p; p++) {
+        if (*p == '.') dot = p + 1;
+    }
+    return dot;
+}
+
+static VOID load_syntax_rules_from_fd(PATRC_FD fd) {
+    if (!fd) return;
+    PU8 v;
+    ed.syntax_rule_count = 0;
+    if (!DOES_EXIST_BLOCK(fd, "SYNTAX_KEYWORDS")) return;
+
+    for (U32 i = 0; i < MAX_SYNTAX_RULES; i++) {
+        CHAR key[16];
+        SPRINTF(key, "RULE_%d", i);
+        v = READ_KEY(fd, "SYNTAX_KEYWORDS", key);
+        if (!v) break;
+
+        /* Format: "colour_r,g,b:word1,word2,word3" */
+        PU8 colon = STRCHR(v, ':');
+        if (!colon) continue;
+
+        CHAR colour_str[32];
+        U32 cl = colon - v;
+        if (cl >= sizeof(colour_str)) cl = sizeof(colour_str) - 1;
+        MEMCPY(colour_str, v, cl);
+        colour_str[cl] = NULLT;
+
+        SYNTAX_RULE *rule = &ed.syntax_rules[ed.syntax_rule_count];
+        rule->colour = parse_colour_val(colour_str);
+        rule->kw_count = 0;
+
+        PU8 kw_list = colon + 1;
+        PSTR_ARR arr = ATRC_TO_LIST(kw_list, ',');
+        if (arr) {
+            for (U32 j = 0; j < arr->len && j < MAX_SYNTAX_KWS; j++) {
+                STRNCPY(rule->keywords[j], arr->strs[j], MAX_KW_LEN - 1);
+                rule->keywords[j][MAX_KW_LEN - 1] = NULLT;
+                rule->kw_count++;
+            }
+            FREE_STR_ARR(arr);
+        }
+        ed.syntax_rule_count++;
+    }
+}
+
+static VOID load_syntax_config_for_ext(PU8 ext) {
+    if (!ext || !ext[0]) return;
+
+    /* Look up extension in map */
+    PU8 syntax_name = NULLPTR;
+    for (U32 i = 0; i < ed.syntax_ext_map_count; i++) {
+        if (STRICMP(ed.syntax_ext_map[i].ext, ext) == 0) {
+            syntax_name = ed.syntax_ext_map[i].syntax;
+            break;
+        }
+    }
+    if (!syntax_name) return;
+
+    /* Construct config file path: /ATOS/CONFS/JOT/{NAME}_JOT.CNF */
+    CHAR path[256];
+    SPRINTF(path, "%s%s_JOT.CNF", SYNTAX_BASE_PATH, syntax_name);
+
+    ed.syntax_config = CREATE_ATRCFD(path, ATRC_READ_WRITE);
+    if (!ed.syntax_config) return;
+
+    PU8 v;
+
+    /* Load COMMENT_START from syntax config (overrides JOT.CNF fallback) */
+    v = READ_KEY(ed.syntax_config, "SETTINGS", "COMMENT_START");
+    if (v) STRNCPY(ed.syntax_comment_start, v, sizeof(ed.syntax_comment_start) - 1);
+
+    /* Load block comment delimiters from syntax config */
+    v = READ_KEY(ed.syntax_config, "SETTINGS", "BLOCK_COMMENT_START");
+    if (v) STRNCPY(ed.syntax_block_comment_start, v, sizeof(ed.syntax_block_comment_start) - 1);
+    v = READ_KEY(ed.syntax_config, "SETTINGS", "BLOCK_COMMENT_END");
+    if (v) STRNCPY(ed.syntax_block_comment_end, v, sizeof(ed.syntax_block_comment_end) - 1);
+
+    /* Load TAB_AS_SPACES from syntax config (overrides JOT.CNF) */
+
+    v = READ_KEY(ed.syntax_config, "SETTINGS", "TAB_AS_SPACES");
+    if (v) ed.tab_as_spaces = ATRC_TO_BOOL(v);
+
+    /* Load autocomplete pairs */
+    ed.auto_pair_count = 0;
+    if (DOES_EXIST_BLOCK(ed.syntax_config, "AUTOCOMPLETE")) {
+        v = READ_KEY(ed.syntax_config, "AUTOCOMPLETE", "PAIRS");
+        if (v) {
+            for (U32 i = 0; v[i] && ed.auto_pair_count < MAX_AUTO_PAIRS; i++) {
+                CHAR close = get_pair_close(v[i]);
+                if (close) {
+                    ed.auto_pairs[ed.auto_pair_count].open = v[i];
+                    ed.auto_pairs[ed.auto_pair_count].close = close;
+                    ed.auto_pair_count++;
+                }
+            }
+        }
+    }
+
+    /* Load syntax-specific colours (overrides base theme) */
+    v = READ_KEY(ed.syntax_config, "COLOUR", "FG_COMMENT");
+    if (v) ed.syntax_comment_colour = parse_colour_val(v);
+    v = READ_KEY(ed.syntax_config, "COLOUR", "FG_STRING");
+    if (v) ed.syntax_string_colour = parse_colour_val(v);
+    v = READ_KEY(ed.syntax_config, "COLOUR", "FG_NUMBER");
+    if (v) ed.syntax_number_colour = parse_colour_val(v);
+
+    /* Load syntax keyword rules */
+    load_syntax_rules_from_fd(ed.syntax_config);
+}
+
+/* ====== Keybind action lookup ====== */
+
+static JOT_ACTION lookup_action(KEYCODES key, BOOL ctrl, BOOL shift) {
+    for (U32 i = 0; i < JOT_ACT_COUNT; i++) {
+        if (ed.keybinds[i].key == key &&
+            ed.keybinds[i].need_ctrl == ctrl &&
+            ed.keybinds[i].need_shift == shift)
+            return (JOT_ACTION)i;
+    }
+    return JOT_ACT_COUNT;
 }
 
 /* ====== Config loading ====== */
@@ -422,7 +721,6 @@ static VOID load_colours(VOID) {
 static VOID load_config(VOID) {
 
     ed.config = CREATE_ATRCFD(CONFIG_PATH, ATRC_READ_WRITE);
-    ed.colour_config = CREATE_ATRCFD(COLOUR_PATH, ATRC_READ_WRITE);
 
     /* Defaults */
     ed.tab_size          = TAB_SIZE_DEFAULT;
@@ -431,9 +729,19 @@ static VOID load_config(VOID) {
     ed.soft_wrap         = FALSE;
     ed.syntax_enabled    = TRUE;
     ed.search_case_sensitive = FALSE;
+    ed.tab_as_spaces     = TRUE;
     STRCPY(ed.syntax_comment_start, "//");
+    STRCPY(ed.syntax_block_comment_start, "/*");
+    STRCPY(ed.syntax_block_comment_end, "*/");
+
+    /* Default bracket auto-pairs */
+    ed.auto_pairs[0].open = '('; ed.auto_pairs[0].close = ')';
+    ed.auto_pairs[1].open = '{'; ed.auto_pairs[1].close = '}';
+    ed.auto_pairs[2].open = '['; ed.auto_pairs[2].close = ']';
+    ed.auto_pair_count = 3;
 
     if (!ed.config) {
+        load_keybinds();
         load_colours();
         return;
     }
@@ -460,42 +768,19 @@ static VOID load_config(VOID) {
     v = READ_KEY(ed.config, "SETTINGS", "COMMENT_START");
     if (v) STRNCPY(ed.syntax_comment_start, v, sizeof(ed.syntax_comment_start) - 1);
 
-    /* Load syntax rules from config */
-    ed.syntax_rule_count = 0;
-    if (DOES_EXIST_BLOCK(ed.config, "SYNTAX_KEYWORDS")) {
-        for (U32 i = 0; i < MAX_SYNTAX_RULES; i++) {
-            CHAR key[16];
-            SPRINTF(key, "RULE_%d", i);
-            v = READ_KEY(ed.config, "SYNTAX_KEYWORDS", key);
-            if (!v) break;
+    v = READ_KEY(ed.config, "SETTINGS", "BLOCK_COMMENT_START");
+    if (v) STRNCPY(ed.syntax_block_comment_start, v, sizeof(ed.syntax_block_comment_start) - 1);
+    v = READ_KEY(ed.config, "SETTINGS", "BLOCK_COMMENT_END");
+    if (v) STRNCPY(ed.syntax_block_comment_end, v, sizeof(ed.syntax_block_comment_end) - 1);
 
-            /* Format: "colour_r,g,b:word1,word2,word3" */
-            PU8 colon = STRCHR(v, ':');
-            if (!colon) continue;
+    v = READ_KEY(ed.config, "SETTINGS", "TAB_AS_SPACES");
+    if (v) ed.tab_as_spaces = ATRC_TO_BOOL(v);
 
-            CHAR colour_str[32];
-            U32 cl = colon - v;
-            if (cl >= sizeof(colour_str)) cl = sizeof(colour_str) - 1;
-            MEMCPY(colour_str, v, cl);
-            colour_str[cl] = NULLT;
+    /* Load syntax extension map from [SYNTAX_FILES] */
+    load_syntax_extension_map();
 
-            SYNTAX_RULE *rule = &ed.syntax_rules[ed.syntax_rule_count];
-            rule->colour = parse_colour_val(colour_str);
-            rule->kw_count = 0;
-
-            PU8 kw_list = colon + 1;
-            PSTR_ARR arr = ATRC_TO_LIST(kw_list, ',');
-            if (arr) {
-                for (U32 j = 0; j < arr->len && j < MAX_SYNTAX_KWS; j++) {
-                    STRNCPY(rule->keywords[j], arr->strs[j], MAX_KW_LEN - 1);
-                    rule->keywords[j][MAX_KW_LEN - 1] = NULLT;
-                    rule->kw_count++;
-                }
-                FREE_STR_ARR(arr);
-            }
-            ed.syntax_rule_count++;
-        }
-    }
+    /* Load keybindings from [KEYBINDS] */
+    load_keybinds();
 
     load_colours();
 }
@@ -528,13 +813,23 @@ static VOID add_builtin_rule(VBE_COLOUR colour, PU8 csv_keywords) {
 
 static VOID detect_syntax(VOID) {
     if (!ed.syntax_enabled) return;
-    /* Only apply built-in rules if no user-defined rules exist */
-    if (ed.syntax_rule_count > 0) return;
     if (!ed.filepath[0]) return;
+
+    /* Try config-based syntax loading first */
+    PU8 ext = get_file_extension(ed.filepath);
+    if (ext && ed.syntax_ext_map_count > 0) {
+        load_syntax_config_for_ext(ext);
+        if (ed.syntax_rule_count > 0) return; /* Config rules loaded */
+    }
+
+    /* Fall back to built-in rules only if no config rules exist */
+    if (ed.syntax_rule_count > 0) return;
 
     if (str_endswith(ed.filepath, ".C") || str_endswith(ed.filepath, ".H") ||
         str_endswith(ed.filepath, ".c") || str_endswith(ed.filepath, ".h")) {
         STRCPY(ed.syntax_comment_start, "//");
+        STRCPY(ed.syntax_block_comment_start, "/*");
+        STRCPY(ed.syntax_block_comment_end, "*/");
         /* Types and qualifiers */
         add_builtin_rule(VBE_LIGHT_GREEN,
             "int,char,void,float,double,long,short,unsigned,signed,const,static,"
@@ -632,6 +927,12 @@ static VOID load_file(PU8 filepath) {
 static BOOL save_file(VOID) {
     if (!ed.filepath[0]) return FALSE;
 
+    if(!FILE_EXISTS(ed.filepath)) {
+        if(!FILE_CREATE(ed.filepath)) {
+            set_status("[ Error creating file ]");
+            return FALSE;
+        }
+    }
     FILE *f = FOPEN(ed.filepath, MODE_FW);
     if (!f) {
         set_status("[ Error writing file ]");
@@ -693,12 +994,20 @@ static BOOL match_keyword_at(PU8 line, U32 pos, U32 line_len, PU8 keyword) {
 }
 
 /* Get syntax colour for a character position in a line.
-   Returns VBE_SEE_THROUGH if no highlighting applies. */
+   Returns VBE_SEE_THROUGH if no highlighting applies.
+   kw_skip/kw_colour track multi-char keyword highlighting across calls. */
 static VBE_COLOUR get_syntax_colour(PU8 line, U32 line_len, U32 pos,
-                                     BOOL *in_string, CHAR *string_char) {
+                                     BOOL *in_string, CHAR *string_char,
+                                     U32 *kw_skip, VBE_COLOUR *kw_colour) {
     if (!ed.syntax_enabled || !line) return VBE_SEE_THROUGH;
 
     CHAR c = line[pos];
+
+    /* Continue keyword colour from previous match */
+    if (*kw_skip > 0) {
+        (*kw_skip)--;
+        return *kw_colour;
+    }
 
     /* String handling */
     if (*in_string) {
@@ -714,35 +1023,87 @@ static VBE_COLOUR get_syntax_colour(PU8 line, U32 line_len, U32 pos,
         return ed.syntax_string_colour;
     }
 
-    /* Comment check */
-    U32 comment_len = STRLEN(ed.syntax_comment_start);
-    if (comment_len > 0 && pos + comment_len <= line_len) {
-        BOOL is_comment = TRUE;
-        for (U32 ci = 0; ci < comment_len; ci++) {
-            if (line[pos + ci] != ed.syntax_comment_start[ci]) {
-                is_comment = FALSE;
-                break;
-            }
-        }
-        if (is_comment) return ed.syntax_comment_colour;
-    }
-
     /* Number literal */
     if (IS_DIGIT(c) && (pos == 0 || !is_word_char(line[pos - 1]))) {
         return ed.syntax_number_colour;
     }
 
-    /* Keyword matching */
+    /* Keyword matching — highlights the entire keyword, not just the first char */
     for (U32 r = 0; r < ed.syntax_rule_count; r++) {
         SYNTAX_RULE *rule = &ed.syntax_rules[r];
         for (U32 k = 0; k < rule->kw_count; k++) {
             if (match_keyword_at(line, pos, line_len, rule->keywords[k])) {
+                U32 kwlen = STRLEN(rule->keywords[k]);
+                if (kwlen > 1) {
+                    *kw_skip = kwlen - 1;
+                    *kw_colour = rule->colour;
+                }
                 return rule->colour;
             }
         }
     }
 
     return VBE_SEE_THROUGH;
+}
+
+static BOOL is_bracket(CHAR c) {
+    return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
+}
+
+/* Compute syntax state (block comment, bracket depth) at start of a given line
+   by scanning all preceding lines.  Needed for correct multi-line highlights. */
+static VOID compute_syntax_state_at(U32 target_row,
+                                     BOOL *out_block, U32 *out_depth) {
+    BOOL in_block  = FALSE;
+    BOOL in_str    = FALSE;
+    CHAR str_ch    = 0;
+    U32  depth     = 0;
+    U32  bc_s_len  = STRLEN(ed.syntax_block_comment_start);
+    U32  bc_e_len  = STRLEN(ed.syntax_block_comment_end);
+    U32  sc_len    = STRLEN(ed.syntax_comment_start);
+
+    for (U32 row = 0; row < target_row && row < ed.line_count; row++) {
+        LINE_BUF *lb = &ed.lines[row];
+        in_str = FALSE;            /* strings don't span lines */
+        for (U32 col = 0; col < lb->len; col++) {
+            CHAR c = lb->data[col];
+            /* Inside block comment — look only for end */
+            if (in_block) {
+                if (bc_e_len > 0 && col + bc_e_len <= lb->len) {
+                    BOOL m = TRUE;
+                    for (U32 i = 0; i < bc_e_len; i++)
+                        if (lb->data[col + i] != ed.syntax_block_comment_end[i]) { m = FALSE; break; }
+                    if (m) { in_block = FALSE; col += bc_e_len - 1; }
+                }
+                continue;
+            }
+            if (in_str) {
+                if (c == str_ch && (col == 0 || lb->data[col - 1] != '\\'))
+                    in_str = FALSE;
+                continue;
+            }
+            if (c == '"' || c == '\'') { in_str = TRUE; str_ch = c; continue; }
+            /* Single-line comment — skip rest of line */
+            if (sc_len > 0 && col + sc_len <= lb->len) {
+                BOOL m = TRUE;
+                for (U32 i = 0; i < sc_len; i++)
+                    if (lb->data[col + i] != ed.syntax_comment_start[i]) { m = FALSE; break; }
+                if (m) break;
+            }
+            /* Block comment start */
+            if (bc_s_len > 0 && col + bc_s_len <= lb->len) {
+                BOOL m = TRUE;
+                for (U32 i = 0; i < bc_s_len; i++)
+                    if (lb->data[col + i] != ed.syntax_block_comment_start[i]) { m = FALSE; break; }
+                if (m) { in_block = TRUE; col += bc_s_len - 1; continue; }
+            }
+            /* Track brackets */
+            if (c == '(' || c == '[' || c == '{') depth++;
+            else if (c == ')' || c == ']' || c == '}') { if (depth > 0) depth--; }
+        }
+    }
+    *out_block = in_block;
+    *out_depth = depth;
 }
 
 /* ====== Drawing ====== */
@@ -847,10 +1208,21 @@ static VOID draw_status_bar(VOID) {
 }
 
 static VOID draw_text(VOID) {
-    U32 gutter = ed.show_line_numbers ? 6 : 0;
+    U32 gutter = ed.show_line_numbers ? 5 : 0;
     U32 text_cols = ed.screen_cols > gutter ? ed.screen_cols - gutter : 1;
 
     ATUI_SET_COLOR(ed.fg_text, ed.bg_text);
+
+    /* Pre-compute block-comment and bracket-depth state at first visible line */
+    BOOL in_block_comment = FALSE;
+    U32  bracket_depth    = 0;
+    if (ed.syntax_enabled && ed.scroll_y > 0) {
+        compute_syntax_state_at(ed.scroll_y, &in_block_comment, &bracket_depth);
+    }
+
+    U32 comment_len  = STRLEN(ed.syntax_comment_start);
+    U32 bc_start_len = STRLEN(ed.syntax_block_comment_start);
+    U32 bc_end_len   = STRLEN(ed.syntax_block_comment_end);
 
     for (U32 scr_row = 0; scr_row < ed.edit_rows; scr_row++) {
         U32 file_row = scr_row + ed.scroll_y;
@@ -871,37 +1243,94 @@ static VOID draw_text(VOID) {
             BOOL in_string = FALSE;
             CHAR string_char = 0;
             BOOL in_comment = FALSE;
-
-            U32 comment_len = STRLEN(ed.syntax_comment_start);
+            U32  kw_skip = 0;
+            VBE_COLOUR kw_colour = VBE_SEE_THROUGH;
+            U32  bc_end_skip = 0;   /* chars remaining of block-comment end token */
 
             for (U32 scr_col = 0; scr_col < text_cols; scr_col++) {
                 U32 file_col = scr_col + ed.scroll_x;
                 if (file_col < lb->len) {
                     CHAR c = lb->data[file_col];
+                    VBE_COLOUR fg = VBE_SEE_THROUGH;
 
-                    /* Check for comment start */
-                    if (!in_string && !in_comment && ed.syntax_enabled &&
-                        comment_len > 0 && file_col + comment_len <= lb->len) {
-                        BOOL match = TRUE;
-                        for (U32 ci = 0; ci < comment_len; ci++) {
-                            if (lb->data[file_col + ci] != ed.syntax_comment_start[ci]) {
-                                match = FALSE;
-                                break;
+                    /* --- 1. Inside a block comment --- */
+                    if (in_block_comment) {
+                        fg = ed.syntax_comment_colour;
+                        /* Check for block-comment end */
+                        if (bc_end_skip == 0 && bc_end_len > 0 &&
+                            file_col + bc_end_len <= lb->len) {
+                            BOOL m = TRUE;
+                            for (U32 ci = 0; ci < bc_end_len; ci++) {
+                                if (lb->data[file_col + ci] != ed.syntax_block_comment_end[ci])
+                                    { m = FALSE; break; }
+                            }
+                            if (m) bc_end_skip = bc_end_len;
+                        }
+                        if (bc_end_skip > 0) {
+                            bc_end_skip--;
+                            if (bc_end_skip == 0) in_block_comment = FALSE;
+                        }
+                    }
+                    /* --- 2. Single-line comment (rest of line) --- */
+                    else if (in_comment) {
+                        fg = ed.syntax_comment_colour;
+                    }
+                    /* --- 3. Normal text — detect comments, strings, kw, brackets --- */
+                    else {
+                        /* 3a. Block comment start? (only outside strings) */
+                        if (!in_string && ed.syntax_enabled &&
+                            bc_start_len > 0 && file_col + bc_start_len <= lb->len) {
+                            BOOL m = TRUE;
+                            for (U32 ci = 0; ci < bc_start_len; ci++) {
+                                if (lb->data[file_col + ci] != ed.syntax_block_comment_start[ci])
+                                    { m = FALSE; break; }
+                            }
+                            if (m) {
+                                in_block_comment = TRUE;
+                                kw_skip = 0; /* reset keyword state */
+                                fg = ed.syntax_comment_colour;
                             }
                         }
-                        if (match) in_comment = TRUE;
+
+                        /* 3b. Single-line comment start? */
+                        if (fg == VBE_SEE_THROUGH && !in_string && ed.syntax_enabled &&
+                            comment_len > 0 && file_col + comment_len <= lb->len) {
+                            BOOL m = TRUE;
+                            for (U32 ci = 0; ci < comment_len; ci++) {
+                                if (lb->data[file_col + ci] != ed.syntax_comment_start[ci])
+                                    { m = FALSE; break; }
+                            }
+                            if (m) {
+                                in_comment = TRUE;
+                                kw_skip = 0;
+                                fg = ed.syntax_comment_colour;
+                            }
+                        }
+
+                        /* 3c. Syntax colour (strings, keywords, numbers) */
+                        if (fg == VBE_SEE_THROUGH) {
+                            fg = get_syntax_colour(lb->data, lb->len, file_col,
+                                                   &in_string, &string_char,
+                                                   &kw_skip, &kw_colour);
+                        }
+
+                        /* 3d. Bracket colouring (only outside strings) */
+                        if (fg == VBE_SEE_THROUGH && !in_string &&
+                            ed.syntax_enabled && is_bracket(c)) {
+                            if (c == '(' || c == '[' || c == '{') {
+                                fg = ed.syntax_bracket_colours[bracket_depth % 4];
+                                bracket_depth++;
+                            } else {
+                                if (bracket_depth > 0) bracket_depth--;
+                                fg = ed.syntax_bracket_colours[bracket_depth % 4];
+                            }
+                        }
                     }
 
-                    if (in_comment) {
-                        ATUI_SET_COLOR(ed.syntax_comment_colour, ed.bg_text);
-                    } else {
-                        VBE_COLOUR sc = get_syntax_colour(lb->data, lb->len, file_col,
-                                                           &in_string, &string_char);
-                        if (sc != VBE_SEE_THROUGH)
-                            ATUI_SET_COLOR(sc, ed.bg_text);
-                        else
-                            ATUI_SET_COLOR(ed.fg_text, ed.bg_text);
-                    }
+                    if (fg != VBE_SEE_THROUGH)
+                        ATUI_SET_COLOR(fg, ed.bg_text);
+                    else
+                        ATUI_SET_COLOR(ed.fg_text, ed.bg_text);
 
                     /* Tab expansion */
                     if (c == '\t') {
@@ -984,8 +1413,8 @@ static VOID draw_help_screen(VOID) {
         "   ^G               This help screen",
         "",
         " Configuration:",
-        "   Edit /ATOS/CONFS/JOT.CNF for settings.",
-        "   Edit /ATOS/CONFS/C_JOT.CNF for colours.",
+        "   Edit /ATOS/CONFS/JOT/JOT.CNF for settings & keybinds.",
+        "   Syntax configs in /ATOS/CONFS/JOT/*_JOT.CNF.",
     };
     U32 hcount = sizeof(help) / sizeof(help[0]);
     for (U32 i = 0; i < hcount && i + 2 < ed.screen_rows; i++) {
@@ -1017,7 +1446,7 @@ static VOID draw_screen(VOID) {
     draw_shortcut_bar();
 
     /* Position cursor */
-    U32 gutter = ed.show_line_numbers ? 6 : 0;
+    U32 gutter = ed.show_line_numbers ? 5 : 0;
     U32 vis_row = ed.cur_row - ed.scroll_y + 1;
     U32 vis_col = ed.cur_col - ed.scroll_x + gutter;
     ATUI_MOVE(vis_row, vis_col);
@@ -1077,16 +1506,48 @@ static U32 prompt_input(PU8 prompt_text, PU8 buf, U32 buflen) {
 
 static VOID op_insert_char(CHAR ch) {
     LINE_BUF *lb = &ed.lines[ed.cur_row];
+
+    /* Skip over closing pair character if it matches what's under cursor */
+    if (ed.auto_pair_count > 0 && ed.cur_col < lb->len && lb->data[ed.cur_col] == ch) {
+        for (U32 i = 0; i < ed.auto_pair_count; i++) {
+            if (ch == ed.auto_pairs[i].close) {
+                ed.cur_col++; /* just skip over */
+                return;
+            }
+        }
+    }
+
     line_insert_char(lb, ed.cur_col, ch);
     undo_push(UNDO_INSERT_CHAR, ed.cur_row, ed.cur_col, ch, NULLPTR);
     ed.cur_col++;
     ed.modified = TRUE;
+
+    /* Auto-insert closing pair */
+    if (ed.auto_pair_count > 0) {
+        for (U32 i = 0; i < ed.auto_pair_count; i++) {
+            if (ch == ed.auto_pairs[i].open) {
+                CHAR close = ed.auto_pairs[i].close;
+                /* For symmetric pairs (quotes), don't autocomplete inside words */
+                if (ch == close) {
+                    if (ed.cur_col >= 2 && is_word_char(lb->data[ed.cur_col - 2]))
+                        break;
+                }
+                line_insert_char(lb, ed.cur_col, close);
+                undo_push(UNDO_INSERT_CHAR, ed.cur_row, ed.cur_col, close, NULLPTR);
+                break;
+            }
+        }
+    }
 }
 
 static VOID op_insert_tab(VOID) {
-    U32 spaces = ed.tab_size - (ed.cur_col % ed.tab_size);
-    for (U32 i = 0; i < spaces; i++) {
-        op_insert_char(' ');
+    if (ed.tab_as_spaces) {
+        U32 spaces = ed.tab_size - (ed.cur_col % ed.tab_size);
+        for (U32 i = 0; i < spaces; i++) {
+            op_insert_char(' ');
+        }
+    } else {
+        op_insert_char('\t');
     }
 }
 
@@ -1413,15 +1874,18 @@ static VOID op_read_file(VOID) {
 }
 
 static VOID op_write_out(VOID) {
-    /* If no filename, prompt for one */
-    if (!ed.filepath[0]) {
+    /* If no filename or new file, prompt for filename */
+    if (!ed.filepath[0] || ed.new_file) {
         CHAR path[256] = {0};
-        U32 len = prompt_input("File Name to Write: ", path, sizeof(path));
-        if (len == 0) {
+        if (ed.filepath[0]) STRCPY(path, ed.filepath);
+        INT result = ATUI_MSGBOX_INPUT("Save File",
+            "File Name to Write:", path, sizeof(path));
+        if (result == 0 || path[0] == NULLT) {
             set_status("[ Cancelled ]");
             return;
         }
         STRCPY(ed.filepath, path);
+        ed.new_file = FALSE;
     }
 
     save_file();
@@ -1436,88 +1900,47 @@ static VOID handle_input(VOID) {
     MODIFIERS *mods = kb_mods();
     KEYCODES key = kb->cur.keycode;
 
-    /* ---- Ctrl shortcuts ---- */
+    /* ---- Ctrl shortcuts (configurable via JOT.CNF [KEYBINDS]) ---- */
     if (mods->ctrl) {
-        switch (key) {
-        case KEY_X: /* Exit */
+        JOT_ACTION action = lookup_action(key, TRUE, mods->shift);
+        switch (action) {
+        case JOT_ACT_EXIT:
             if (ed.modified) {
-                CHAR buf[16] = {0};
-                U32 len = prompt_input("Save modified buffer? (Y/N): ", buf, sizeof(buf));
-                if (len > 0 && (buf[0] == 'Y' || buf[0] == 'y')) {
+                INT result = ATUI_MSGBOX_YESNO("Unsaved Changes",
+                    "Save changes before exiting?");
+                if (result == 1) {
                     op_write_out();
+                    if (ed.modified) return; /* save failed/cancelled */
                 }
             }
             ed.running = FALSE;
             return;
 
-        case KEY_O: /* Write Out */
-            op_write_out();
-            return;
+        case JOT_ACT_SAVE:      op_write_out();  return;
+        case JOT_ACT_CUT:       op_cut_line();   return;
+        case JOT_ACT_UNCUT:     op_uncut();      return;
+        case JOT_ACT_SEARCH:    op_search();     return;
+        case JOT_ACT_REPLACE:   op_replace();    return;
+        case JOT_ACT_HELP:      ed.show_help = TRUE; return;
+        case JOT_ACT_UNDO:      undo_pop(); set_status("[ Undo ]"); return;
+        case JOT_ACT_POSITION:  op_show_pos();   return;
+        case JOT_ACT_READ_FILE: op_read_file();  return;
+        case JOT_ACT_GOTO_LINE: op_goto_line();  return;
 
-        case KEY_K: /* Cut line */
-            op_cut_line();
-            return;
+        case JOT_ACT_TOP:
+            ed.cur_row = 0; ed.cur_col = 0;
+            set_status("[ Top of file ]"); return;
 
-        case KEY_U: /* Uncut */
-            op_uncut();
-            return;
-
-        case KEY_W: /* Where Is (search) */
-            op_search();
-            return;
-
-        case KEY_G: /* Help */
-            ed.show_help = TRUE;
-            return;
-
-        case KEY_C: /* Show cursor position */
-            op_show_pos();
-            return;
-
-        case KEY_R: /* Read file */
-            op_read_file();
-            return;
-
-        case KEY_Z: /* Undo */
-            undo_pop();
-            set_status("[ Undo ]");
-            return;
-
-        case KEY_T: /* Go to top */
-            ed.cur_row = 0;
-            ed.cur_col = 0;
-            set_status("[ Top of file ]");
-            return;
-
-        case KEY_B: /* Go to bottom */
+        case JOT_ACT_BOTTOM:
             ed.cur_row = ed.line_count > 0 ? ed.line_count - 1 : 0;
             ed.cur_col = ed.lines[ed.cur_row].len;
-            set_status("[ Bottom of file ]");
-            return;
+            set_status("[ Bottom of file ]"); return;
 
-        case KEY_L: /* Refresh screen */
-            ATUI_TOUCHSCREEN();
-            return;
-
-        case KEY_A: /* Home */
-            ed.cur_col = 0;
-            return;
-
-        case KEY_E: /* End of line */
-            ed.cur_col = ed.lines[ed.cur_row].len;
-            return;
-
-        case KEY_BACKSLASH: /* Replace */
-            op_replace();
-            return;
-
-        default:
-            /* ^_ = Go to line (Ctrl+Shift+Minus on many layouts) */
-            if (key == KEY_SLASH && mods->shift) {
-                op_goto_line();
-                return;
-            }
-            break;
+        case JOT_ACT_REFRESH:   ATUI_TOUCHSCREEN(); return;
+        case JOT_ACT_HOME:      ed.cur_col = 0; return;
+        case JOT_ACT_END:       ed.cur_col = ed.lines[ed.cur_row].len; return;
+        case JOT_ACT_COUNT:
+        default: break;
         }
         return; /* Don't insert ctrl combos as chars */
     }
@@ -1638,7 +2061,7 @@ static VOID cleanup_editor(VOID) {
 
     /* Free config */
     if (ed.config) DESTROY_ATRCFD(ed.config);
-    if (ed.colour_config) DESTROY_ATRCFD(ed.colour_config);
+    if (ed.syntax_config) DESTROY_ATRCFD(ed.syntax_config);
 }
 
 static VOID exit_jot(VOID) {

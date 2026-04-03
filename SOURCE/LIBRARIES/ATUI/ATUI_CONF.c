@@ -1,6 +1,6 @@
 #define ATUI_INTERNALS
 #define ATRC_IMPLEMENTATION
-#define ATRC_DEBUG
+// #define ATRC_DEBUG
 #include <LIBRARIES/ATRC/ATRC.h>
 #include <LIBRARIES/ATUI/ATUI_TYPES.h>
 #include <LIBRARIES/ATUI/ATUI.h>
