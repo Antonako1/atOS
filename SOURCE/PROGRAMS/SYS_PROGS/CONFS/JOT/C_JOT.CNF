@@ -1,29 +1,24 @@
 #!ATRC
 
-# JOT Editor Colour Theme
-# Values are in R,G,B format (0-255 per channel).
+# C/H syntax highlighting for JOT
+
+[SETTINGS]
+COMMENT_START=//
+TAB_AS_SPACES=TRUE
+
+[AUTOCOMPLETE]
+PAIRS=({["'
 
 [COLOUR]
-# Main text area
-FG_TEXT=255,255,255
-BG_TEXT=0,0,0
-
-# Title bar and status bar
-FG_BAR=0,0,0
-BG_BAR=255,255,255
-
-# Shortcut bar
-FG_SHORTCUT_KEY=255,255,255
-BG_SHORTCUT=0,0,0
-FG_SHORTCUT_DESC=180,180,180
-
-# Line number gutter
-FG_LINE_NUMBER=180,150,50
-
-# Status messages
-FG_STATUS=255,255,255
-
-# Syntax highlighting
 FG_COMMENT=128,128,128
 FG_STRING=100,220,100
 FG_NUMBER=100,200,220
+
+[SYNTAX_KEYWORDS]
+# Format: R,G,B:keyword1,keyword2,...
+# Types and qualifiers
+RULE_0=100,220,100:int,char,void,float,double,long,short,unsigned,signed,const,static,struct,union,enum,typedef,extern,volatile,register,inline,auto,U8,U16,U32,I8,I16,I32,U0,I0,S0,F32,PU8,PU32,PPU8,PPU32,VOID,CHAR,BOOL,BOOLEAN,BOOL8,UINT,INT,DWORD,WORD,BYTE,SIZE_T,VOIDPTR,NULLPTR
+# Control flow
+RULE_1=200,100,220:if,else,for,while,do,switch,case,default,break,continue,return,goto,sizeof
+# Preprocessor and constants
+RULE_2=100,200,220:#include,#define,#ifndef,#ifdef,#endif,#if,#else,#elif,#undef,#pragma,TRUE,FALSE,NULL,NULLT

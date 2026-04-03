@@ -876,3 +876,13 @@ U8 KEYPRESS_TO_CHARS(U32 kcode) {
 
     return keymap_lower[kcode];
 }
+
+
+U32 CHAR_TO_KEYCODE(U8 c) {
+    for (U32 i = 0; i < KEY_MAX; i++) {
+        if (keymap_lower[i] == c || keymap_upper[i] == c) {
+            return i;
+        }
+    }
+    return KEY_UNKNOWN;
+}

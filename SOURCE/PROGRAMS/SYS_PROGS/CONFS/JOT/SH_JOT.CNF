@@ -1,0 +1,22 @@
+#!ATRC
+
+# SH syntax highlighting for JOT
+
+[SETTINGS]
+COMMENT_START=#
+TAB_AS_SPACES=TRUE
+
+[AUTOCOMPLETE]
+PAIRS=({["'
+
+[COLOUR]
+FG_COMMENT=128,128,128
+FG_STRING=100,220,100
+FG_NUMBER=100,200,220
+
+[SYNTAX_KEYWORDS]
+# Format: R,G,B:keyword1,keyword2,...
+# Commands
+RULE_0=100,220,100:echo,cd,ls,dir,cat,type,rm,mkdir,cp,mv,set,export,exit,clear,cls
+# Control flow
+RULE_1=200,100,220:if,else,fi,then,for,while,do,done,case,esac,in,function

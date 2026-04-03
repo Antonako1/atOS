@@ -144,6 +144,6 @@ typedef U8           BOOLEAN8;
 #define CMAIN() U32 main(U32 argc, PPU8 argv) 
 #else
 #define CMAIN() U32 ATGL_MAIN(U32 argc, PPU8 argv)
-#include <RUNTIME/RUNTIME.h>
 #endif
+#include <RUNTIME/RUNTIME.h>
 #endif // TYPEDEF_H

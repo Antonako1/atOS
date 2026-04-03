@@ -11,29 +11,55 @@ SOFT_WRAP=FALSE
 SYNTAX=TRUE
 CASE_SENSITIVE_SEARCH=FALSE
 COMMENT_START=//
+TAB_AS_SPACES=TRUE
 
 [KEYBINDS]
-# Keybinds are currently hardcoded in JOT.
-# Future versions will allow remapping here.
-# EXIT=^X
-# SAVE=^O
-# CUT=^K
-# UNCUT=^U
-# SEARCH=^W
-# REPLACE=^\
-# HELP=^G
-# UNDO=^Z
-# TOP=^T
-# BOTTOM=^B
-# GOTO_LINE=^_
-# POSITION=^C
-# REFRESH=^L
-# READ_FILE=^R
+EXIT=^X
+SAVE=^O
+CUT=^K
+UNCUT=^U
+SEARCH=^W
+REPLACE=^\
+HELP=^G
+UNDO=^Z
+TOP=^T
+BOTTOM=^B
+GOTO_LINE=^_
+POSITION=^C
+REFRESH=^L
+READ_FILE=^R
+HOME=^A
+END=^E
 
-[SYNTAX_KEYWORDS]
-# Define custom syntax highlighting rules.
-# Format:  RULE_N = R,G,B:keyword1,keyword2,...
-# Example: RULE_0 = 100,200,100:int,char,void,float,double
-#
-# Built-in rules exist for .C/.H, .ASM/.INC, .SH, .CNF files.
-# Custom rules here override built-in rules.
+[SYNTAX_FILES]
+FILES=C_JOT.CNF,ASM_JOT.CNF,SH_JOT.CNF
+C=C
+H=C
+ASM=ASM
+INC=ASM
+SH=SH
+
+[COLOUR]
+# Main text area
+FG_TEXT=255,255,255
+BG_TEXT=0,0,0
+
+# Title bar and status bar
+FG_BAR=0,0,0
+BG_BAR=255,255,255
+
+# Shortcut bar
+FG_SHORTCUT_KEY=255,255,255
+BG_SHORTCUT=0,0,0
+FG_SHORTCUT_DESC=180,180,180
+
+# Line number gutter
+FG_LINE_NUMBER=180,150,50
+
+# Status messages
+FG_STATUS=255,255,255
+
+# Syntax highlighting defaults
+FG_COMMENT=128,128,128
+FG_STRING=100,220,100
+FG_NUMBER=100,200,220
