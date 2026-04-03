@@ -24,6 +24,7 @@ jobs:
       - name: Build ISO
         run: make iso
 
+<<<<<<< Updated upstream
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
@@ -33,3 +34,85 @@ jobs:
           prerelease: false
           make_latest: true
           files: OUTPUT/ISO/atOS.iso
+=======
+      # -------------------------
+      # Build timing + summary
+      # -------------------------
+      - name: Set build end time
+        run: |
+          END_TIME=$(date +%s)
+          START_TIME=${START_TIME}
+          DURATION=$((END_TIME - START_TIME))
+
+          echo "Build started at: $(date -d @$START_TIME)"
+          echo "Build finished at: $(date -d @$END_TIME)"
+          echo "Total build time: ${DURATION} seconds"
+
+      # Optional: Add nice GitHub summary
+      - name: Write job summary
+        run: |
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          # Expected versions (from your spec)
+          EXPECTED_NASM="2.16"
+          EXPECTED_MAKE="4.3"
+          EXPECTED_GCC="13.3.0"
+          EXPECTED_GENISO="1.1.11"
+          EXPECTED_CMAKE="3.28.3"
+          EXPECTED_NINJA="1.11.1"
+
+          # Actual versions
+          ACTUAL_NASM=$(nasm -v)
+          ACTUAL_MAKE=$(make --version | head -n1)
+          ACTUAL_GCC=$(gcc --version | head -n1)
+          ACTUAL_GENISO=$(genisoimage --version | head -n1)
+          ACTUAL_CMAKE=$(cmake --version | head -n1)
+          ACTUAL_NINJA=$(ninja --version)
+
+          echo "qemu-system-x86_64 version should be 8.2.2 for running the ISO." >> $GITHUB_STEP_SUMMARY
+
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Start Time: $(date -d @$START_TIME)" >> $GITHUB_STEP_SUMMARY
+          echo "- End Time: $(date -d @$END_TIME)" >> $GITHUB_STEP_SUMMARY
+          echo "- Duration: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Tool Versions (Expected vs Actual)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Tool | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| NASM | $EXPECTED_NASM | $ACTUAL_NASM |" >> $GITHUB_STEP_SUMMARY
+          echo "| Make | $EXPECTED_MAKE | $ACTUAL_MAKE |" >> $GITHUB_STEP_SUMMARY
+          echo "| GCC | $EXPECTED_GCC | $ACTUAL_GCC |" >> $GITHUB_STEP_SUMMARY
+          echo "| Genisoimage | $EXPECTED_GENISO | $ACTUAL_GENISO |" >> $GITHUB_STEP_SUMMARY
+          echo "| CMake | $EXPECTED_CMAKE | $ACTUAL_CMAKE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ninja | $EXPECTED_NINJA | $ACTUAL_NINJA |" >> $GITHUB_STEP_SUMMARY
+
+      # -------------------------
+      # Upload ISO as artifact
+      # -------------------------
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: atOS-iso
+          path: OUTPUT/ISO/atOS.iso
+
+      # -------------------------
+      # Create GitHub Release
+      # -------------------------
+      - name: Generate release tag
+        id: tag
+        run: echo "TAG=build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: "atOS Build ${{ steps.tag.outputs.TAG }}"
+          body: "Automated build from commit ${{ github.sha }}"
+          files: OUTPUT/ISO/atOS.iso
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+>>>>>>> Stashed changes
