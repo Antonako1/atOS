@@ -11,13 +11,134 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Set build start time
+        id: start_time
+        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      # -------------------------
+      # Install dependencies
+      # -------------------------
+      - name: Install base packages
         run: |
           sudo apt update
-          sudo apt install -y nasm make gcc genisoimage cmake ninja-build
+          sudo apt install -y build-essential wget tar
 
+      # NASM 2.16
+      - name: Install NASM 2.16
+        run: |
+          wget https://www.nasm.us/pub/nasm/releasebuilds/2.16/nasm-2.16.tar.gz
+          tar -xzf nasm-2.16.tar.gz
+          cd nasm-2.16
+          ./configure
+          make -j$(nproc)
+          sudo make install
+
+      # Make 4.3 (already default, but ensure)
+      - name: Install Make 4.3
+        run: |
+          sudo apt install -y make
+
+      # GCC 13.3.0
+      - name: Install GCC 13
+        run: |
+          sudo apt install -y gcc-13 g++-13
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+
+      # Genisoimage 1.1.11 (apt usually matches this)
+      - name: Install Genisoimage
+        run: |
+          sudo apt install -y genisoimage
+
+      # CMake 3.28.3
+      - name: Install CMake 3.28.3
+        run: |
+          wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz
+          tar -xzf cmake-3.28.3-linux-x86_64.tar.gz
+          sudo mv cmake-3.28.3-linux-x86_64 /opt/cmake
+          echo "/opt/cmake/bin" >> $GITHUB_PATH
+
+      # Ninja 1.11.1
+      - name: Install Ninja 1.11.1
+        run: |
+          wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip
+          unzip ninja-linux.zip
+          chmod +x ninja
+          sudo mv ninja /usr/local/bin/
+
+      # -------------------------
+      # Print tool versions
+      # -------------------------
+      - name: Print tool versions
+        run: |
+          echo "Tool versions:"
+          echo "NASM: $(nasm -v)"
+          echo "Make: $(make --version | head -n1)"
+          echo "GCC: $(gcc --version | head -n1)"
+          echo "Genisoimage: $(genisoimage --version | head -n1)"
+          echo "CMake: $(cmake --version | head -n1)"
+          echo "Ninja: $(ninja --version)"
+
+      # -------------------------
+      # Build ISO
+      # -------------------------
       - name: Build ISO
         run: make iso
+
+      # -------------------------
+      # Build timing + summary
+      # -------------------------
+      - name: Set build end time
+        run: |
+          END_TIME=$(date +%s)
+          START_TIME=${START_TIME}
+          DURATION=$((END_TIME - START_TIME))
+
+          echo "Build started at: $(date -d @$START_TIME)"
+          echo "Build finished at: $(date -d @$END_TIME)"
+          echo "Total build time: ${DURATION} seconds"
+
+      # Optional: Add nice GitHub summary
+      - name: Write job summary
+        run: |
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+
+          # Expected versions (from your spec)
+          EXPECTED_NASM="2.16"
+          EXPECTED_MAKE="4.3"
+          EXPECTED_GCC="13.3.0"
+          EXPECTED_GENISO="1.1.11"
+          EXPECTED_CMAKE="3.28.3"
+          EXPECTED_NINJA="1.11.1"
+
+          # Actual versions
+          ACTUAL_NASM=$(nasm -v)
+          ACTUAL_MAKE=$(make --version | head -n1)
+          ACTUAL_GCC=$(gcc --version | head -n1)
+          ACTUAL_GENISO=$(genisoimage --version | head -n1)
+          ACTUAL_CMAKE=$(cmake --version | head -n1)
+          ACTUAL_NINJA=$(ninja --version)
+
+          echo "qemu-system-x86_64 version should be 8.2.2 for running the ISO." >> $GITHUB_STEP_SUMMARY
+
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Start Time: $(date -d @$START_TIME)" >> $GITHUB_STEP_SUMMARY
+          echo "- End Time: $(date -d @$END_TIME)" >> $GITHUB_STEP_SUMMARY
+          echo "- Duration: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Tool Versions (Expected vs Actual)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Tool | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| NASM | $EXPECTED_NASM | $ACTUAL_NASM |" >> $GITHUB_STEP_SUMMARY
+          echo "| Make | $EXPECTED_MAKE | $ACTUAL_MAKE |" >> $GITHUB_STEP_SUMMARY
+          echo "| GCC | $EXPECTED_GCC | $ACTUAL_GCC |" >> $GITHUB_STEP_SUMMARY
+          echo "| Genisoimage | $EXPECTED_GENISO | $ACTUAL_GENISO |" >> $GITHUB_STEP_SUMMARY
+          echo "| CMake | $EXPECTED_CMAKE | $ACTUAL_CMAKE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ninja | $EXPECTED_NINJA | $ACTUAL_NINJA |" >> $GITHUB_STEP_SUMMARY
