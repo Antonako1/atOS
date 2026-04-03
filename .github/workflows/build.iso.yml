@@ -24,17 +24,6 @@ jobs:
       - name: Build ISO
         run: make iso
 
-<<<<<<< Updated upstream
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: Latest Build
-          body: "Automated build from commit ${{ github.sha }}"
-          prerelease: false
-          make_latest: true
-          files: OUTPUT/ISO/atOS.iso
-=======
       # -------------------------
       # Build timing + summary
       # -------------------------
@@ -115,4 +104,3 @@ jobs:
           files: OUTPUT/ISO/atOS.iso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
->>>>>>> Stashed changes
