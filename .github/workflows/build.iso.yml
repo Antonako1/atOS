@@ -59,25 +59,26 @@ jobs:
           ACTUAL_CMAKE=$(cmake --version | head -n1)
           ACTUAL_NINJA=$(ninja --version)
 
-          echo "qemu-system-x86_64 version should be 8.2.2 for running the ISO." >> $GITHUB_STEP_SUMMARY
+          SUMMARY="summary.md"
+          echo "qemu-system-x86_64 version should be 8.2.2 for running the ISO." >> $SUMMARY
+          echo "" >> $SUMMARY
+          echo "## Build Summary" >> $SUMMARY
+          echo "- Start Time: $(date -d @$START_TIME)" >> $SUMMARY
+          echo "- End Time: $(date -d @$END_TIME)" >> $SUMMARY
+          echo "- Duration: ${DURATION}s" >> $SUMMARY
+          echo "" >> $SUMMARY
+          echo "### Tool Versions (Expected vs Actual)" >> $SUMMARY
+          echo "" >> $SUMMARY
+          echo "| Tool | Expected | Actual |" >> $SUMMARY
+          echo "|------|----------|--------|" >> $SUMMARY
+          echo "| NASM | $EXPECTED_NASM | $ACTUAL_NASM |" >> $SUMMARY
+          echo "| Make | $EXPECTED_MAKE | $ACTUAL_MAKE |" >> $SUMMARY
+          echo "| GCC | $EXPECTED_GCC | $ACTUAL_GCC |" >> $SUMMARY
+          echo "| Genisoimage | $EXPECTED_GENISO | $ACTUAL_GENISO |" >> $SUMMARY
+          echo "| CMake | $EXPECTED_CMAKE | $ACTUAL_CMAKE |" >> $SUMMARY
+          echo "| Ninja | $EXPECTED_NINJA | $ACTUAL_NINJA |" >> $SUMMARY
 
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- Start Time: $(date -d @$START_TIME)" >> $GITHUB_STEP_SUMMARY
-          echo "- End Time: $(date -d @$END_TIME)" >> $GITHUB_STEP_SUMMARY
-          echo "- Duration: ${DURATION}s" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "### Tool Versions (Expected vs Actual)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "| Tool | Expected | Actual |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| NASM | $EXPECTED_NASM | $ACTUAL_NASM |" >> $GITHUB_STEP_SUMMARY
-          echo "| Make | $EXPECTED_MAKE | $ACTUAL_MAKE |" >> $GITHUB_STEP_SUMMARY
-          echo "| GCC | $EXPECTED_GCC | $ACTUAL_GCC |" >> $GITHUB_STEP_SUMMARY
-          echo "| Genisoimage | $EXPECTED_GENISO | $ACTUAL_GENISO |" >> $GITHUB_STEP_SUMMARY
-          echo "| CMake | $EXPECTED_CMAKE | $ACTUAL_CMAKE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Ninja | $EXPECTED_NINJA | $ACTUAL_NINJA |" >> $GITHUB_STEP_SUMMARY
+          cat $SUMMARY >> $GITHUB_STEP_SUMMARY
 
       # -------------------------
       # Upload ISO as artifact
@@ -100,7 +101,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.TAG }}
           name: "atOS Build ${{ steps.tag.outputs.TAG }}"
-          body: "Automated build from commit ${{ github.sha }}"
+          body_path: summary.md
           files: OUTPUT/ISO/atOS.iso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
