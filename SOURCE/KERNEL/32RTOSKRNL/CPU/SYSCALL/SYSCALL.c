@@ -252,6 +252,10 @@ U32 SYS_GET_KB_MOUSE_DATA(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U3
     (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     return GET_KB_MOUSE_DATA();
 }
+U32 SYS_CHAR_TO_KEYCODE(U32 char_c, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    return CHAR_TO_KEYCODE((U8)char_c);
+}
 
 U32 SYS_KMALLOC(U32 size, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;

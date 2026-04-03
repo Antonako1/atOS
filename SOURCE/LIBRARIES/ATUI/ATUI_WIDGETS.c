@@ -14,6 +14,7 @@
 #include <STD/STRING.h>
 #include <STD/PROC_COM.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
+#include <STD/IO.h>
 
 #define PIT_TICKS_PER_SCROLL_STEP 10 // ~50 ms per marquee scroll step
 
@@ -619,13 +620,14 @@ VOID ATUI_WIDGET_SET_TEXT(ATUI_WIDGET *w, const CHAR *text) {
 static VOID textbox_handle_key(ATUI_WIDGET *w, U32 key) {
     ATUI_TEXTBOX *tb = &w->data.textbox;
 
-    if (key >= 32 && key < 256 && key != 127) {
+    U8 ascii = keypress_to_char(key);
+    if (ascii >= 32 && ascii < 256 && ascii != 127) {
         // Printable character
         if (tb->len < 127) {
             // Shift chars right from cursor
             for (U32 i = tb->len; i > tb->cursor; i--)
                 tb->buffer[i] = tb->buffer[i - 1];
-            tb->buffer[tb->cursor] = (CHAR)key;
+            tb->buffer[tb->cursor] = (CHAR)ascii;
             tb->len++;
             tb->cursor++;
             tb->buffer[tb->len] = '\0';
@@ -634,7 +636,7 @@ static VOID textbox_handle_key(ATUI_WIDGET *w, U32 key) {
                 tb->scroll_offset = tb->cursor - tb->visible_width;
             if (w->on_change) w->on_change(w);
         }
-    } else if (key == 8 || key == 127) {
+    } else if (key == KEY_BACKSPACE) {
         // Backspace
         if (tb->cursor > 0) {
             for (U32 i = tb->cursor - 1; i < tb->len - 1; i++)
@@ -944,6 +946,20 @@ INT ATUI_MSGBOX_INPUT(const CHAR *title, const CHAR *message, CHAR *buf, U32 buf
     ATUI_WSET_TITLE(win, title ? title : "Input");
     ATUI_WADD_LABEL(win, 2, 3, message);               // widget 0 — label
     ATUI_WIDGET *tb = ATUI_WADD_TEXTBOX(win, 4, 3, 38, "", NULLPTR); // widget 1
+
+    /* Pre-fill textbox if buf has content */
+    if (buf && buf[0]) {
+        ATUI_TEXTBOX *tbd = &tb->data.textbox;
+        U32 len = STRLEN(buf);
+        if (len > 127) len = 127;
+        MEMCPY(tbd->buffer, buf, len);
+        tbd->buffer[len] = '\0';
+        tbd->len = len;
+        tbd->cursor = len;
+        if (len > tbd->visible_width)
+            tbd->scroll_offset = len - tbd->visible_width;
+    }
+
     ATUI_WADD_BUTTON(win, 6, 12, "OK",     NULLPTR);   // widget 2
     ATUI_WADD_BUTTON(win, 6, 26, "Cancel", NULLPTR);   // widget 3
     ATUI_WSET_FOCUS(win, 1); // start in textbox

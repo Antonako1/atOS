@@ -125,8 +125,21 @@ Want to dig into the source or contribute? Here’s how to set up the environmen
 Install the essential build tools:
 
 ```bash
+# For Debian/Ubuntu
 sudo apt install qemu-system-x86 nasm make gcc genisoimage cmake ninja-build
 ```
+
+Tools used in development:
+
+| Tool | Version | Purpose |
+| ---- | ------- | ------- |
+| QEMU | 8.2.2 | Virtualization and testing |
+| NASM | 2.16 | Assembler for x86 assembly code |
+| Make | 4.3 | Build automation |
+| GCC | 13.3.0 | C compiler for building tools and libraries |
+| Genisoimage | 1.1.11 | Create ISO images for booting |
+| CMake | 3.28.3 | Build system generator for libraries and tools |
+| Ninja | 1.11.1 | Fast build system |
 
 ### Building
 
@@ -163,7 +176,7 @@ Planned and in-progress features for atOS:
 
 * [x] [ATUI](SOURCE/LIBRARIES/ATUI/README.md) & [ATGL](SOURCE/LIBRARIES/ATGL/README.md) UI/Graphics Libraries
 * [x] [BATSH](DOCS/BATSH.md) Scripting Language
-* [ ] Text Editor (Ironclad WIP)
+* [x] Text Editor (JOT)
 * [ ] Dynamic Library Loading
 * [ ] Assembler / Disassembler
 * [ ] C Compiler implementation

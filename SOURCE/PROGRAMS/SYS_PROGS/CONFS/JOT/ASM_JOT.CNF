@@ -1,0 +1,24 @@
+#!ATRC
+
+# ASM/INC syntax highlighting for JOT
+
+[SETTINGS]
+COMMENT_START=;
+TAB_AS_SPACES=FALSE
+
+[AUTOCOMPLETE]
+PAIRS=["'
+
+[COLOUR]
+FG_COMMENT=128,128,128
+FG_STRING=100,220,100
+FG_NUMBER=100,200,220
+
+[SYNTAX_KEYWORDS]
+# Format: R,G,B:keyword1,keyword2,...
+# Instructions
+RULE_0=100,220,100:mov,add,sub,mul,div,inc,dec,and,or,xor,not,shl,shr,push,pop,call,ret,jmp,je,jne,jz,jnz,jg,jl,jge,jle,cmp,test,lea,nop,int,iret,cli,sti,hlt,in,out,rep,movs,stos,lods
+# Directives and macros
+RULE_1=200,100,220:section,segment,global,extern,bits,org,db,dw,dd,dq,times,resb,resw,resd,equ,%macro,%endmacro,%include,%define,%if,%endif
+# Registers
+RULE_2=100,200,220:eax,ebx,ecx,edx,esi,edi,esp,ebp,ax,bx,cx,dx,si,di,sp,bp,al,ah,bl,bh,cl,ch,dl,dh,cs,ds,es,fs,gs,ss,cr0,cr3
