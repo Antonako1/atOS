@@ -52,14 +52,14 @@ This makes atOS ideal for learning, experimentation, and low-level programming w
 ## Features
 
 - 🖥️ **32-bit x86 Architecture** — runs on legacy and virtualized hardware.
-- 🛠️ **Custom Language Support** — integrated experimental [BATSH](DOCS/BATSH.md) shell language for scripting.
+- 🛠️ **Assembler (Compiler and disassembler WIP)** — integrated experimental assembler and disassembler for low-level programming.
 - 🔓 **No Safety Barriers** — Ring 0, no protection layers or user/kernel enforcement, making it ideal for exploration.
 - 🗄️ **File System Support** — ISO9660 for CD-ROM images and FAT32 for local storage.
-- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries. Examples are SANDBOX.BIN, PAINT.BIN and TSHELL.BIN
-- 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), and Serial ports.
+- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries. Examples are SANDBOX.BIN, PAINT.BIN and JOT.BIN
+- 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), Serial ports and more!
 - 🐢 **Multitasking** — simple cooperative scheduler for handling multiple processes.
-- 🐚 **Shell Environment** — a feature-rich command-line shell with path support and environment variables.
-- 🎮 **System Programs** — suite of utilities including `PAINT`, `CLOCK`, `JOT (text editor)`, and games like `PONG`.
+- 🐚 **Shell Environment** — a feature-rich command-line shell with environment variables and [BATSH](DOCS/BATSH.md) shell language for scripting.
+- 🎮 **System Programs** — suite of utilities including `ASTRAC (compiler)`, `PAINT`, `CLOCK`, `JOT (text editor)`, and games like `PONG`.
 - 📖 **Open Source** — licensed under MIT, designed as a learning tool for systems programming.
 
 ---
