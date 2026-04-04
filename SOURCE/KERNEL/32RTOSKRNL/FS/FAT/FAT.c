@@ -108,7 +108,7 @@ BPB *GET_BPB() {
 BOOLEAN WRITE_DISK_BPB() {
     MEMZERO(&bpb, sizeof(BPB));
     bpb.JMPSHORT[0] = 0xEB;
-    bpb.JMPSHORT[1] = 0x3C;
+    bpb.JMPSHORT[1] = sizeof(BPB); // JMP SHORT to offset 0x5A (= sizeof(BPB) = 90), past the entire BPB
     bpb.JMPSHORT[2] = 0x90;
     SET_BPB(bpb.OEM_IDENT, "MSWIN4.1", 8);
 
@@ -151,10 +151,15 @@ BOOLEAN WRITE_DISK_BPB() {
     bpb_loaded = TRUE;
     return res;
 }
-
+#include <STD/DEBUG.h>
 BOOLEAN POPULATE_BOOTLOADER(VOIDPTR BOOTLOADER_BIN, U32 sz) {
-    if (sz + sizeof(BPB) > ATA_PIO_SECTOR_SIZE)
+    // VBR.BIN is a full 512-byte sector image: [JMP+BPB placeholder (90 bytes)][boot code (422 bytes)].
+    // We write our own BPB (already in `bpb`) to bytes 0-89, then copy only the
+    // code portion of VBR.BIN (bytes sizeof(BPB)..sz-1) to bytes sizeof(BPB)..511.
+    if (sz > ATA_PIO_SECTOR_SIZE)
         return FALSE;
+    if (sz <= sizeof(BPB))
+        return FALSE; // nothing to copy after the header
 
     U8 *loader = (U8 *)BOOTLOADER_BIN;
 
@@ -167,15 +172,16 @@ BOOLEAN POPULATE_BOOTLOADER(VOIDPTR BOOTLOADER_BIN, U32 sz) {
         return FALSE;
     }
 
+    // Overwrite sector header with the authoritative BPB (contains correct JMP)
     MEMCPY(buf, &bpb, sizeof(BPB));
 
-    MEMCPY(buf + sizeof(BPB), loader, sz);
+    MEMCPY(buf + sizeof(BPB), loader, sz - sizeof(BPB));
 
     buf[510] = 0x55;
     buf[511] = 0xAA;
-
     BOOLEAN ok = FAT_WRITE_SECTOR_ON_DISK(0, buf);
     Free(buf);
+    
     return ok;
 }
 

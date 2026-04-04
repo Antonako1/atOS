@@ -35,7 +35,6 @@ set(Sources
 
     # Disassembler
     ${CUR_DIR}/DISSASEMBLER/DISMAIN.c
-    ${CUR_DIR}/DISSASEMBLER/PARSER.c
 
     # Compiler front-end
     ${CUR_DIR}/COMPILER/COMPMAIN.c
@@ -74,7 +73,7 @@ set(CompArgs
     
     # -Wno-comment (No longer needed if using -w)
     # -Wno-comments (No longer needed if using -w)
-    
+    -DDEBUG
     -m32
     -ffreestanding
     -fno-pic

@@ -46,7 +46,7 @@ INPUT_ISO_DIR_SYSTEM ?= $(INPUT_ISO_DIR)/ATOS
 INPUT_ISO_DIR_HOME ?= $(INPUT_ISO_DIR)/HOME
 INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 
-.PHONY: all kernel bootloader iso clean run help programs diskvbr clean_tap runn setup_tap
+.PHONY: all kernel bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap
 .PHONY: run_user
 .PHONY: run_user_gui
 
@@ -152,6 +152,7 @@ kernel:
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/FS/FAT/FAT.c -o $(OUTPUT_KERNEL_DIR)/FAT32.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_DIR)/STD/MEM.c -o $(OUTPUT_KERNEL_DIR)/MEM.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_DIR)/STD/STRING.c -o $(OUTPUT_KERNEL_DIR)/STRING.o
+	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_DIR)/STD/DEBUG.c -o $(OUTPUT_KERNEL_DIR)/DEBUG.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_DIR)/STD/MATH.c -o $(OUTPUT_KERNEL_DIR)/MATH.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/RTOSKRNL/ACPI/ACPI.c -o $(OUTPUT_KERNEL_DIR)/ACPI.o
 	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/RTOSKRNL/ERROR/ERROR.c -o $(OUTPUT_KERNEL_DIR)/ERROR.o	
@@ -197,6 +198,7 @@ kernel:
 		$(OUTPUT_KERNEL_DIR)/RTL8139.o \
 		$(OUTPUT_KERNEL_DIR)/AC97.o \
 		$(OUTPUT_KERNEL_DIR)/KDEBUG.o \
+		$(OUTPUT_KERNEL_DIR)/DEBUG.o \
 		$(OUTPUT_KERNEL_DIR)/ATA_PIIX3.o \
 		$(OUTPUT_KERNEL_DIR)/ATA_PIO.o \
 		$(OUTPUT_KERNEL_DIR)/PCI.o \
@@ -237,6 +239,7 @@ iso: bootloader kernel programs diskvbr
 		echo "Warning: DISK_VBR.BIN not found, skipping copy."; \
 	fi
 
+	cp -f $(SOURCE_DIR)/../HOME/SRC/KRNL/VKR.BIN $(INPUT_ISO_DIR)/
 	cp -rf $(SOURCE_DIR)/../HOME/* $(INPUT_ISO_DIR_HOME)/
 	cp -rf $(SOURCE_DIR)/SYS_SRC/* $(INPUT_ISO_DIR_SYSTEM)/SYS_SRC
 	cp -f $(OUTPUT_KERNEL_DIR)/KERNEL.BIN $(INPUT_ISO_DIR)/KERNEL.BIN
@@ -278,6 +281,43 @@ run:
 		-vga std \
 		-m 1024 \
 		-boot order=d \
+		-cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) \
+		-drive id=cdrom,file=$(OUTPUT_ISO_DIR)/$(ISO_NAME),format=raw,if=none \
+		-drive id=hd0,file=hdd.img,format=raw,if=none \
+		-device piix3-ide,id=ide \
+		-device ide-hd,drive=hd0,bus=ide.0 \
+		-device ide-cd,drive=cdrom,bus=ide.1 \
+		-device ac97,audiodev=snd0 \
+		-debugcon file:OUTPUT/DEBUG/DEBUG.log \
+		-global isa-debugcon.iobase=0xe9 \
+		-audiodev sdl,id=snd0 \
+		-nic user,model=rtl8139,mac=52:54:00:12:34:56 \
+		-serial stdio \
+		-serial pipe:OUTPUT/SERIAL/SERIAL2 \
+		-serial pipe:OUTPUT/SERIAL/SERIAL3 \
+		-serial pipe:OUTPUT/SERIAL/SERIAL4
+
+hdd:
+	@echo "Running QEMU booting from hdd.img..."
+# 	[ -f hdd.img ] || qemu-img create -f raw hdd.img 256M
+	mkdir -p OUTPUT/DEBUG
+	mkdir -p OUTPUT/SERIAL
+
+	rm -f OUTPUT/SERIAL/SERIAL2.in 
+	rm -f OUTPUT/SERIAL/SERIAL2.out
+	rm -f OUTPUT/SERIAL/SERIAL3.in 
+	rm -f OUTPUT/SERIAL/SERIAL3.out
+	rm -f OUTPUT/SERIAL/SERIAL4.in 
+	rm -f OUTPUT/SERIAL/SERIAL4.out
+
+	mkfifo OUTPUT/SERIAL/SERIAL2.in OUTPUT/SERIAL/SERIAL2.out
+	mkfifo OUTPUT/SERIAL/SERIAL3.in OUTPUT/SERIAL/SERIAL3.out
+	mkfifo OUTPUT/SERIAL/SERIAL4.in OUTPUT/SERIAL/SERIAL4.out
+
+	qemu-system-i386 \
+		-vga std \
+		-m 1024 \
+		-boot order=c \
 		-cdrom $(OUTPUT_ISO_DIR)/$(ISO_NAME) \
 		-drive id=cdrom,file=$(OUTPUT_ISO_DIR)/$(ISO_NAME),format=raw,if=none \
 		-drive id=hd0,file=hdd.img,format=raw,if=none \
@@ -366,6 +406,7 @@ help:
 	@echo "  make bootloader - Compile bootloader"
 	@echo "  make iso        - Build bootable ISO (default)"
 	@echo "  make run        - Run ISO in QEMU"
+	@echo "  make hdd        - Run QEMU booting from hdd.img"
 	@echo "  sudo make runn  - Run ISO in QEMU with ethernet driver"
 	@echo "  make run_user   - Run headless QEMU (no sudo, user-net)"
 	@echo "  make run_user_gui - Run QEMU with GUI+audio (no sudo, user-net)"
