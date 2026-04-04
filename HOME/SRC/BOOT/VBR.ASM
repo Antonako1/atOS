@@ -231,7 +231,7 @@ print_str:
 
 
 ; filename in 8.3 FAT format: 8-char name (space-padded) + 3-char extension
-target_name  db "VBR     BIN", 11
+target_name  db "VKR     BIN", 11
 
 err_msg      db "VBR_ERR", 0
 drive_num    db 0

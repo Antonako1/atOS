@@ -16,4 +16,4 @@ dissasembled_output.txt
 
 # Allow VBR.BIN if it exists, since it's needed for the bootloader
 !VBR.BIN
-
+!VKR.BIN
