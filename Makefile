@@ -63,16 +63,6 @@ $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN: $(SOURCE_BOOTLOADER_DIR)/BOOTLOADER.asm
 
 bootloader: $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN
 
-
-# Disk VBR build (Volume Boot Record for FAT)
-$(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN: $(SOURCE_BOOTLOADER_DIR)/DISK_VBR.asm
-	@echo "Compiling disk VBR (16-bit real mode)..."
-	mkdir -p $(OUTPUT_BOOTLOADER_DIR)
-	$(ASSEMBLER) -f bin -D__REAL_MODE__ -o $@ $<
-	@echo "Disk VBR compiled successfully."
-
-diskvbr: $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN
-
 kernel: 
 	@echo "Compiling KERNEL.BIN (16-bit real mode second stage)..."
 	mkdir -p $(OUTPUT_KERNEL_DIR)
@@ -240,7 +230,12 @@ iso: bootloader kernel programs diskvbr
 	mkdir -p $(INPUT_ISO_DIR_HOME)/DOCS/
 	mkdir -p $(INPUT_ISO_DIR_PROGRAMS)
 	cp -f $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN $(INPUT_ISO_DIR)/BOOTLOADER.BIN
-	cp -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN $(INPUT_ISO_DIR_SYSTEM)/DISK_VBR.BIN
+	if [ -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN ]; then \
+		echo "Copying DISK_VBR.BIN to ISO directory..."; \
+		 cp -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN $(INPUT_ISO_DIR_SYSTEM)/DISK_VBR.BIN; \
+	else \
+		echo "Warning: DISK_VBR.BIN not found, skipping copy."; \
+	fi
 
 	cp -rf $(SOURCE_DIR)/../HOME/* $(INPUT_ISO_DIR_HOME)/
 	cp -rf $(SOURCE_DIR)/SYS_SRC/* $(INPUT_ISO_DIR_SYSTEM)/SYS_SRC
