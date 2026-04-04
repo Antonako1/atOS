@@ -106,6 +106,8 @@ typedef struct _ASTRAC_ARGS {
     BOOL verbose;
     BOOL quiet;
 
+    U8 dsm_bits;            /* Disassembler code mode: 16 or 32 (default 32) */
+
     BUILD_TYPE build_type;
 } ASTRAC_ARGS;
 
