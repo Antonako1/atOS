@@ -19,6 +19,8 @@ FG_NUMBER=100,200,220
 # Instructions
 RULE_0=100,220,100:mov,add,sub,mul,div,inc,dec,and,or,xor,not,shl,shr,push,pop,call,ret,jmp,je,jne,jz,jnz,jg,jl,jge,jle,cmp,test,lea,nop,int,iret,cli,sti,hlt,in,out,rep,movs,stos,lods
 # Directives and macros
-RULE_1=200,100,220:section,segment,global,extern,bits,org,db,dw,dd,dq,times,resb,resw,resd,equ,%macro,%endmacro,%include,%define,%if,%endif
+RULE_1=200,100,220:@@,@,.use16,.use32,.org,section,segment,global,extern,bits,db,dw,dd,dq,$$,$,.times,resb,resw,resd,equ
 # Registers
-RULE_2=100,200,220:eax,ebx,ecx,edx,esi,edi,esp,ebp,ax,bx,cx,dx,si,di,sp,bp,al,ah,bl,bh,cl,ch,dl,dh,cs,ds,es,fs,gs,ss,cr0,cr3
+RULE_2=200,50,220:eax,ebx,ecx,edx,esi,edi,esp,ebp,ax,bx,cx,dx,si,di,sp,bp,al,ah,bl,bh,cl,ch,dl,dh,cs,ds,es,fs,gs,ss,cr0,cr3
+# Preprocessor and constants
+RULE_2=100,200,220:#include,#define,#ifndef,#ifdef,#endif,#if,#else,#elif,#undef
