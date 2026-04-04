@@ -1307,13 +1307,14 @@ VOID buffer_putch(CHAR c, VOID *ctx) {
 
 
 
-VOID SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
+U32 SPRINTF(CHAR *buffer, CHAR *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     CHAR *out = buffer;
     VFORMAT(buffer_putch, &out, fmt, args);
     *out = '\0'; // null-terminate
     va_end(args);
+    return out - buffer; // return number of characters written
 }
 
 PU8 STR_REPLACE_FIRST(PU8 src, PU8 repl, PU8 with) {
@@ -1369,6 +1370,44 @@ PU8 STR_REPLACE(PU8 src, PU8 repl, PU8 with) {
     return result;
 }
 
+PU8 STRI_REPLACE(PU8 src, PU8 repl, PU8 with) {
+    if (!src || !repl) return NULLPTR;
+    if (!with) with = "";
+
+    PU8 result = STRDUP(src); // start with a copy
+    if (!result) return NULLPTR;
+
+    PU8 pos;
+    while ((pos = STRISTR(result, repl)) != NULLPTR) {
+        PU8 tmp = STR_REPLACE_FIRST(pos, repl, with);
+        if (!tmp) {
+            MFree(result);
+            return NULLPTR;
+        }
+        // Replace the part of result starting at pos with tmp
+        U32 prefix_len = pos - result;
+        U32 tmp_len = STRLEN(tmp);
+        U32 suffix_len = STRLEN(pos + STRLEN(repl));
+
+        U8 *new_result = MAlloc(prefix_len + tmp_len + suffix_len + 1);
+        if (!new_result) {
+            MFree(result);
+            return NULLPTR;
+        }
+
+        MEMCPY(new_result, result, prefix_len); // copy prefix
+        MEMCPY(new_result + prefix_len, tmp, tmp_len); // copy replacement
+        MEMCPY(new_result + prefix_len + tmp_len, pos + STRLEN(repl), suffix_len); // copy suffix
+        new_result[prefix_len + tmp_len + suffix_len] = '\0';
+
+        MFree(result);
+        MFree(tmp);
+        result = new_result;
+    }
+
+    return result;
+}
+
 BOOL IS_SPACE(CHAR c) {
     if(
         c == ' ' ||
@@ -1377,4 +1416,24 @@ BOOL IS_SPACE(CHAR c) {
         c == ' \t'
     ) return TRUE;
     return FALSE;
+}
+
+U32 VSNPRINTF(CHAR *buffer, U32 size, CHAR *fmt, ...) {
+    va_list a;
+    va_start(a, fmt);
+    CHAR *out = (CHAR*)buffer;
+    VFORMAT(buffer_putch, &out, (CHAR*)fmt, a);
+    *out = '\0';
+    va_end(a);
+    return (U32)(out - (CHAR*)buffer);
+}
+
+U32 SNPRINTF(CHAR *buffer, U32 size, CHAR *fmt, ...) {
+    va_list a;
+    va_start(a, fmt);
+    CHAR *out = (CHAR*)buffer;
+    VFORMAT(buffer_putch, &out, (CHAR*)fmt, a);
+    *out = '\0';
+    va_end(a);
+    return (U32)(out - (CHAR*)buffer);
 }

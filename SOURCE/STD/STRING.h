@@ -9,6 +9,7 @@
 #define STRING_H
 
 #include <STD/TYPEDEF.h>
+#include <STD/ARG.h>
 
 U32 STRLEN(CONST U8* str);
 U32 STRNLEN(CONST U8* str, U32 maxlen);
@@ -43,9 +44,9 @@ PU8 STRISTR(PU8 a, PU8 b);
 
 PU8 STR_REPLACE_FIRST(PU8 src, PU8 repl, PU8 with); // returns allocated string
 PU8 STR_REPLACE(PU8 src, PU8 repl, PU8 with);
+PU8 STRI_REPLACE(PU8 src, PU8 repl, PU8 with); // Case-insensitive version
 
-// same support as printf
-void SPRINTF(CHAR *buffer, CHAR *fmt, ...);
+U32 SPRINTF(CHAR *buffer, CHAR *fmt, ...);
 
 VOID STRSHIFT(U8 *src, U32 index, I32 shiftcount);
 VOID STRNSHIFT(U8 *src, U32 index, I32 shiftcount, U32 maxlen);
@@ -75,6 +76,22 @@ U8 TOLOWER(U8 c);
 U0 STR_TOUPPER(U8* str);
 U0 STR_TOLOWER(U8* str);
 U32 FIRST_INDEX_OF(CONST U8* str, U8 c);
+
+/// @brief A vsnprintf implementation that supports a subset of standard format specifiers.
+/// @param buffer The output buffer to write the formatted string into.
+/// @param bufsize The size of the output buffer in bytes.
+/// @param fmt The format string
+/// @param args The variable argument list containing values to format.
+/// @return The number of characters that would have been written if bufsize was sufficiently large, not counting the terminating null byte.
+U32 VSNPRINTF(CHAR *buffer, U32 bufsize, CHAR *fmt, ...);
+
+/// @brief A snprintf implementation that supports a subset of standard format specifiers.
+/// @param buffer The output buffer to write the formatted string into.
+/// @param bufsize The size of the output buffer in bytes.
+/// @param fmt The format string
+/// @param ... The variable arguments containing values to format.
+/// @return The number of characters that would have been written if bufsize was sufficiently large,
+U32 SNPRINTF(CHAR *buffer, U32 bufsize, CHAR *fmt, ...);
 
 BOOL IS_DIGIT_STR(PU8 str);
 BOOL IS_DIGIT(CHAR c);
@@ -119,7 +136,6 @@ U8* str_ltrim(U8 *s);
 U8* str_rtrim(U8 *s);
 U8* str_trim(U8 *s);
 
-#include <STD/ARG.h>
 VOID buffer_putch(CHAR c, VOID *ctx);
 VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args);
 #endif // STRING_H
