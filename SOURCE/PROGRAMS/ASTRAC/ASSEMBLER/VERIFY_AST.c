@@ -130,6 +130,7 @@ STATIC BOOL operand_type_compatible(ASM_OPERAND_TYPE actual,
                                     ASM_OPERAND_TYPE expected) {
     if (actual == expected)                              return TRUE;
     if (expected == OP_MEM  && actual == OP_REG)         return TRUE;  /* r/m */
+
     if (expected == OP_IMM  && actual == OP_PTR)         return TRUE;  /* rel */
     if (expected == OP_MEM  && actual == OP_PTR)         return TRUE;  /* [sym] */
     return FALSE;
@@ -308,9 +309,10 @@ STATIC BOOL verify_instruction(PASM_NODE node, PLABEL_TABLE labels) {
             }
             break;
 
-        /* ── Segment / memory-offset - basic acceptance ───────────────────── */
+        /* ── Segment / memory-offset / far ptr - basic acceptance ──────────── */
         case OP_SEG:
         case OP_MOFFS:
+        case OP_FAR:
             break;
 
         default:

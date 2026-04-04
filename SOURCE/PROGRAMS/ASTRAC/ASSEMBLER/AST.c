@@ -4,6 +4,10 @@
 /* Forward declarations */
 STATIC PU8 COLLECT_VALUE_TEXT(TOK_CURSOR *cur);
 
+/* Current code mode — tracked by the AST builder so that RESOLVE_MNEMONIC
+ * can prefer the native operand size when no register constrains it. */
+STATIC ASM_DIRECTIVE ast_code_mode = DIR_CODE_TYPE_32;
+
 /*
  * ════════════════════════════════════════════════════════════════════════════
  *  AST BUILDER
@@ -61,10 +65,21 @@ STATIC ASM_OPERAND_SIZE ast_reg_size(ASM_REGS reg) {
     }
 }
 
+/* Is this a segment register? (CS, DS, ES, FS, GS, SS) */
+STATIC BOOL ast_is_seg_reg(ASM_REGS reg) {
+    switch (reg) {
+        case REG_CS: case REG_DS: case REG_ES:
+        case REG_FS: case REG_GS: case REG_SS:
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
+
 /*
  * Check whether 'actual' operand type satisfies 'expected' from the table.
- * r/m accepts a plain register, and a label reference (OP_PTR) can appear
- * where an immediate or memory operand is expected.
+ * r/m accepts a plain register (or segment register), and a label reference
+ * (OP_PTR) can appear where an immediate or memory operand is expected.
  */
 STATIC BOOL ast_operand_type_ok(ASM_OPERAND_TYPE actual,
                                 ASM_OPERAND_TYPE expected) {
@@ -83,6 +98,31 @@ STATIC BOOL ast_operand_type_ok(ASM_OPERAND_TYPE actual,
 STATIC const ASM_MNEMONIC_TABLE *RESOLVE_MNEMONIC(
         PU8 name, ASM_OPERAND *operands, U32 op_count) {
     U32 tbl_len = sizeof(asm_mnemonics) / sizeof(asm_mnemonics[0]);
+
+    /* Determine native operand size from the current code mode. */
+    ASM_OPERAND_SIZE native_size =
+        (ast_code_mode == DIR_CODE_TYPE_16) ? SZ_16BIT : SZ_32BIT;
+
+    /* Check whether any operand constrains the size (register or
+     * explicitly-sized memory reference).  When constrained the first
+     * matching table entry is always correct.  When NOT constrained
+     * (all operands are OP_IMM / unsized OP_PTR) we prefer the entry
+     * whose size matches the native mode so that e.g. `push 0xb800`
+     * in .use16 picks PUSH_IMM16 instead of PUSH_IMM32. */
+    BOOL has_size_constraint = FALSE;
+    for (U32 j = 0; j < op_count; j++) {
+        if (operands[j].type == OP_REG || operands[j].type == OP_SEG) {
+            has_size_constraint = TRUE;
+            break;
+        }
+        if ((operands[j].type == OP_MEM || operands[j].type == OP_PTR)
+            && operands[j].size != SZ_NONE) {
+            has_size_constraint = TRUE;
+            break;
+        }
+    }
+
+    const ASM_MNEMONIC_TABLE *fallback = NULLPTR;
 
     for (U32 i = 0; i < tbl_len; i++) {
         const ASM_MNEMONIC_TABLE *tbl = &asm_mnemonics[i];
@@ -116,7 +156,7 @@ STATIC const ASM_MNEMONIC_TABLE *RESOLVE_MNEMONIC(
             for (U32 j = 0; j < op_count; j++) {
                 if (is_0f_two_op && j == 0) continue; /* skip dest size check */
 
-                if (operands[j].type == OP_REG) {
+                if (operands[j].type == OP_REG || operands[j].type == OP_SEG) {
                     ASM_OPERAND_SIZE rs = ast_reg_size(operands[j].reg);
                     if (rs != SZ_NONE && rs != tbl->size) { ok = FALSE; break; }
                 }
@@ -131,6 +171,13 @@ STATIC const ASM_MNEMONIC_TABLE *RESOLVE_MNEMONIC(
 
         /* ── Immediate bounds check: ensure OP_IMM values fit ────────── */
         if (tbl->size != SZ_NONE) {
+            /* For 0x83 / 0x6B: the immediate is sign-extended from 8 bits,
+             * so it must fit in [-128, 127].  This prevents ADD_RM16_IMM8
+             * from matching e.g. `add ax, 511` which should use IMM16. */
+            U8 imm_opc = tbl->opcode[0];
+            if (tbl->opcode_prefix == PFX_0F) imm_opc = tbl->opcode[1];
+            BOOL is_simm8 = (imm_opc == 0x83 || imm_opc == 0x6B);
+
             for (U32 j = 0; j < op_count; j++) {
                 if (operands[j].type == OP_IMM) {
                     U32 v = operands[j].immediate;
@@ -140,15 +187,36 @@ STATIC const ASM_MNEMONIC_TABLE *RESOLVE_MNEMONIC(
                     if (tbl->size == SZ_16BIT && v > 0xFFFF && v < 0xFFFF0000u) {
                         ok = FALSE; break;
                     }
+                    /* 0x83 / 0x6B sign-extended imm8: value must be in [-128,127] */
+                    if (is_simm8 && v > 0x7F && v < 0xFFFFFF80u) {
+                        ok = FALSE; break;
+                    }
                 }
             }
             if (!ok) continue;
         }
 
-        return tbl;     /* first full match wins */
+        /* ── This entry matches ───────────────────────────────────── */
+
+        /* Size is constrained by a register / sized memory operand —
+         * the first match is always the correct one. */
+        if (has_size_constraint)
+            return tbl;
+
+        /* No register constrains size — prefer entries whose size
+         * matches the native operand width of the current code mode.
+         * SZ_8BIT forms (e.g. PUSH imm8) are always optimal since
+         * they sign-extend to the native size automatically. */
+        if (tbl->size == native_size || tbl->size == SZ_8BIT
+            || tbl->size == SZ_NONE)
+            return tbl;
+
+        /* Non-native size — save as fallback in case no native-sized
+         * entry exists (e.g. value too large for native size). */
+        if (!fallback) fallback = tbl;
     }
 
-    return NULLPTR;
+    return fallback;
 }
 
 
@@ -315,6 +383,58 @@ STATIC PASM_NODE PARSE_SECTION(TOK_CURSOR *cur) {
  *  For memory refs the bracket loop in PARSE_OPERAND handles the brackets.
  *  Returns the raw text joined into a freshly-allocated string, or NULLPTR.
  */
+/* ── Numeric expression evaluator for compile-time immediates ─────────────── */
+STATIC U32 parse_single_num(PU8 *pp) {
+    PU8 p = *pp;
+    while (*p == ' ' || *p == '\t') p++;
+    U32 val = 0;
+    if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        p += 2;
+        while ((*p >= '0' && *p <= '9') ||
+               (*p >= 'a' && *p <= 'f') ||
+               (*p >= 'A' && *p <= 'F')) {
+            val <<= 4;
+            if (*p >= '0' && *p <= '9') val += (U32)(*p - '0');
+            else if (*p >= 'a') val += (U32)(*p - 'a') + 10u;
+            else val += (U32)(*p - 'A') + 10u;
+            p++;
+        }
+    } else if (p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) {
+        p += 2;
+        while (*p == '0' || *p == '1') { val = val * 2u + (U32)(*p - '0'); p++; }
+    } else if (*p >= '0' && *p <= '9') {
+        while (*p >= '0' && *p <= '9') { val = val * 10u + (U32)(*p - '0'); p++; }
+    }
+    *pp = p;
+    return val;
+}
+
+/* Evaluate left-to-right: A + B - C * D / E  (handles +, -, *, /) */
+STATIC U32 eval_imm_text(PU8 txt) {
+    if (!txt || !txt[0]) return 0;
+    PU8 p = txt;
+    U32 result = parse_single_num(&p);
+    while (*p) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (!*p) break;
+        if (*p == '+') {
+            p++;
+            result += parse_single_num(&p);
+        } else if (*p == '-') {
+            p++;
+            result -= parse_single_num(&p);
+        } else if (*p == '*') {
+            p++;
+            result *= parse_single_num(&p);
+        } else if (*p == '/') {
+            p++;
+            U32 b = parse_single_num(&p);
+            if (b) result /= b;
+        } else break;
+    }
+    return result;
+}
+
 STATIC PU8 COLLECT_VALUE_TEXT(TOK_CURSOR *cur) {
     U8  buf[BUF_SZ] = { 0 };
     U32 len = 0;
@@ -359,6 +479,20 @@ STATIC BOOL PARSE_OPERAND(TOK_CURSOR *cur, ASM_OPERAND *out) {
     PASM_TOK t = TOK_PEEK(cur);
     if (!t) return FALSE;
 
+    /* NEAR / FAR distance hint prefix (consumed before size prefixes) */
+    BOOL want_far = FALSE;
+    if (t->type == TOK_IDENT_VAR
+        && (t->var_type == TYPE_NEAR || t->var_type == TYPE_FAR)) {
+        want_far = (t->var_type == TYPE_FAR);
+        TOK_ADVANCE(cur);
+        /* optional PTR keyword after near/far */
+        PASM_TOK maybe_ptr = TOK_PEEK(cur);
+        if (maybe_ptr && maybe_ptr->type == TOK_IDENT_VAR
+            && maybe_ptr->var_type == TYPE_PTR)
+            TOK_ADVANCE(cur);
+        t = TOK_PEEK(cur);
+    }
+
     /* BYTE/WORD/DWORD PTR prefix */
     if (t->type == TOK_IDENT_VAR) {
         switch (t->var_type) {
@@ -379,7 +513,7 @@ STATIC BOOL PARSE_OPERAND(TOK_CURSOR *cur, ASM_OPERAND *out) {
     /* Register */
     if (t && t->type == TOK_REGISTER) {
         TOK_ADVANCE(cur);
-        out->type = OP_REG;
+        out->type = ast_is_seg_reg(t->reg) ? OP_SEG : OP_REG;
         out->reg  = t->reg;
         /* Infer size from register unless an explicit PTR override was given */
         if (out->size == SZ_NONE)
@@ -579,8 +713,22 @@ STATIC BOOL PARSE_OPERAND(TOK_CURSOR *cur, ASM_OPERAND *out) {
 
         if (t && t->type == TOK_NUMBER) {
             out->type      = OP_IMM;
-            out->immediate = t->num_val;
+            out->immediate = eval_imm_text(txt);  /* evaluate full expression */
             MFree(txt);
+            /* Check for far pointer syntax: SEG:OFF  (e.g. jmp 0x0000:0x2000) */
+            PASM_TOK maybe_colon = TOK_PEEK(cur);
+            if (maybe_colon && maybe_colon->type == TOK_SYMBOL
+                && maybe_colon->symbol == SYM_COLON) {
+                TOK_ADVANCE(cur);   /* consume ':' */
+                PU8 off_txt = COLLECT_VALUE_TEXT(cur);
+                if (off_txt) {
+                    U32 seg = out->immediate;
+                    U32 off = eval_imm_text(off_txt);
+                    MFree(off_txt);
+                    out->type      = OP_FAR;
+                    out->immediate = (seg << 16) | (off & 0xFFFF);
+                }
+            }
         } else {
             /* symbol / label reference — store as mem with symbol name */
             ASM_NODE_MEM *mem = MAlloc(sizeof(ASM_NODE_MEM));
@@ -593,6 +741,26 @@ STATIC BOOL PARSE_OPERAND(TOK_CURSOR *cur, ASM_OPERAND *out) {
             mem->symbol_name = txt;
             out->type    = OP_PTR;
             out->mem_ref = mem;
+            /* jmp far label:imm  — label is the segment, imm is the offset */
+            if (want_far) {
+                PASM_TOK maybe_colon = TOK_PEEK(cur);
+                if (maybe_colon && maybe_colon->type == TOK_SYMBOL
+                    && maybe_colon->symbol == SYM_COLON) {
+                    TOK_ADVANCE(cur);   /* consume ':' */
+                    PU8 off_txt = COLLECT_VALUE_TEXT(cur);
+                    if (off_txt) {
+                        /* Segment is a symbolic label — store offset only;
+                         * the symbol will be resolved as 0 at link time for
+                         * far absolute pointers.  Encode what we can. */
+                        U32 off = eval_imm_text(off_txt);
+                        MFree(off_txt);
+                        out->type      = OP_FAR;
+                        out->immediate = (0u << 16) | (off & 0xFFFF);
+                        /* mem_ref still holds the segment symbol for future
+                         * linker support; immediate holds the offset. */
+                    }
+                }
+            }
         }
         return TRUE;
     }
@@ -833,6 +1001,7 @@ ASM_AST_ARRAY *ASM_BUILD_AST(ASM_TOK_ARRAY *toks) {
     TOK_CURSOR     cur  = { toks, 0 };
     ASM_DIRECTIVE  current_section  = DIR_NONE;
     ASM_DIRECTIVE  code_type        = DIR_CODE_TYPE_32;
+    ast_code_mode = DIR_CODE_TYPE_32;
 
     while (!TOK_AT_END(&cur)) {
         TOK_SKIP_EOL(&cur);
@@ -873,8 +1042,10 @@ ASM_AST_ARRAY *ASM_BUILD_AST(ASM_TOK_ARRAY *toks) {
             if (node) {
                 if (node->type == NODE_SECTION) {
                     ASM_DIRECTIVE new_sec = node->dir.section;
-                    if (new_sec == DIR_CODE_TYPE_32 || new_sec == DIR_CODE_TYPE_16)
+                    if (new_sec == DIR_CODE_TYPE_32 || new_sec == DIR_CODE_TYPE_16) {
                         code_type = new_sec;
+                        ast_code_mode = new_sec;
+                    }
                     else
                         current_section = new_sec;
                 }

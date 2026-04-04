@@ -129,6 +129,8 @@ typedef enum _ASM_VAR_TYPE {
     TYPE_DWORD,     /* 32-bit  (DD, DWORD)  */
     TYPE_FLOAT,     /* 32-bit  (REAL4)      */
     TYPE_PTR,       /* size depends on .use */
+    TYPE_NEAR,      /* near keyword (jmp/call hint) */
+    TYPE_FAR,       /* far  keyword (jmp/call hint) */
 
     TYPE_AMOUNT,
 } ASM_VAR_TYPE;
@@ -288,6 +290,7 @@ typedef enum {
     OP_IMM,
     OP_SEG,
     OP_PTR,
+    OP_FAR,     /* far pointer: immediate = (seg16 << 16) | off16 */
     OP_MOFFS,
 } ASM_OPERAND_TYPE;
 
@@ -374,6 +377,7 @@ typedef enum {
  */
 #define OPS_NONE           { OP_NONE,  OP_NONE, OP_NONE,  OP_NONE }
 #define OPS_PTR            { OP_PTR,   OP_NONE, OP_NONE,  OP_NONE }
+#define OPS_FAR16          { OP_FAR,   OP_NONE, OP_NONE,  OP_NONE }
 #define OPS_REG            { OP_REG,   OP_NONE, OP_NONE,  OP_NONE }
 #define OPS_SEG            { OP_SEG,   OP_NONE, OP_NONE,  OP_NONE }
 #define OPS_RM16           { OP_MEM,   OP_NONE, OP_NONE,  OP_NONE }

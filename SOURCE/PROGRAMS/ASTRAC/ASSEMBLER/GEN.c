@@ -28,7 +28,9 @@ typedef struct {
 
 STATIC ASM_PTR_ARRAY ptrs;
 
-
+#define FIRST_PASS 0
+#define SECOND_PASS 1
+STATIC U8 CURRENT_PASS ATTRIB_DATA = FIRST_PASS; /* 0 = first pass, 1 = second pass (resolving labels) */
 /*
  * ════════════════════════════════════════════════════════════════════════════
  *  HELPERS
@@ -129,7 +131,8 @@ STATIC U32 RESOLVE_SYMBOL(PU8 name) {
     if (STRCMP(name, "$$") == 0) return 0;  /* section start = file offset 0 */
     ASM_PTR *p = FIND_ASM_PTR(name);
     if (!p) {
-        printf("[ASM GEN] ERROR: undefined symbol '%s'\n", name);
+        if(CURRENT_PASS == SECOND_PASS)
+            printf("[ASM GEN] ERROR: undefined symbol '%s'\n", name);
         return 0;
     }
     return p->offset;
@@ -367,7 +370,7 @@ STATIC BOOL IS_REG16(ASM_REGS reg) {
  *  Displacement is 0 (mod=00), 8-bit (mod=01), or 16-bit (mod=10).
  */
 STATIC VOID EMIT_MODRM_16(FILE *f, U8 reg_field, ASM_OPERAND *op) {
-    if (op->type == OP_REG) {
+    if (op->type == OP_REG || op->type == OP_SEG) {
         /* mod=11 register-direct — same as 32-bit */
         EMIT_U8(f, MODRM(3, reg_field, REG_NUM(op->reg)));
         return;
@@ -445,7 +448,7 @@ STATIC VOID EMIT_MODRM_16(FILE *f, U8 reg_field, ASM_OPERAND *op) {
  *  operand:   the r/m side operand (OP_REG or OP_MEM).
  */
 STATIC VOID EMIT_MODRM(FILE *f, U8 reg_field, ASM_OPERAND *op) {
-    if (op->type == OP_REG) {
+    if (op->type == OP_REG || op->type == OP_SEG) {
         /* mod=11  register-direct */
         EMIT_U8(f, MODRM(3, reg_field, REG_NUM(op->reg)));
         return;
@@ -606,7 +609,11 @@ STATIC BOOL ENCODE_INSTRUCTION(FILE *f, PASM_NODE node) {
                     switch (tbl->rel_type) {
                         case RL_REL8:  rsz = SZ_8BIT;  break;
                         case RL_REL16: rsz = SZ_16BIT; break;
-                        case RL_REL32: rsz = SZ_32BIT; break;
+                        case RL_REL32:
+                            /* In 16-bit code mode, near rel uses 16-bit disp */
+                            rsz = (ptrs.code_type == DIR_CODE_TYPE_16)
+                                ? SZ_16BIT : SZ_32BIT;
+                            break;
                         default:       rsz = tbl->size; break;
                     }
                     /* For now, emit the raw value; a link pass would fix these. */
@@ -624,7 +631,14 @@ STATIC BOOL ENCODE_INSTRUCTION(FILE *f, PASM_NODE node) {
                     switch (tbl->rel_type) {
                         case RL_REL8:  rsz = SZ_8BIT;  imm_bytes = 1; break;
                         case RL_REL16: rsz = SZ_16BIT; imm_bytes = 2; break;
-                        case RL_REL32: rsz = SZ_32BIT; imm_bytes = 4; break;
+                        case RL_REL32:
+                            /* In 16-bit code mode, near rel uses 16-bit disp */
+                            if (ptrs.code_type == DIR_CODE_TYPE_16) {
+                                rsz = SZ_16BIT; imm_bytes = 2;
+                            } else {
+                                rsz = SZ_32BIT; imm_bytes = 4;
+                            }
+                            break;
                         default:       rsz = SZ_32BIT; imm_bytes = 4; break;
                     }
                     S32 rel = (S32)target - (S32)(CURRENT_OFFSET() + imm_bytes);
@@ -633,6 +647,14 @@ STATIC BOOL ENCODE_INSTRUCTION(FILE *f, PASM_NODE node) {
                     /* Absolute: include origin */
                     EMIT_IMM(f, target + ptrs.origin, tbl->size);
                 }
+            } else if (op->type == OP_FAR) {
+                /* Far pointer: lower 16 = offset, upper 16 = segment */
+                U16 off = (U16)(op->immediate & 0xFFFF);
+                U16 seg = (U16)(op->immediate >> 16);
+                EMIT_U8(f, (U8)(off & 0xFF));
+                EMIT_U8(f, (U8)(off >> 8));
+                EMIT_U8(f, (U8)(seg & 0xFF));
+                EMIT_U8(f, (U8)(seg >> 8));
             }
         }
         break;
@@ -672,14 +694,14 @@ STATIC BOOL ENCODE_INSTRUCTION(FILE *f, PASM_NODE node) {
                 /* Determine direction from the operand type layout:
                  *   tbl->operand[0]==OP_MEM  → op0=r/m, op1=reg
                  *   tbl->operand[0]==OP_REG  → op0=reg, op1=r/m */
-                if (tbl->operand[0] == OP_REG) {
+                if (tbl->operand[0] == OP_REG || tbl->operand[0] == OP_SEG) {
                     reg_op = &node->instr.operands[0];
                     rm_op  = &node->instr.operands[1];
                 } else {
                     rm_op  = &node->instr.operands[0];
                     reg_op = &node->instr.operands[1];
                 }
-                reg_field = (reg_op && reg_op->type == OP_REG)
+                reg_field = (reg_op && (reg_op->type == OP_REG || reg_op->type == OP_SEG))
                           ? REG_NUM(reg_op->reg) : 0;
             } else if (node->instr.operand_count == 1) {
                 rm_op = &node->instr.operands[0];
@@ -689,15 +711,22 @@ STATIC BOOL ENCODE_INSTRUCTION(FILE *f, PASM_NODE node) {
 
         /* Emit ModR/M (+ SIB + displacement) */
         if (rm_op) {
-            /* Choose 16-bit or 32-bit addressing based on the memory operand's
-             * base/index registers.  If the r/m operand is a memory reference
-             * using 16-bit registers (SI, DI, BX, BP), use 16-bit ModR/M. */
-            BOOL use_16 = FALSE;
+            /* Choose 16-bit or 32-bit addressing.
+             *
+             * Default comes from the current code mode (.use16 / .use32).
+             * If the memory operand explicitly uses registers, the register
+             * width overrides the default (e.g. [eax] in .use16 → 32-bit,
+             * [bx+si] in .use32 → 16-bit).
+             */
+            BOOL use_16 = (ptrs.code_type == DIR_CODE_TYPE_16);
             if (rm_op->type == OP_MEM && rm_op->mem_ref) {
                 ASM_REGS b = rm_op->mem_ref->base_reg;
                 ASM_REGS x = rm_op->mem_ref->index_reg;
-                if ((b != REG_NONE && IS_REG16(b)) || (x != REG_NONE && IS_REG16(x)))
-                    use_16 = TRUE;
+                if (b != REG_NONE || x != REG_NONE) {
+                    /* Registers present — they dictate addressing mode */
+                    use_16 = ((b != REG_NONE && IS_REG16(b))
+                           || (x != REG_NONE && IS_REG16(x)));
+                }
             }
             if (use_16)
                 EMIT_MODRM_16(f, reg_field, rm_op);
@@ -1200,7 +1229,14 @@ STATIC BOOL GEN_EMIT_PASS(FILE *f, ASM_AST_ARRAY *ast, ASTRAC_ARGS *cfg) {
         /* ── Raw number in .code ──────────────────────────────────────── */
         case NODE_RAW_NUM: {
             U32 val  = node->raw.value;
-            U32 size = (val <= 0xFF) ? 1 : (val <= 0xFFFF) ? 2 : 4;
+            U32 size;
+            if (ptrs.code_type == DIR_CODE_TYPE_16) {
+                /* In 16-bit mode the native word is 2 bytes; only use
+                 * 4 bytes when the value exceeds 16-bit range. */
+                size = (val <= 0xFF) ? 1 : (val <= 0xFFFF) ? 2 : 4;
+            } else {
+                size = (val <= 0xFF) ? 1 : (val <= 0xFFFF) ? 2 : 4;
+            }
             EMIT(f, (U8 *)&val, size);
             break;
         }
@@ -1249,6 +1285,8 @@ BOOLEAN GEN_BINARY(ASM_AST_ARRAY *ast, PASM_INFO info) {
     MEMSET(&ptrs, 0, sizeof(ptrs));
     ptrs.current_section = DIR_NONE;
     ptrs.code_type       = DIR_CODE_TYPE_32;
+    
+    CURRENT_PASS = FIRST_PASS;
 
     /* ── Scope local labels (@@name, .name) to enclosing global label ──── */
     SCOPE_LOCAL_LABELS(ast);
@@ -1291,6 +1329,7 @@ BOOLEAN GEN_BINARY(ASM_AST_ARRAY *ast, PASM_INFO info) {
     /* ──────────────────────────────────────────────────────────────────
      *  Pass 2:  Emit binary
      * ────────────────────────────────────────────────────────────────── */
+    CURRENT_PASS = SECOND_PASS;
     if (!GEN_EMIT_PASS(out, ast, cfg)) {
         FCLOSE(out);
         return FALSE;

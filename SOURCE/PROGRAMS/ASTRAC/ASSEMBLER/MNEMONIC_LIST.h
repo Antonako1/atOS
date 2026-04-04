@@ -400,7 +400,27 @@ MNEM_RM_NF_P(MNEM_POP_RM16,    "pop",  PF_66, 0x8F, OPS_RM16, OPN_ONE, SZ_16BIT,
 /* ── 32-bit ───────────────────────────────────────────────────────────────── */
 MNEM_RM_NF(MNEM_PUSH_RM32,     "push", 0xFF, OPS_RM32, OPN_ONE, SZ_32BIT, MODRM_6, "Push r/m32 onto stack")
 MNEM_RM_NF(MNEM_POP_RM32,      "pop",  0x8F, OPS_RM32, OPN_ONE, SZ_32BIT, MODRM_0, "Pop stack top into r/m32")
+/* Direct near/far calls and jumps MUST appear before indirect r/m forms so
+ * that a bare label reference (OP_PTR satisfies OP_IMM) is matched first. */
+MNEM_REL(MNEM_JMP_REL32_PRI,  "jmp",   0xE9, RL_REL32, "Near jump (rel32) - priority slot")
+MNEM_REL(MNEM_JMP_REL8_PRI,   "jmp",   0xEB, RL_REL8,  "Short jump (rel8) - priority slot")
+MNEM_REL(MNEM_CALL_REL32_PRI, "call",  0xE8, RL_REL32, "Near call (rel32) - priority slot")
+/* Far jump / call  (opcode 0xEA ptr16:off16 / 0x9A ptr16:off16) */
+MNEMONIC(MNEM_JMP_FAR16, "jmp",
+         PF_NONE, OPCODE(0xEA,0x00), ENC_IMM, OPS_FAR16, OPN_ONE, SZ_NONE,
+         REG_NONE, MODRM_NONE, FALSE, PROC_ANY, ST_DOCUMENTED, MODE_ANY,
+         MEM_NONE, RL_NONE, X_NONE, EX_NONE,
+         FLG_ALL, FLG_NONE, FLG_NONE, FLG_NONE, FLG_NONE,
+         "Far jump to ptr16:off16")
+MNEMONIC(MNEM_CALL_FAR16, "call",
+         PF_NONE, OPCODE(0x9A,0x00), ENC_IMM, OPS_FAR16, OPN_ONE, SZ_NONE,
+         REG_NONE, MODRM_NONE, FALSE, PROC_ANY, ST_DOCUMENTED, MODE_ANY,
+         MEM_NONE, RL_NONE, X_NONE, EX_NONE,
+         FLG_ALL, FLG_NONE, FLG_NONE, FLG_NONE, FLG_NONE,
+         "Far call to ptr16:off16")
+MNEM_RM_NF_P(MNEM_CALL_RM16,   "call", PF_66, 0xFF, OPS_RM16, OPN_ONE, SZ_16BIT, MODRM_2, "Call near procedure at r/m16")
 MNEM_RM_NF(MNEM_CALL_RM32,     "call", 0xFF, OPS_RM32, OPN_ONE, SZ_32BIT, MODRM_2, "Call near procedure at r/m32")
+MNEM_RM_NF_P(MNEM_JMP_RM16,    "jmp",  PF_66, 0xFF, OPS_RM16, OPN_ONE, SZ_16BIT, MODRM_4, "Jump to address in r/m16")
 MNEM_RM_NF(MNEM_JMP_RM32,      "jmp",  0xFF, OPS_RM32, OPN_ONE, SZ_32BIT, MODRM_4, "Jump to address in r/m32")
 
 
@@ -529,6 +549,9 @@ MNEM_RM(MNEM_ROR_RM32_I8, "ror", 0xC1, OPS_RM32_IMM8, OPN_TWO, SZ_32BIT, MODRM_1
  *  Short (rel8) and near (rel32) unconditional/conditional jumps.
  *  No size variants — operand is the displacement, not a register.
  * ════════════════════════════════════════════════════════════════════════════ */
+/* NOTE: MNEM_JMP_REL32, MNEM_JMP_REL8, MNEM_CALL_REL32 are defined earlier
+ * (as _PRI variants) before the indirect r/m forms so bare label references
+ * match the relative encoding first.  These aliases remain for completeness. */
 MNEM_REL(MNEM_JMP_REL32,  "jmp",   0xE9, RL_REL32, "Near jump (rel32)")
 MNEM_REL(MNEM_JMP_REL8,   "jmp",   0xEB, RL_REL8,  "Short jump (rel8)")
 MNEM_REL(MNEM_CALL_REL32, "call",  0xE8, RL_REL32, "Near call (rel32)")

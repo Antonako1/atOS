@@ -93,6 +93,8 @@ STATIC CONST KEYWORD variable_types[] ATTRIB_DATA = {
     { "DWORD", TYPE_DWORD  },
     { "REAL4", TYPE_FLOAT  },
     { "PTR",   TYPE_PTR    },
+    { "NEAR",  TYPE_NEAR   },
+    { "FAR",   TYPE_FAR    },
     { NULL, TYPE_NONE }
 };
 
