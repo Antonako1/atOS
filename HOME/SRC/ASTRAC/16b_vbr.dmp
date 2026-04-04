@@ -1,0 +1,261 @@
+0x0000000000007c00:  FA                   cli    
+0x0000000000007c01:  31 C0                xor    ax, ax
+0x0000000000007c03:  8E D8                mov    ds, ax
+0x0000000000007c05:  8E C0                mov    es, ax
+0x0000000000007c07:  8E D0                mov    ss, ax
+0x0000000000007c09:  C7 C4 00 7C          mov    sp, 0x7c00
+0x0000000000007c0d:  88 16 03 7E          mov    byte ptr [0x7e03], dl
+
+0x0000000000007c11:  FB                   sti    
+
+0x0000000000007c12:  C7 C0 10 00          mov    ax, 0x10
+0x0000000000007c16:  51                   push   cx
+0x0000000000007c17:  52                   push   dx
+0x0000000000007c18:  C7 C1 01 00          mov    cx, 1
+0x0000000000007c1c:  C7 C2 00 00          mov    dx, 0
+0x0000000000007c20:  E8 95 01             call   0x7db8
+0x0000000000007c23:  59                   pop    cx
+0x0000000000007c24:  5A                   pop    dx
+
+0x0000000000007c25:  C7 C0 00 00          mov    ax, 0
+0x0000000000007c29:  8E D8                mov    ds, ax
+0x0000000000007c2b:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007c2f:  8A 04                mov    al, byte ptr [si]
+0x0000000000007c31:  80 F8 01             cmp    al, 1
+0x0000000000007c34:  75 3D                jne    0x7c73
+
+0x0000000000007c36:  C7 C0 00 00          mov    ax, 0
+0x0000000000007c3a:  8E D8                mov    ds, ax
+0x0000000000007c3c:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007c40:  81 C6 A6 00          add    si, 0xa6
+0x0000000000007c44:  89 F3                mov    bx, si
+0x0000000000007c46:  8B 47 02             mov    ax, word ptr [bx + 2]
+0x0000000000007c49:  89 06 08 7E          mov    word ptr [0x7e08], ax
+0x0000000000007c4d:  8B 07                mov    ax, word ptr [bx]
+0x0000000000007c4f:  89 06 08 7E          mov    word ptr [0x7e08], ax
+
+0x0000000000007c53:  C7 C0 00 00          mov    ax, 0
+0x0000000000007c57:  8E D8                mov    ds, ax
+0x0000000000007c59:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007c5d:  81 C6 9E 00          add    si, 0x9e
+0x0000000000007c61:  89 F3                mov    bx, si
+0x0000000000007c63:  8B 47 02             mov    ax, word ptr [bx + 2]
+0x0000000000007c66:  89 06 04 7E          mov    word ptr [0x7e04], ax
+0x0000000000007c6a:  8B 07                mov    ax, word ptr [bx]
+0x0000000000007c6c:  89 06 04 7E          mov    word ptr [0x7e04], ax
+
+0x0000000000007c70:  8B 06 04 7E          mov    ax, word ptr [0x7e04]
+0x0000000000007c74:  51                   push   cx
+0x0000000000007c75:  52                   push   dx
+0x0000000000007c76:  C7 C1 01 00          mov    cx, 1
+0x0000000000007c7a:  C7 C2 00 00          mov    dx, 0
+0x0000000000007c7e:  E8 37 01             call   0x7db8
+0x0000000000007c81:  59                   pop    cx
+0x0000000000007c82:  5A                   pop    dx
+0x0000000000007c83:  C7 C0 00 00          mov    ax, 0
+0x0000000000007c87:  89 06 0C 7E          mov    word ptr [0x7e0c], ax
+
+@@main_loop_start
+0x0000000000007c8b:  8B 06 0C 7E          mov    ax, word ptr [0x7e0c]
+0x0000000000007c8f:  8B 1E 08 7E          mov    bx, word ptr [0x7e08]
+0x0000000000007c93:  39 D8                cmp    ax, bx
+0x0000000000007c95:  7D 9C                jge    0x7c33
+
+0x0000000000007c97:  C7 C0 00 00          mov    ax, 0
+0x0000000000007c9b:  8E D8                mov    ds, ax
+0x0000000000007c9d:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007ca1:  03 36 0C 7E          add    si, word ptr [0x7e0c]
+0x0000000000007ca5:  8A 04                mov    al, byte ptr [si]
+0x0000000000007ca7:  80 F8 00             cmp    al, 0
+0x0000000000007caa:  74 C7                je     0x7c73
+
+0x0000000000007cac:  C7 C0 00 00          mov    ax, 0
+0x0000000000007cb0:  8E D8                mov    ds, ax
+0x0000000000007cb2:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007cb6:  03 36 0C 7E          add    si, word ptr [0x7e0c]
+0x0000000000007cba:  83 C6 19             add    si, 0x19
+0x0000000000007cbd:  8A 04                mov    al, byte ptr [si]
+0x0000000000007cbf:  80 E0 02             and    al, 2
+0x0000000000007cc2:  75 52                jne    0x7d16
+
+0x0000000000007cc4:  C7 C0 00 00          mov    ax, 0
+0x0000000000007cc8:  8E D8                mov    ds, ax
+0x0000000000007cca:  C7 C6 00 20          mov    si, 0x2000
+
+0x0000000000007cce:  03 36 0C 7E          add    si, word ptr [0x7e0c]
+0x0000000000007cd2:  83 C6 20             add    si, 0x20
+0x0000000000007cd5:  31 C9                xor    cx, cx
+0x0000000000007cd7:  8A 0C                mov    cl, byte ptr [si]
+0x0000000000007cd9:  46                   inc    si
+0x0000000000007cda:  8D 3E 14 7E          lea    di, [0x7e14]
+0x0000000000007cde:  E8 9C 00             call   0x7d7d
+
+0x0000000000007ce1:  8D 36 F5 7D          lea    si, [0x7df5]
+0x0000000000007ce5:  8D 3E 14 7E          lea    di, [0x7e14]
+0x0000000000007ce9:  C7 C1 0C 00          mov    cx, 0xc
+
+0x0000000000007ced:  E8 9F 00             call   0x7d8f
+0x0000000000007cf0:  83 F8 01             cmp    ax, 1
+0x0000000000007cf3:  75 21                jne    0x7d16
+
+0x0000000000007cf5:  C7 C0 00 00          mov    ax, 0
+0x0000000000007cf9:  8E D8                mov    ds, ax
+0x0000000000007cfb:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007cff:  03 36 0C 7E          add    si, word ptr [0x7e0c]
+0x0000000000007d03:  83 C6 02             add    si, 2
+0x0000000000007d06:  8B 1C                mov    bx, word ptr [si]
+0x0000000000007d08:  8B 4C 02             mov    cx, word ptr [si + 2]
+0x0000000000007d0b:  89 1E 04 7E          mov    word ptr [0x7e04], bx
+0x0000000000007d0f:  89 0E 04 7E          mov    word ptr [0x7e04], cx
+0x0000000000007d13:  E9 1D 00             jmp    0x7d33
+
+@@to_loop_increment
+0x0000000000007d16:  C7 C0 00 00          mov    ax, 0
+0x0000000000007d1a:  8E D8                mov    ds, ax
+0x0000000000007d1c:  C7 C6 00 20          mov    si, 0x2000
+0x0000000000007d20:  31 C0                xor    ax, ax
+0x0000000000007d22:  03 36 0C 7E          add    si, word ptr [0x7e0c]
+0x0000000000007d26:  8A 04                mov    al, byte ptr [si]
+
+0x0000000000007d28:  03 06 0C 7E          add    ax, word ptr [0x7e0c]
+0x0000000000007d2c:  89 06 0C 7E          mov    word ptr [0x7e0c], ax
+
+0x0000000000007d30:  E9 58 FF             jmp    0x7c8b
+
+@@main_loop_end
+0x0000000000007d33:  E9 00 00             jmp    0x7d36
+
+bootend
+0x0000000000007d36:  8B 06 08 7E          mov    ax, word ptr [0x7e08]
+0x0000000000007d3a:  81 C0 FF 01          add    ax, 0x1ff
+0x0000000000007d3e:  C1 E8 09             shr    ax, 9
+0x0000000000007d41:  89 C1                mov    cx, ax
+
+0x0000000000007d43:  8B 06 04 7E          mov    ax, word ptr [0x7e04]
+0x0000000000007d47:  C7 C2 00 00          mov    dx, 0
+0x0000000000007d4b:  E8 6A 00             call   0x7db8
+
+0x0000000000007d4e:  8A 16 03 7E          mov    dl, byte ptr [0x7e03]
+0x0000000000007d52:  C7 C0 00 20          mov    ax, 0x2000
+0x0000000000007d56:  8E C0                mov    es, ax
+0x0000000000007d58:  89 C3                mov    bx, ax
+0x0000000000007d5a:  8A 16 03 7E          mov    dl, byte ptr [0x7e03]
+0x0000000000007d5e:  C7 C0 00 B8          mov    ax, 0xb800
+0x0000000000007d62:  8E C0                mov    es, ax
+
+0x0000000000007d64:  EA 00 20 00 00       ljmp   0:0x2000
+
+disk_error:
+0x0000000000007d69:  8B 36 E2 7D          mov    si, word ptr [0x7de2]
+0x0000000000007d6d:  E8 3A 00             call   0x7daa
+0x0000000000007d70:  E9 FE FF             jmp    0x7d71
+
+ISO_ERROR:
+0x0000000000007d73:  8B 36 EC 7D          mov    si, word ptr [0x7dec]
+0x0000000000007d77:  E8 30 00             call   0x7daa
+0x0000000000007d7a:  E9 FE FF             jmp    0x7d7b
+
+strncopy:
+0x0000000000007d7d:  60                   pushaw 
+@@copy_loop:
+0x0000000000007d7e:  83 F9 00             cmp    cx, 0
+0x0000000000007d81:  74 0A                je     0x7d8d
+0x0000000000007d83:  AC                   lodsb  al, byte ptr [si]
+0x0000000000007d84:  AA                   stosb  byte ptr es:[di], al
+0x0000000000007d85:  08 C0                or     al, al
+0x0000000000007d87:  74 04                je     0x7d8d
+0x0000000000007d89:  49                   dec    cx
+0x0000000000007d8a:  E9 F1 FF             jmp    0x7d7e
+@@done:
+0x0000000000007d8d:  61                   popaw  
+0x0000000000007d8e:  C3                   ret    
+
+strncmp:
+@@cmp_loop:
+0x0000000000007d8f:  83 F9 00             cmp    cx, 0
+0x0000000000007d92:  74 11                je     0x7da5
+0x0000000000007d94:  AC                   lodsb  al, byte ptr [si]
+0x0000000000007d95:  AE                   scasb  al, byte ptr es:[di]
+0x0000000000007d96:  75 08                jne    0x7da0
+0x0000000000007d98:  08 C0                or     al, al
+0x0000000000007d9a:  74 09                je     0x7da5
+0x0000000000007d9c:  49                   dec    cx
+0x0000000000007d9d:  E9 EF FF             jmp    0x7d8f
+@@not_equal:
+0x0000000000007da0:  31 C0                xor    ax, ax
+0x0000000000007da2:  E9 04 00             jmp    0x7da9
+@@equal:
+0x0000000000007da5:  C7 C0 01 00          mov    ax, 1
+@@done:
+0x0000000000007da9:  C3                   ret    
+
+print_string:
+0x0000000000007daa:  AC                   lodsb  al, byte ptr [si]
+0x0000000000007dab:  08 C0                or     al, al
+0x0000000000007dad:  74 08                je     0x7db7
+0x0000000000007daf:  C6 C4 0E             mov    ah, 0xe
+0x0000000000007db2:  CD 10                int    0x10
+0x0000000000007db4:  E9 F3 FF             jmp    0x7daa
+@@done
+0x0000000000007db7:  C3                   ret    
+
+READ_DISK:
+0x0000000000007db8:  8B 36 15 7E          mov    si, word ptr [0x7e15]
+0x0000000000007dbc:  C6 04 10             mov    byte ptr [si], 0x10
+0x0000000000007dbf:  C6 44 01 00          mov    byte ptr [si + 1], 0
+0x0000000000007dc3:  89 4C 02             mov    word ptr [si + 2], cx
+0x0000000000007dc6:  C7 44 04 00 20       mov    word ptr [si + 4], 0x2000
+0x0000000000007dcb:  89 54 06             mov    word ptr [si + 6], dx
+
+0x0000000000007dce:  89 44 08             mov    word ptr [si + 8], ax
+0x0000000000007dd1:  C7 44 0A 00 00       mov    word ptr [si + 0xa], 0
+
+0x0000000000007dd6:  C6 C4 42             mov    ah, 0x42
+0x0000000000007dd9:  8A 16 03 7E          mov    dl, byte ptr [0x7e03]
+0x0000000000007ddd:  CD 13                int    0x13
+0x0000000000007ddf:  72 88                jb     0x7d69
+0x0000000000007de1:  C3                   ret    
+
+;DATA
+0x0000000000007de2:  64 69 73 6B 45 52    imul   si, word ptr fs:[bp + di + 0x6b], 0x5245
+0x0000000000007de8:  52                   push   dx
+0x0000000000007de9:  4F                   dec    di
+0x0000000000007dea:  52                   push   dx
+0x0000000000007deb:  00 69 73             add    byte ptr [bx + di + 0x73], ch
+0x0000000000007dee:  6F                   outsw  dx, word ptr [si]
+0x0000000000007def:  45                   inc    bp
+0x0000000000007df0:  52                   push   dx
+0x0000000000007df1:  52                   push   dx
+0x0000000000007df2:  4F                   dec    di
+0x0000000000007df3:  52                   push   dx
+0x0000000000007df4:  00 4B 45             add    byte ptr [bp + di + 0x45], cl
+0x0000000000007df7:  52                   push   dx
+0x0000000000007df8:  4E                   dec    si
+0x0000000000007df9:  45                   inc    bp
+0x0000000000007dfa:  4C                   dec    sp
+0x0000000000007dfb:  2E 42                inc    dx
+0x0000000000007dfd:  49                   dec    cx
+0x0000000000007dfe:  4E                   dec    si
+0x0000000000007dff:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e01:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e03:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e05:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e07:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e09:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e0b:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e0d:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e0f:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e11:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e13:  00 12                add    byte ptr [bp + si], dl
+0x0000000000007e15:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e17:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e19:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e1b:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e1d:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e1f:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e21:  00 00                add    byte ptr [bx + si], al
+0x0000000000007e23:  00 00                add    byte ptr [bx + si], al
+
+; boot signature
+0x0000000000007e25:  55                   push   bp
+0x0000000000007e26:  AA                   stosb  byte ptr es:[di], al
