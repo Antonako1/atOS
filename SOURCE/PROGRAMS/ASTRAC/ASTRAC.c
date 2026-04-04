@@ -1,5 +1,6 @@
 #include <PROGRAMS/ASTRAC/ASTRAC.h>
 #include <PROGRAMS/ASTRAC/ASSEMBLER/ASSEMBLER.h>
+#include <PROGRAMS/ASTRAC/DISSASEMBLER/DISSASEMBLER.h>
 #include <STD/GRAPHICS.h>
 #include <STD/IO.h>
 #include <STD/STRING.h>
@@ -21,7 +22,7 @@ VOID PRINT_HELP() {
         "PIPELINE OPTIONS (choose one):\n"
             "\t-A, --assemble                  Assemble ASM files  -> BIN\n"
             "\t-C, --compile                   Compile C files     -> ASM\n"
-            "\t-D, --disassemble               Disassemble BIN     -> ASM\n"
+            "\t-D, --disassemble               Disassemble BIN     -> ASM (.DSM)\n"
             "\t-B, --build                     Full pipeline: C -> ASM -> BIN\n"
             "\t-E, --preprocess                Run preprocessor only (C files)\n\n"
 
@@ -29,6 +30,10 @@ VOID PRINT_HELP() {
             "\t-o, --out <file>                Specify output file name\n"
             "\t-I, --include <dir>             Add include search directory\n"
             "\t-M, --macro <NAME[=VALUE]>      Define a preprocessor macro\n\n"
+
+        "DISASSEMBLER OPTIONS:\n"
+            "\t    --16                        Disassemble as 16-bit code\n"
+            "\t    --32                        Disassemble as 32-bit code (default)\n\n"
 
         "INFORMATION:\n"
             "\t-V, --version                   Show version info and exit\n"
@@ -76,9 +81,10 @@ ASTRAC_RESULT START_WORKLOAD() {
         return ASTRAC_ERR_ARGS;
     }
     switch(args.build_type) {
-        case DISASSEMBLE:
-            printf("[ASTRAC] Disassembly not yet implemented.\n");
-            return ASTRAC_ERR_DISASSEMBLE;
+        case DISASSEMBLE: {
+            if (!args.quiet) printf("[ASTRAC] Starting disassembler pipeline...\n");
+            return START_DISSASEMBLER();
+        }
         case COMPILE:
             printf("[ASTRAC] C compilation not yet implemented.\n");
             return ASTRAC_ERR_COMPILE;
@@ -111,17 +117,20 @@ VOID FREE_ARGS() {
  * Derive a default output filename from the first input file:
  *   foo.ASM  + ASSEMBLE     -> foo.BIN
  *   foo.C    + COMPILE      -> foo.ASM
- *   foo.BIN  + DISASSEMBLE  -> foo.ASM
+ *   foo.BIN  + DISASSEMBLE  -> foo.DSM
  */
 static VOID DERIVE_OUTPUT_NAME() {
     args.outfile = STRDUP(args.input_files[0]);
     PU8 dot = STRRCHR(args.outfile, '.');
     if (dot) *dot = '\0';
-
-    if (args.build_type & DISASSEMBLE || args.build_type & COMPILE)
+    if (args.build_type & COMPILE)
         STRCAT(args.outfile, ".ASM");
-    else if (args.build_type & ASSEMBLE)
+     else if (args.build_type & ASSEMBLE)
         STRCAT(args.outfile, ".BIN");
+     else if (args.build_type & DISASSEMBLE)
+        STRCAT(args.outfile, ".DSM");
+     else
+        STRCAT(args.outfile, ".OUT");
 }
 
 U32 main(U32 argc, PPU8 argv) {
@@ -145,6 +154,8 @@ U32 main(U32 argc, PPU8 argv) {
         else if (ARG_CMP2("-A", "--assemble"))    { args.build_type |= ASSEMBLE; }
         else if (ARG_CMP2("-C", "--compile"))     { args.build_type |= COMPILE; }
         else if (ARG_CMP2("-D", "--disassemble")) { args.build_type |= DISASSEMBLE; }
+        else if (ARG_CMP1("--16"))                   { args.dsm_bits = 16; }
+        else if (ARG_CMP1("--32"))                   { args.dsm_bits = 32; }
         else if (ARG_CMP2("-B", "--build"))       { args.build_type |= BUILD; }
         else if (ARG_CMP2("-o", "--out")) {
             if (++i < argc) {
@@ -203,6 +214,9 @@ U32 main(U32 argc, PPU8 argv) {
 
     if (args.build_type == NONE)
         args.build_type = BUILD;
+
+    if (args.dsm_bits == 0)
+        args.dsm_bits = 32;
 
     if (!args.got_outfile)
         DERIVE_OUTPUT_NAME();
