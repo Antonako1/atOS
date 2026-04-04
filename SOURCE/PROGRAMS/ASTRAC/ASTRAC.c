@@ -4,144 +4,222 @@
 #include <STD/IO.h>
 #include <STD/STRING.h>
 #include <STD/MEM.h>
+#include <STD/BINARY.h>
 
 
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ *  HELP / VERSION
+ * ════════════════════════════════════════════════════════════════════════════
+ */
 
 VOID PRINT_HELP() {
-    printf("\n%s. \n", TRADEMARK);
+    printf("\n%s v%s\n\n", TRADEMARK, VERSION);
     printf(
-        "ASTRAC.BIN {files.{C|ASM|BIN}...} [options]\n"
+        "Usage: ASTRAC.BIN {files.{C|ASM|BIN}...} [options]\n\n"
 
-        "OPTIONS:"
-            "\t-o, --out <file>                Specify output file name (default: derived from input)\n"
-            "\t-A, --assemble                  Assemble input ASM files into object binaries\n"
-            "\t-C, --compile                   Compile C source files into object binaries\n"
-            "\t-D, --disassemble               Disassemble a binary back into readable ASM\n"
-            "\t-E, --preprocess                Run preprocessor only (for C files)\n"
-            "\t-B, --build                     Perform full build pipeline (compile + assemble)\n\n"
-            
-            "\t-I, --include <dir>             Add an include directory for headers\n\n"
+        "PIPELINE OPTIONS (choose one):\n"
+            "\t-A, --assemble                  Assemble ASM files  -> BIN\n"
+            "\t-C, --compile                   Compile C files     -> ASM\n"
+            "\t-D, --disassemble               Disassemble BIN     -> ASM\n"
+            "\t-B, --build                     Full pipeline: C -> ASM -> BIN\n"
+            "\t-E, --preprocess                Run preprocessor only (C files)\n\n"
 
-            "\t-M, --macro <define[=value]>    Add a preprocessor macro for C or ASM\n\n"
-            
+        "INPUT / OUTPUT:\n"
+            "\t-o, --out <file>                Specify output file name\n"
+            "\t-I, --include <dir>             Add include search directory\n"
+            "\t-M, --macro <NAME[=VALUE]>      Define a preprocessor macro\n\n"
+
+        "INFORMATION:\n"
             "\t-V, --version                   Show version info and exit\n"
             "\t-v, --verbose                   Enable verbose output\n"
             "\t-q, --quiet                     Suppress normal output\n"
             "\t-h, --help                      Display this help and exit\n"
+            "\t-i, --info <[asm|c]=<keyword>>  Info about register/directive/symbol/type\n"
     );
 }
 
 VOID PRINT_VERSION() {
-    printf("%s. Version %s\n", TRADEMARK, VERSION);
+    printf("%s v%s\n", TRADEMARK, VERSION);
 }
 
-#define ARG_CMP1(x) STRCMP(arg, x) == 0
-#define ARG_CMP2(x, y) ARG_CMP1(x) || ARG_CMP1(y)
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ *  GLOBALS & ACCESSORS
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+
+#define ARG_CMP1(x)    (STRCMP(arg, x) == 0)
+#define ARG_CMP2(x, y) (ARG_CMP1(x) || ARG_CMP1(y))
 
 static ASTRAC_ARGS args ATTRIB_DATA = { 0 };
 
-ASTRAC_ARGS* GET_ARGS() {return &args;}
+ASTRAC_ARGS* GET_ARGS() { return &args; }
 
-U32 START_WORKLOAD() {
-    if(args.build_type & NONE) {
-        return 0x1F; // Should not happen
-    } 
-    else if(args.build_type & DISSASEMBLE) {
-        return 0x2F;
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ *  PIPELINE DISPATCH
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ *  Dispatch to the correct pipeline stage(s) based on args.build_type:
+ *
+ *   -A  (ASSEMBLE)     ->  Preprocess -> Lex -> AST -> Verify -> Optimize -> Gen
+ *   -C  (COMPILE)      ->  (not yet implemented)
+ *   -D  (DISASSEMBLE)  ->  (not yet implemented)
+ *   -B  (BUILD)        ->  Compile then Assemble (not yet implemented)
+ *
+ *  Returns ASTRAC_OK on success, or an ASTRAC_ERR_* code on failure.
+ */
+ASTRAC_RESULT START_WORKLOAD() {
+    if (args.build_type == NONE) {
+        printf("[ASTRAC] Error: no build mode selected (use -A, -C, -D, or -B)\n");
+        return ASTRAC_ERR_ARGS;
     }
-    else if(args.build_type & COMPILE) {
-        return 0x5F;
+    switch(args.build_type) {
+        case DISASSEMBLE:
+            printf("[ASTRAC] Disassembly not yet implemented.\n");
+            return ASTRAC_ERR_DISASSEMBLE;
+        case COMPILE:
+            printf("[ASTRAC] C compilation not yet implemented.\n");
+            return ASTRAC_ERR_COMPILE;
+        case ASSEMBLE:
+            if (!args.quiet) printf("[ASTRAC] Starting assembler pipeline...\n");
+            return START_ASSEMBLING();
+        case BUILD:
+            printf("[ASTRAC] Full build pipeline not yet implemented.\n");
+            return ASTRAC_ERR_COMPILE;
+        default:
+            printf("[ASTRAC] Error: unknown build mode 0x%X\n", args.build_type);
+            return ASTRAC_ERR_INTERNAL;
     }
-    else if(args.build_type & ASSEMBLE) {
-        return START_ASSEMBLING();
-    } else { // args.built_type & BUILD
-        return 0x7F;
+}
+
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ *  ARGUMENT PARSING & MAIN
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+
+VOID FREE_ARGS() {
+    if (!args.got_outfile && args.outfile) {
+        MFree(args.outfile);
+        args.outfile = NULLPTR;
     }
-    return 0;
+}
+
+/*
+ * Derive a default output filename from the first input file:
+ *   foo.ASM  + ASSEMBLE     -> foo.BIN
+ *   foo.C    + COMPILE      -> foo.ASM
+ *   foo.BIN  + DISASSEMBLE  -> foo.ASM
+ */
+static VOID DERIVE_OUTPUT_NAME() {
+    args.outfile = STRDUP(args.input_files[0]);
+    PU8 dot = STRRCHR(args.outfile, '.');
+    if (dot) *dot = '\0';
+
+    if (args.build_type & DISASSEMBLE || args.build_type & COMPILE)
+        STRCAT(args.outfile, ".ASM");
+    else if (args.build_type & ASSEMBLE)
+        STRCAT(args.outfile, ".BIN");
 }
 
 U32 main(U32 argc, PPU8 argv) {
+    /* ── no arguments: show help ────────────────────────────────── */
     if (argc < 2) {
         PRINT_HELP();
-        return 1;
+        return ASTRAC_ERR_ARGS;
     }
 
     printf("\n%s\n", TRADEMARK);
     MEMZERO(&args, sizeof(ASTRAC_ARGS));
 
+    /* ── parse command-line arguments ───────────────────────────── */
     for (U32 i = 1; i < argc; i++) {
         PU8 arg = argv[i];
-        printf("[%d] %s\n", i, arg);
-        if (ARG_CMP2("-h", "--help")) { PRINT_HELP(); return 0; }
+
+        if (ARG_CMP2("-h", "--help"))         { PRINT_HELP(); return ASTRAC_OK; }
+        else if (ARG_CMP2("-V", "--version")) { PRINT_VERSION(); return ASTRAC_OK; }
         else if (ARG_CMP2("-v", "--verbose")) { args.verbose = TRUE; }
-        else if (ARG_CMP2("-q", "--quiet")) { args.quiet = TRUE; }
-        else if (ARG_CMP2("-A", "--assemble")) { args.build_type |= ASSEMBLE; }
-        else if (ARG_CMP2("-C", "--compile")) { args.build_type |= COMPILE; }
-        else if (ARG_CMP2("-D", "--disassemble")) { args.build_type |= DISSASEMBLE; }
-        else if (ARG_CMP2("-B", "--build")) { args.build_type |= BUILD; }
+        else if (ARG_CMP2("-q", "--quiet"))   { args.quiet = TRUE; }
+        else if (ARG_CMP2("-A", "--assemble"))    { args.build_type |= ASSEMBLE; }
+        else if (ARG_CMP2("-C", "--compile"))     { args.build_type |= COMPILE; }
+        else if (ARG_CMP2("-D", "--disassemble")) { args.build_type |= DISASSEMBLE; }
+        else if (ARG_CMP2("-B", "--build"))       { args.build_type |= BUILD; }
         else if (ARG_CMP2("-o", "--out")) {
             if (++i < argc) {
                 args.outfile = argv[i];
                 args.got_outfile = TRUE;
             } else {
-                printf("Missing output file after -o\n");
-                return 1;
+                printf("Error: missing filename after -o\n");
+                return ASTRAC_ERR_ARGS;
             }
         }
         else if (ARG_CMP2("-I", "--include")) {
-            if (++i < argc) args.includes[args.include_count++] = argv[i];
+            if (++i < argc) {
+                if (args.include_count >= MAX_INCLUDES) {
+                    printf("Error: too many include directories (max %d)\n", MAX_INCLUDES);
+                    return ASTRAC_ERR_ARGS;
+                }
+                args.includes[args.include_count++] = argv[i];
+            } else {
+                printf("Error: missing path after -I\n");
+                return ASTRAC_ERR_ARGS;
+            }
         }
         else if (ARG_CMP2("-M", "--macro")) {
             if (++i < argc) {
                 PU8 equ = STRCHR(argv[i], '=');
                 PU8 val = NULLPTR;
-                if(equ) {
-                    *equ = '\0';    // terminate macro name
-                    val = equ + 1;  // value starts after '='
+                if (equ) {
+                    *equ = '\0';
+                    val = equ + 1;
                 }
-                DEFINE_MACRO(
-                    argv[i], 
-                    val, 
-                    args.macros.macros[args.macros.len]
-                );
+                if (!DEFINE_MACRO(argv[i], val, &args.macros)) {
+                    printf("Error: failed to define macro '%s'\n", argv[i]);
+                    return ASTRAC_ERR_ARGS;
+                }
             } else {
-                printf("Define macros as -M NAME=VALUE\n");
-                return 1;
+                printf("Error: define macros as -M NAME[=VALUE]\n");
+                return ASTRAC_ERR_ARGS;
             }
         }
         else {
+            /* Treat unrecognised arguments as input files */
+            if (args.input_file_count >= MAX_INPUT_FILES) {
+                printf("Error: too many input files (max %d)\n", MAX_INPUT_FILES);
+                return ASTRAC_ERR_ARGS;
+            }
             args.input_files[args.input_file_count++] = arg;
         }
     }
 
+    /* ── validate ───────────────────────────────────────────────── */
     if (args.input_file_count == 0) {
+        printf("Error: no input files specified.\n");
         PRINT_HELP();
-        return 1;
+        return ASTRAC_ERR_ARGS;
     }
 
     if (args.build_type == NONE)
         args.build_type = BUILD;
 
-    if (!args.got_outfile) {
-        args.outfile = STRDUP(args.input_files[0]);
-        PU8 dot = STRRCHR(args.outfile, '.');
-        if (dot) *dot = '\0';
+    if (!args.got_outfile)
+        DERIVE_OUTPUT_NAME();
 
-        if (args.build_type & DISSASEMBLE ||
-            args.build_type & COMPILE
-        ) STRCAT(args.outfile, ".ASM");
-        else if (args.build_type & ASSEMBLE) STRCAT(args.outfile, ".BIN");
+    if (args.verbose) {
+        printf("[ASTRAC] Mode: 0x%X  |  Files: %u  |  Output: %s\n",
+               args.build_type, args.input_file_count, args.outfile);
     }
 
-    U32 retval = START_WORKLOAD();
+    /* ── run pipeline ───────────────────────────────────────────── */
+    ASTRAC_RESULT result = START_WORKLOAD();
+
+    if (result != ASTRAC_OK && !args.quiet)
+        printf("[ASTRAC] Pipeline failed (error %d)\n", result);
+    else if (!args.quiet)
+        printf("[ASTRAC] Done.\n");
+
     FREE_ARGS();
-    return retval;
-}
-
-
-
-VOID FREE_ARGS() {
-    if(!args.got_outfile) {
-        MFree(args.outfile);
-    }
+    return (U32)result;
 }
