@@ -59,6 +59,15 @@ U32 ATOI_BIN(CONST U8* str);
 F32 ATOF(PU8 str);
 F32 ATOF_HEX(PU8 str);
 F32 ATOF_BIN(PU8 str);
+
+/* Error-checking versions (return BOOL, output via pointer) */
+BOOL ATOI_E(CONST U8* str, U32 *out_val);
+BOOL ATOI_I32_E(CONST U8* str, I32 *out_val);
+BOOL ATOI_HEX_E(CONST U8* str, U32 *out_val);
+BOOL ATOI_BIN_E(CONST U8* str, U32 *out_val);
+BOOL ATOF_E(PU8 str, F32 *out_val);
+BOOL ATOF_HEX_E(PU8 str, F32 *out_val);
+BOOL ATOF_BIN_E(PU8 str, F32 *out_val);
 U0 *ITOA(S32 value, I8* buffer, U32 base);
 U0 *ITOA_U(U32 value, U8* buffer, U32 base);
 U8 TOUPPER(U8 c);

@@ -149,6 +149,27 @@ U32 ATOI(CONST U8* str) {
     }
     return res;
 }
+
+BOOL ATOI_E(CONST U8* str, U32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    if (!*str) return FALSE;  /* empty string */
+    
+    U32 res = 0;
+    BOOL found_digit = FALSE;
+    
+    while (*str >= '0' && *str <= '9') {
+        res = res * 10 + (*str - '0');
+        str++;
+        found_digit = TRUE;
+    }
+    
+    /* success only if we parsed at least one digit AND reached end or non-digit */
+    if (found_digit) {
+        *out_val = res;
+        return TRUE;
+    }
+    return FALSE;
+}
 I32 ATOI_I32(CONST U8* str) {
     if (!str) return 0;
 
@@ -175,8 +196,46 @@ I32 ATOI_I32(CONST U8* str) {
     return negative ? -res : res;
 }
 
+BOOL ATOI_I32_E(CONST U8* str, I32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    
+    I32 res = 0;
+    BOOL negative = FALSE;
+    
+    /* Skip leading spaces */
+    PU8 p = str;
+    while (*p == ' ' || *p == '\t') p++;
+    
+    if (!*p) return FALSE;  /* only spaces */
+    
+    /* Optional sign */
+    if (*p == '-') {
+        negative = TRUE;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
+    
+    /* Parse digits */
+    BOOL found_digit = FALSE;
+    while (*p >= '0' && *p <= '9') {
+        res = res * 10 + (*p - '0');
+        p++;
+        found_digit = TRUE;
+    }
+    
+    if (found_digit) {
+        *out_val = negative ? -res : res;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 U32 ATOI_HEX(CONST U8* str) {
     U32 res = 0;
+    if(str && str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        str += 2; // Skip "0x" prefix
+    }
     while ((*str >= '0' && *str <= '9') || (*str >= 'A' && *str <= 'F') || (*str >= 'a' && *str <= 'f')) {
         res *= 16;
         if (*str >= '0' && *str <= '9') {
@@ -189,6 +248,35 @@ U32 ATOI_HEX(CONST U8* str) {
         str++;
     }
     return res;
+}
+
+BOOL ATOI_HEX_E(CONST U8* str, U32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    if (!*str) return FALSE;
+    if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        str += 2; // Skip "0x" prefix
+    }
+    U32 res = 0;
+    BOOL found_digit = FALSE;
+    
+    while ((*str >= '0' && *str <= '9') || (*str >= 'A' && *str <= 'F') || (*str >= 'a' && *str <= 'f')) {
+        res *= 16;
+        if (*str >= '0' && *str <= '9') {
+            res += (*str - '0');
+        } else if (*str >= 'A' && *str <= 'F') {
+            res += (*str - 'A' + 10);
+        } else if (*str >= 'a' && *str <= 'f') {
+            res += (*str - 'a' + 10);
+        }
+        str++;
+        found_digit = TRUE;
+    }
+    
+    if (found_digit) {
+        *out_val = res;
+        return TRUE;
+    }
+    return FALSE;
 }
 
 F32 ATOF(PU8 str)
@@ -219,6 +307,49 @@ F32 ATOF(PU8 str)
 
     return result * sign;
 }
+
+BOOL ATOF_E(PU8 str, F32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    if (!*str) return FALSE;
+    
+    F32 result = 0.0f;
+    F32 fraction = 0.1f;
+    int sign = 1;
+    BOOL found_digit = FALSE;
+    
+    PU8 p = str;
+    
+    if (*p == '-') {
+        sign = -1;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
+    
+    /* Integer part */
+    while (*p >= '0' && *p <= '9') {
+        result = result * 10.0f + (*p - '0');
+        p++;
+        found_digit = TRUE;
+    }
+    
+    /* Fractional part */
+    if (*p == '.') {
+        p++;
+        while (*p >= '0' && *p <= '9') {
+            result += (*p - '0') * fraction;
+            fraction *= 0.1f;
+            p++;
+            found_digit = TRUE;
+        }
+    }
+    
+    if (found_digit) {
+        *out_val = result * sign;
+        return TRUE;
+    }
+    return FALSE;
+}
 static int hex_val(char c)
 {
     if (c >= '0' && c <= '9') return c - '0';
@@ -232,7 +363,10 @@ F32 ATOF_HEX(PU8 str)
     F32 result = 0.0f;
     F32 fraction = 1.0f / 16.0f;
     int sign = 1;
-
+    if( !str || !*str) return 0.0f;
+     if( str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        str += 2; // Skip "0x" prefix
+    }
     if (*str == '-') {
         sign = -1;
         str++;
@@ -256,12 +390,60 @@ F32 ATOF_HEX(PU8 str)
     return result * sign;
 }
 
+BOOL ATOF_HEX_E(PU8 str, F32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    if (!*str) return FALSE;
+    if( str[0] == '0' && (str[1] == 'x' || str[1] == 'X')) {
+        str += 2; // Skip "0x" prefix
+    }
+    F32 result = 0.0f;
+    F32 fraction = 1.0f / 16.0f;
+    int sign = 1;
+    BOOL found_digit = FALSE;
+    
+    PU8 p = str;
+    
+    if (*p == '-') {
+        sign = -1;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
+    
+    /* Integer part */
+    while (*p && *p != '.' && hex_val(*p) >= 0) {
+        result = result * 16.0f + hex_val(*p);
+        p++;
+        found_digit = TRUE;
+    }
+    
+    /* Fractional part */
+    if (*p == '.') {
+        p++;
+        while (*p && hex_val(*p) >= 0) {
+            result += hex_val(*p) * fraction;
+            fraction /= 16.0f;
+            p++;
+            found_digit = TRUE;
+        }
+    }
+    
+    if (found_digit) {
+        *out_val = result * sign;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 F32 ATOF_BIN(PU8 str)
 {
     F32 result = 0.0f;
     F32 fraction = 0.5f;
     int sign = 1;
-
+    if( !str || !*str) return 0.0f;
+    if( str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
+        str += 2; // Skip "0b" prefix
+    }
     if (*str == '-') {
         sign = -1;
         str++;
@@ -285,14 +467,85 @@ F32 ATOF_BIN(PU8 str)
     return result * sign;
 }
 
+BOOL ATOF_BIN_E(PU8 str, F32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    if (!*str) return FALSE;
+    if( str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
+        str += 2; // Skip "0b" prefix
+    }
+    F32 result = 0.0f;
+    F32 fraction = 0.5f;
+    int sign = 1;
+    BOOL found_digit = FALSE;
+    
+    PU8 p = str;
+    
+    if (*p == '-') {
+        sign = -1;
+        p++;
+    } else if (*p == '+') {
+        p++;
+    }
+    
+    /* Integer part */
+    while (*p && *p != '.' && (*p == '0' || *p == '1')) {
+        result = result * 2.0f + (*p - '0');
+        p++;
+        found_digit = TRUE;
+    }
+    
+    /* Fractional part */
+    if (*p == '.') {
+        p++;
+        while (*p && (*p == '0' || *p == '1')) {
+            result += (*p - '0') * fraction;
+            fraction *= 0.5f;
+            p++;
+            found_digit = TRUE;
+        }
+    }
+    
+    if (found_digit) {
+        *out_val = result * sign;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 
 U32 ATOI_BIN(CONST U8* str) {
+    if( !str || !*str) return 0;
+    if( str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
+        str += 2; // Skip "0b" prefix
+    }
     U32 res = 0;
     while ((*str == '0' || *str == '1')) {
         res = (res << 1) | (*str - '0');
         str++;
     }
     return res;
+}
+
+BOOL ATOI_BIN_E(CONST U8* str, U32 *out_val) {
+    if (!str || !out_val) return FALSE;
+    if (!*str) return FALSE;
+    
+    U32 res = 0;
+    BOOL found_digit = FALSE;
+    if( str[0] == '0' && (str[1] == 'b' || str[1] == 'B')) {
+        str += 2; // Skip "0b" prefix
+    }
+    while ((*str == '0' || *str == '1')) {
+        res = (res << 1) | (*str - '0');
+        str++;
+        found_digit = TRUE;
+    }
+    
+    if (found_digit) {
+        *out_val = res;
+        return TRUE;
+    }
+    return FALSE;
 }
 U0 *ITOA(S32 value, I8* buffer, U32 base) {
     if(value == 0) {
