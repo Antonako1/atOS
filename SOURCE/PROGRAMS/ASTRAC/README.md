@@ -1,4 +1,4 @@
-# AstraC — Compiler, Assembler & Disassembler for atOS
+# AstraC — A 16 and 32-bit Compiler, Assembler & Disassembler for atOS
 
 AstraC is the native toolchain for atOS.  It takes C source or assembly and
 produces flat binaries that run on the atOS kernel.
@@ -9,7 +9,7 @@ produces flat binaries that run on the atOS kernel.
 |------|---------|
 | `ASSEMBLER/` | x86 assembler — preprocess, lex, parse, verify, optimise, codegen |
 | `COMPILER/`  | C compiler front-end (WIP) |
-| `DISSASEMBLER/` | Binary → readable ASM disassembler (WIP) |
+| `DISSASEMBLER/` | Binary → readable ASM disassembler |
 | `SHARED/`    | Code shared across all three tools (preprocessor, macros) |
 
 ## Build pipeline (As of now)
@@ -41,7 +41,7 @@ produces flat binaries that run on the atOS kernel.
 |------|------|-------|--------|
 | `-A` | Assemble    | `.ASM` | `.BIN` |
 | `-C` | Compile     | `.C`   | `.ASM` |
-| `-D` | Disassemble | `.BIN` | `.ASM` |
+| `-D` | Disassemble | `.BIN` | `.DSM` |
 | `-B` | Build       | `.C`   | `.BIN` (compile + assemble) |
 
 ## Usage
@@ -53,7 +53,7 @@ OPTIONS:
     -o, --out <file>                Specify output file name (default: derived from input)
     -A, --assemble                  Assemble input ASM files into object binaries
     -C, --compile                   Compile C source files into object binaries
-    -D, --disassemble               Disassemble a binary back into readable ASM
+    -D, --disassemble               Disassemble a binary back into readable ASM (.DSM)
     -E, --preprocess                Run preprocessor only (for C files)
     -B, --build                     Perform full build pipeline (compile + assemble)
 
@@ -65,6 +65,12 @@ OPTIONS:
     -q, --quiet                     Suppress normal output
     -h, --help                      Display this help and exit
     -i, --info <[asm|c]=<keyword>>  Info about a register, directive, symbol, or type
+
+EXAMPLES:
+    ASTRAC.BIN -A src/BOOT/VBR.ASM -o VBR.BIN
+    ASTRAC.BIN -C src/TESTS/HELLO.C -o HELLO.ASM
+    ASTRAC.BIN -D src/BOOT/VBR.BIN -o VBR.DSM
+    ASTRAC.BIN -B src/TESTS/HELLO.C -o HELLO.BIN
 ```
 
 ## Return codes
