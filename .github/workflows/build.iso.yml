@@ -42,7 +42,18 @@ jobs:
           echo "Build finished at: $(date -d @$END_TIME)"
           echo "Total build time: ${DURATION} seconds"
 
-      # Optional: Add nice GitHub summary
+      - name: Extract latest changelog entry
+        run: |
+          CHANGELOG_FILE=".github/CHANGELOG.md"
+          OUTPUT_FILE="latest_changelog.md"
+
+          # Extract last ## section
+          awk '
+            /^## / {section=""} 
+            {section = section $0 "\n"} 
+            END {printf "%s", section}
+          ' $CHANGELOG_FILE > $OUTPUT_FILE
+        
       - name: Write job summary
         run: |
           END_TIME=$(date +%s)
@@ -66,6 +77,12 @@ jobs:
 
           SUMMARY="summary.md"
           echo "qemu-system-x86_64 version should be 8.2.2 for running the ISO." >> $SUMMARY
+          echo "" >> $SUMMARY
+          
+          echo "## Latest Changelog Entry" >> $SUMMARY
+          echo "" >> $SUMMARY
+          cat latest_changelog.md >> $SUMMARY
+
           echo "" >> $SUMMARY
           echo "## Build Summary" >> $SUMMARY
           echo "- Start Time: $(date -d @$START_TIME)" >> $SUMMARY
@@ -105,7 +122,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.TAG }}
-          name: "atOS Build ${{ steps.tag.outputs.TAG }}"
+          name: "atOS Stable Build ${{ steps.tag.outputs.TAG }}"
           body_path: summary.md
           files: OUTPUT/ISO/atOS.iso
         env:

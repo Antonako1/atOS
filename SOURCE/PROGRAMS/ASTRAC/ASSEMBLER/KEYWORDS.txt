@@ -1,0 +1,134 @@
+Keywords for ASM. All are case-insensitive
+
+Variable types:
+    DB          ; byte, 8bits
+    BYTE
+
+    DW          ; word, 16bits
+    WORD
+
+    DD          ; double word, 32bits
+    DWORD
+
+    REAL4       ; 32-bit floating point
+
+    PTR         ; pointer, 16-bit or 32-bit depending on .use case
+
+Directives:
+    .data       ; data section, mutable
+    .rodata     ; read-only data section
+    .code       ; code section
+    .use32      ; use 32-bit mode
+    .use16      ; use 16-bit mode
+
+Registers:
+    ; General Purpose 32-bit
+    eax  ebx  ecx  edx  esi  edi  ebp  esp
+
+    ; General Purpose 16-bit
+    ax   bx   cx   dx   si   di   bp   sp
+
+    ; 8-bit
+    al  ah  bl  bh  cl  ch  dl  dh
+
+    ; Segment
+    cs  ds  es  fs  gs  ss
+
+    ; Control
+    cr0  cr2  cr3  cr4
+
+    ; Debug
+    dr0  dr1  dr2  dr3  dr6  dr7
+
+    ; x87 FPU
+    st0  st1  st2  st3  st4  st5  st6  st7
+
+    ; MMX
+    mm0  mm1  mm2  mm3  mm4  mm5  mm6  mm7
+
+    ; SSE
+    xmm0  xmm1  xmm2  xmm3  xmm4  xmm5  xmm6  xmm7
+
+Mnemonics (i386):
+    ; No-operand
+    nop  hlt  ret  retf  leave  pusha  popa  pushf  popf
+    int3  into  iret  clc  stc  cmc  cli  sti  cld  std
+    sahf  lahf  xlat  aaa  aas  daa  das  cwde  cdq  cbw  wait
+
+    ; Register-in-opcode (+rd)
+    push  pop  inc  dec  xchg
+
+    ; Immediate
+    int  aam  aad
+
+    ; Arithmetic / Logic (ModRM)
+    add  sub  and  or  xor  cmp  test
+    not  neg  mul  imul  div  idiv
+    shl  shr  sar  rol  ror
+
+    ; Data movement (ModRM, no flags)
+    mov  lea  xchg
+
+    ; Stack / control flow (ModRM, no flags)
+    push  pop  call  jmp
+
+    ; Branches (PC-relative)
+    jmp  call
+    jo  jno  jb  jnb  jz  jnz  jbe  jnbe
+    js  jns  jp  jnp  jl  jnl  jle  jnle
+    loop  loope  loopne  jcxz
+
+    ; 0F-prefixed
+    movzx  movsx  bsf  bsr  cpuid  rdtsc
+    lgdt  lidt  sgdt  sidt
+    seto  setno  setb  setnb  setz  setnz  setbe  setnbe
+    sets  setns  setp  setnp  setl  setnl  setle  setnle
+
+Symbols:
+    ,           ; Separator
+    :           ; Label definition, 16-bit segment:offset
+    ;           ; Comment (removed by preprocessor)
+
+    [           ; Start of memory operand
+    ]           ; End of memory operand
+    (           ; Expression grouping
+    )           ; Expression grouping
+
+    +           ; Addition
+    -           ; Subtraction
+    *           ; Multiplication
+    /           ; Division
+    %           ; Modulo
+    =           ; Assignment / EQU
+
+    &           ; Bitwise AND
+    |           ; Bitwise OR
+    ^           ; Bitwise XOR
+    ~           ; Bitwise NOT
+    <<          ; Left shift
+    >>          ; Right shift
+
+    .           ; Directive prefix
+    @           ; Local label symbol
+    $           ; Current location counter
+    $$          ; Start address of current section
+
+Preprocessor directives:
+    #include    ; Include another file
+    #define     ; Define a macro
+    #undef      ; Undefine a macro
+    #ifdef      ; Conditional compilation (if defined)
+    #ifndef     ; Conditional compilation (if not defined)
+    #elif       ; Else-if branch
+    #else       ; Else branch
+    #endif      ; End conditional block
+    #error      ; Emit a compile-time error
+    #warning    ; Emit a compile-time warning
+
+Literals:
+    123         ; Decimal
+    0xFF        ; Hexadecimal (0x prefix)
+    0b101       ; Binary (0b prefix)
+    'A'         ; Character literal (single-quoted)
+    "Hello"     ; String literal (double-quoted)
+    '\n'        ; Escape sequences: \n \r \t \0 \\ \'

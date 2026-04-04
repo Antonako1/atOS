@@ -1,15 +1,15 @@
 # atOS — a 32-bit Operating System
 
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![Build](https://img.shields.io/badge/build-passed-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Status](https://img.shields.io/badge/status-early--development-orange)
 
 ⚠️ **atOS is in early development**  
 
 A custom 32-bit operating system written in **C** and **Assembly**.  
-Boots from an ISO image and runs as a raw binary.  
+Boots from an ISO or FAT and runs as a raw binary.  
 Intentionally built without modern security constraints to encourage deep low-level learning, experimentation, and hacking.
-As of now, atOS includes shell with custom [shell language](DOCS/BATSH.md), multiprocessing and much more!
+As of now, atOS includes shell, TUI and GUI libraries, assembler/dissasembler, and multitasking support.
 
 ---
 
@@ -52,14 +52,14 @@ This makes atOS ideal for learning, experimentation, and low-level programming w
 ## Features
 
 - 🖥️ **32-bit x86 Architecture** — runs on legacy and virtualized hardware.
-- 🛠️ **Custom Language Support** — integrated experimental [BATSH](DOCS/BATSH.md) shell language for scripting.
+- 🛠️ **Assembler and dissasembler (Compiler WIP)** — integrated experimental assembler and disassembler for low-level programming.
 - 🔓 **No Safety Barriers** — Ring 0, no protection layers or user/kernel enforcement, making it ideal for exploration.
 - 🗄️ **File System Support** — ISO9660 for CD-ROM images and FAT32 for local storage.
-- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries. Examples are SANDBOX.BIN, PAINT.BIN and TSHELL.BIN
-- 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), and Serial ports.
+- 🖥️ **Graphics & UI** — VBE-based graphics with custom [ATGL](SOURCE/LIBRARIES/ATGL/README.md) and [ATUI](SOURCE/LIBRARIES/ATUI/README.md) libraries. Examples are SANDBOX.BIN, PAINT.BIN and JOT.BIN
+- 🧩 **Modular Driver Stack** — support for RTL8139 (Ethernet), AC97 (Audio), PS/2 (Keyboard/Mouse), Serial ports and more!
 - 🐢 **Multitasking** — simple cooperative scheduler for handling multiple processes.
-- 🐚 **Shell Environment** — a feature-rich command-line shell with path support and environment variables.
-- 🎮 **System Programs** — suite of utilities including `PAINT`, `CLOCK`, `JOT (text editor)`, and games like `PONG`.
+- 🐚 **Shell Environment** — a feature-rich command-line shell with environment variables and [BATSH](DOCS/BATSH.md) shell language for scripting.
+- 🎮 **System Programs** — suite of utilities including `ASTRAC (compiler)`, `PAINT`, `CLOCK`, `JOT (text editor)`, and games like `PONG`.
 - 📖 **Open Source** — licensed under MIT, designed as a learning tool for systems programming.
 
 ---
@@ -178,7 +178,7 @@ Planned and in-progress features for atOS:
 * [x] [BATSH](DOCS/BATSH.md) Scripting Language
 * [x] Text Editor (JOT)
 * [ ] Dynamic Library Loading
-* [ ] Assembler / Disassembler
+* [x] Assembler / Disassembler
 * [ ] C Compiler implementation
 * [ ] Improved ACPI & Power Management
 * [ ] Network Stack refinement (TCP/IP)

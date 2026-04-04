@@ -69,6 +69,10 @@ typedef struct {
 // ===================================================
 // File I/O Abstraction Functions
 // Supports FAT32 (read/write) and ISO9660 (read-only) modes
+// 
+// About implementation:
+// FOPEN does not create a new file on disk, it only initializes a FILE structure with the file's data read from disk (FAT32 or ISO9660).
+// 
 // ===================================================
 
 // Open a file in the specified mode (FAT32 or ISO9660)
@@ -106,6 +110,10 @@ BOOLEAN FILE_EOF(FILE *file);
 // Line includes newline character if present
 // Returns TRUE if a line was read, FALSE if EOF or empty
 BOOLEAN FILE_GET_LINE(FILE *file, PU8 line, U32 max_len);
+
+// Write formatted text to a file (like fprintf)
+// Returns number of bytes written, or -1 on error
+BOOLEAN FPRINTF(FILE *file, PU8 fmt, ...);
 
 // ===================================================
 // File / Directory Management
@@ -168,6 +176,7 @@ IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path);
 /// @brief Reads the contents of an ISO9660 file.
 /// @param dir_ptr Pointer to the file record structure
 /// @note MFree the returned pointer with FREE_ISO9660_MEMORY when done.
+/// @note Filesize can be obtained from dir_ptr->extentLengthLE
 /// @return Pointer to the file contents or NULL on failure
 VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr);
 

@@ -620,7 +620,7 @@ BOOL initialize_filestructure(VOID) {
     }
     VOIDPTR bin = NULLPTR;
     U32 sz = 0;
-    bin = ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY("ATOS/DISK_VBR.BIN", &sz);
+    bin = ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY("HOME/SRC/BOOT/VBR.BIN", &sz);
     if(!bin) {
         return FALSE;
     }
