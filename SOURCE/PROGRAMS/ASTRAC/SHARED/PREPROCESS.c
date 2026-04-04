@@ -813,6 +813,13 @@ PASM_INFO PREPROCESS_ASM() {
         /* ── Build temp file path ── */
         U8 tmp_path[32];
         SPRINTF(tmp_path, "/TMP/%02x.ASM", i);
+        if(FILE_EXISTS(tmp_path)) {
+            if(!FILE_DELETE(tmp_path)) {
+                printf("[PP] Cannot delete existing temp file: %s\n", tmp_path);
+                FREE_PREPROCESSING_UNITS();
+                return info;    /* partially filled — caller checks tmp_file_count */
+            }
+        }
         if (!FILE_CREATE(tmp_path)) {
             printf("[PP] Cannot create temp file: %s\n", tmp_path);
             FREE_PREPROCESSING_UNITS();
