@@ -60,6 +60,7 @@ CMD_FUNC(COLOUR);
 CMD_FUNC(SHELL);
 CMD_FUNC(RESTART);
 CMD_FUNC(SHUTDOWN);
+CMD_FUNC(SLEEP);
 #define CMD_NONE NULLPTR
 
 /* =====================================
@@ -126,6 +127,7 @@ static const KEYWORD KEYWORDS[] ATTRIB_RODATA = {
     { "soundoff",  TOK_CMD },
     { "dir",       TOK_CMD },
     { "mkdir",     TOK_CMD },
+    { "sleep",     TOK_CMD },
     { "rmdir",     TOK_CMD },
     { "colour",    TOK_CMD },
 
@@ -186,6 +188,7 @@ static const ShellCommand shell_commands[] ATTRIB_RODATA = {
     { "cd",        CMD_CD,            "Change directory" },
     { "cd..",      CMD_CD_BACKWARDS,  "Change directory backwards" },
     { "dir",       CMD_DIR,           "List directory contents" },
+    { "sleep",     CMD_SLEEP,         "Sleeps for a specified duration: sleep <s>" },
     { "mkdir",     CMD_NONE,         "Create a directory, -h for help" },
     { "rmdir",     CMD_NONE,         "Remove a directory, -h for help" },
     { "type",      CMD_TYPE,          "Print file contents" },
@@ -1380,14 +1383,7 @@ VOID DESTROY_BATSH_INSTANCE(BATSH_INSTANCE *inst) {
  * CMD file includes (same pattern as original shell)
  * =================================================== */
 
-#define TAIL_LINE_COUNT 10
-#include "CMD/MISC.c"
-#include "CMD/AC97.c"
-#include "CMD/CD.c"
-#include "CMD/DIR.c"
-#include "CMD/TYPE.c"
-#include "CMD/TAIL.c"
-#include "CMD/COLOUR.c"
+#include <PROGRAMS/SYS_PROGS/TSHELL/CMD/ALL.h>
 
 /* ===================================================
  * Setup
