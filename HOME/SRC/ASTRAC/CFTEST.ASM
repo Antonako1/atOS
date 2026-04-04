@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════════════════════════════════════════════
-;  VBR.ASM — ASTRAC Assembler Comprehensive Feature Test
+;  CFTEST.ASM — ASTRAC Assembler Comprehensive Feature Test
 ; ═══════════════════════════════════════════════════════════════════════════════
 ;  This file exercises every language feature:
 ;    Preprocessor, directives, labels, data variables, all operand forms,
@@ -30,7 +30,7 @@
 #endif
 
 #ifndef RELEASE
-#warning "Building VBR.ASM in debug/test mode"
+#warning "Building CFTEST.ASM in debug/test mode"
 #endif
 
 #ifdef NONEXISTENT_MACRO
@@ -196,6 +196,7 @@ main_entry:
     INT3
     INTO
     LEAVE
+    
 
 ; ── 6c. MOV — every operand form ─────────────────────────────────────────────
 
@@ -298,7 +299,7 @@ main_entry:
 
 ; ── 6e. AND / OR / XOR — bitwise logic ───────────────────────────────────────
 
-    AND EAX, 0xFF
+    AND EAX, 0x00000000FF
     AND AX, 0x00FF
     AND AL, 0x0F
     AND EAX, EBX
