@@ -21,6 +21,7 @@
 ;     None
 .use16
 .org 0x7C00
+.code
 
 #define SECTOR_SIZE             2048        ; 2KB per sector
 #define VOL_DESC_START          16          ; Volume descriptor starts at sector 16
@@ -41,7 +42,6 @@
 
 #define KERNEL_LEN 12
 
-.code
 start:
     cli
     xor ax, ax
@@ -54,9 +54,6 @@ start:
 
     sti
 
-    ; mov si, bootMessage
-    ; call print_string
-    
     mov ax, PVD_OFFSET
     push cx
     push dx
@@ -336,8 +333,6 @@ print_string:
     mov ah, 0x0E
     int 0x10
     jmp print_string
-    jmp @f
-    jmp @b
 @@done:
     ret
 
@@ -365,7 +360,6 @@ READ_DISK:
 
 
 
-.data
 diskErrorMessage    db "diskERROR", 0
 ISOErrorMessage     db "isoERROR", 0
 KERNEL_FILENAME     db "KERNEL.BIN;1", KERNEL_LEN
@@ -380,8 +374,9 @@ buffer_var    dd 0     ; read_dir var. Directory buffer in PVD
 name_buf     db 12 ; Name buffer for filenames. KERNEL.BIN length is set here
 
 ; Disk Address Packet (DAP)
-dap db 16
+dap db 0
+.times 16-1 db 0
 
 ; Align boot sector
-; .times 510-($-$$) db 0
-0xAA55
+; .times ($-$$)-510 db 0
+dw 0xAA55
