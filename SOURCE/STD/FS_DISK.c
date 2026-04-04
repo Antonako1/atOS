@@ -5,6 +5,7 @@
 #include <STD/MEM.h>
 #include <STD/BINARY.h>
 #include <STD/STRING.h>
+#include <STD/ARG.h>
 #include <STD/DEBUG.h>
 
 U32 CDROM_READ(U32 lba, U32 sectors, U8 *buf) {
@@ -392,7 +393,38 @@ U32 FWRITE(FILE *file, VOIDPTR buffer, U32 len) {
 }
 
 
+typedef struct {
+    FILE *file;
+    U8 buffer[1024];
+    U32 pos;
+} FPRINTF_CTX;
 
+static VOID buffered_fputch(CHAR c, VOID *ctx) {
+    FPRINTF_CTX *fctx = (FPRINTF_CTX *)ctx;
+    fctx->buffer[fctx->pos++] = c;
+    if (fctx->pos >= sizeof(fctx->buffer)) {
+        FWRITE(fctx->file, fctx->buffer, fctx->pos);
+        fctx->pos = 0;
+    }
+}
+
+BOOLEAN FPRINTF(FILE *file, PU8 fmt, ...) {
+    if (!file || !fmt) return FALSE;
+
+    FPRINTF_CTX ctx;
+    ctx.file = file;
+    ctx.pos = 0;
+
+    va_list args;
+    va_start(args, fmt);
+    VFORMAT(buffered_fputch, &ctx, (CHAR*)fmt, args);
+    va_end(args);
+
+    if (ctx.pos > 0) {
+        FWRITE(file, ctx.buffer, ctx.pos);
+    }
+    return TRUE;
+}
 
 BOOLEAN FSEEK(FILE *file, U32 offset) {
     if (!file) return FALSE;

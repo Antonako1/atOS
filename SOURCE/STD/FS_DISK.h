@@ -111,6 +111,10 @@ BOOLEAN FILE_EOF(FILE *file);
 // Returns TRUE if a line was read, FALSE if EOF or empty
 BOOLEAN FILE_GET_LINE(FILE *file, PU8 line, U32 max_len);
 
+// Write formatted text to a file (like fprintf)
+// Returns number of bytes written, or -1 on error
+BOOLEAN FPRINTF(FILE *file, PU8 fmt, ...);
+
 // ===================================================
 // File / Directory Management
 // ===================================================
