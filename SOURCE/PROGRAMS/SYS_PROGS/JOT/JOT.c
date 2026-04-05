@@ -825,8 +825,8 @@ static VOID detect_syntax(VOID) {
     /* Fall back to built-in rules only if no config rules exist */
     if (ed.syntax_rule_count > 0) return;
 
-    if (str_endswith(ed.filepath, ".C") || str_endswith(ed.filepath, ".H") ||
-        str_endswith(ed.filepath, ".c") || str_endswith(ed.filepath, ".h")) {
+    if (str_endswith(ed.filepath, ".AC") || str_endswith(ed.filepath, ".AH") ||
+        str_endswith(ed.filepath, ".Ac") || str_endswith(ed.filepath, ".Ah")) {
         STRCPY(ed.syntax_comment_start, "//");
         STRCPY(ed.syntax_block_comment_start, "/*");
         STRCPY(ed.syntax_block_comment_end, "*/");
