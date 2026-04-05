@@ -524,7 +524,7 @@ STATIC PU8 EXTRACT_SINGLE_VALUE(PU8 line, MACRO_IDENT type) {
  *  Replace all known macro names in `line` with their values.
  *  Word-boundary-aware: only replaces when the match is NOT embedded inside
  *  a larger identifier (e.g. macro "ONE" must not match inside "LOOPNE").
- *  Global macros (from -M flags) are checked first, then per-unit macros.
+ *  Global macros (from -D flags) are checked first, then per-unit macros.
  */
 
 /* Helper: TRUE if c is alphanumeric or underscore (identifier char). */
@@ -650,7 +650,6 @@ BOOL READ_LOGICAL_LINE(FILE *file, U8 *out, U32 out_size) {
  */
 STATIC BOOL PREPROCESS_FILE(FILE *file, FILE *tmp_file, MACRO_ARR *mcr, PREPROCESSING_UNIT *unit) {
     U8 buf[BUF_SZ] = { 0 };
-
     while (READ_LOGICAL_LINE(file, buf, sizeof(buf))) {
         REMOVE_COMMENTS(buf, unit->type);
         if (IS_EMPTY(buf)) continue;
@@ -803,7 +802,7 @@ PASM_INFO PREPROCESS_ASM() {
     if (!info) return NULLPTR;
     MEMZERO(info, sizeof(ASM_INFO));
 
-    /* Seed global macros from command-line -M flags */
+    /* Seed global macros from command-line -D flags */
     for (U32 i = 0; i < args->macros.len; i++) {
         PMACRO m = args->macros.macros[i];
         if (m) DEFINE_MACRO(m->name, m->value, &glb_macros);
@@ -864,6 +863,80 @@ PASM_INFO PREPROCESS_ASM() {
     return info;
 }
 
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ *  PREPROCESS_C  —  top-level entry point for AC source files
+ *  Identical to PREPROCESS_ASM but uses C_PREPROCESSOR mode so the
+ *  comment-stripping pass handles // and  instead of ;.
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+PASM_INFO PREPROCESS_C() {
+    unit_cnt = 0;
+    if_stack_top = 0;
+
+    ASTRAC_ARGS *args = GET_ARGS();
+
+    PASM_INFO info = MAlloc(sizeof(ASM_INFO));
+    if (!info) return NULLPTR;
+    MEMZERO(info, sizeof(ASM_INFO));
+
+    /* Seed global macros from command-line -D flags */
+    for (U32 i = 0; i < args->macros.len; i++) {
+        PMACRO m = args->macros.macros[i];
+        if (m) DEFINE_MACRO(m->name, m->value, &glb_macros);
+    }
+
+    for (U32 i = 0; i < args->input_file_count; i++) {
+        U8 tmp_path[32];
+        SPRINTF(tmp_path, "/TMP/%02x.AC", i);
+        if (FILE_EXISTS(tmp_path)) {
+            if (!FILE_DELETE(tmp_path)) {
+                printf("[PP] Cannot delete existing temp file: %s\n", tmp_path);
+                FREE_PREPROCESSING_UNITS();
+                return info;
+            }
+        }
+        if (!FILE_CREATE(tmp_path)) {
+            printf("[PP] Cannot create temp file: %s\n", tmp_path);
+            FREE_PREPROCESSING_UNITS();
+            return info;
+        }
+
+        FILE *tmp = FOPEN(tmp_path, MODE_RA | MODE_FAT32);
+        if (!tmp) {
+            printf("[PP] Cannot open temp file: %s\n", tmp_path);
+            FREE_PREPROCESSING_UNITS();
+            return info;
+        }
+
+        PREPROCESSING_UNIT *unit = &units[unit_cnt];
+        unit->type = C_PREPROCESSOR;          /* <-- C mode */
+        unit->file = FOPEN(args->input_files[i], MODE_R | MODE_FAT32);
+        if (!unit->file) {
+            printf("[PP] Cannot open input: %s\n", args->input_files[i]);
+            FCLOSE(tmp);
+            FREE_PREPROCESSING_UNITS();
+            return NULLPTR;
+        }
+
+        if (args->verbose) printf("[PP] Processing: %s -> %s\n", args->input_files[i], tmp_path);
+
+        BOOL ok = PREPROCESS_FILE(unit->file, tmp, &unit->macros, unit);
+        FCLOSE(tmp);
+
+        if (!ok) {
+            printf("[PP] Failed on file: %s\n", args->input_files[i]);
+            FREE_PREPROCESSING_UNITS();
+            return info;
+        }
+
+        info->tmp_files[info->tmp_file_count++] = STRDUP(tmp_path);
+        unit_cnt++;
+    }
+
+    FREE_PREPROCESSING_UNITS();
+    return info;
+}
 
 /*
  * ── Cleanup ─────────────────────────────────────────────────────────────────

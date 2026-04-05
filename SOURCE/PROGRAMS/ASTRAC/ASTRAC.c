@@ -17,29 +17,39 @@
 VOID PRINT_HELP() {
     printf("\n%s v%s\n\n", TRADEMARK, VERSION);
     printf(
-        "Usage: ASTRAC.BIN {files.{C|ASM|BIN}...} [options]\n\n"
+        "Usage: ASTRAC.BIN {file.{AC|ASM|BIN}} [options]\n\n"
 
-        "PIPELINE OPTIONS (choose one):\n"
-            "\t-A, --assemble                  Assemble ASM files  -> BIN\n"
-            "\t-C, --compile                   Compile C files     -> ASM\n"
-            "\t-D, --disassemble               Disassemble BIN     -> ASM (.DSM)\n"
-            "\t-B, --build                     Full pipeline: C -> ASM -> BIN\n"
-            "\t-E, --preprocess                Run preprocessor only (C files)\n\n"
-
-        "INPUT / OUTPUT:\n"
+        "GENERAL OPTIONS:\n"
+            "\t-h, --help                      Show this help message\n"
+            "\t    --version                   Show compiler version\n"
+            "\t-v, --verbose                   Increase verbosity\n"
+            "\t-o <file>                       Write output to <file>\n"
+            "\t-q, --quiet                     Suppress non-error output\n"
             "\t-o, --out <file>                Specify output file name\n"
-            "\t-I, --include <dir>             Add include search directory\n"
-            "\t-M, --macro <NAME[=VALUE]>      Define a preprocessor macro\n\n"
+            "\t-D <macro>[=val]                Define macro for preprocessor (like -D NAME=1)\n"
+            "\t-E,                             Preprocess only, do not assemble/compile AC -> AC/ ASM -> ASM\n"
+            "\t-O, --org <address>             Set origin address for assembly output (default: 0x10000000)\n\n"
+
+        "COMPILER OPTIONS:\n"
+            "\t-C, --compile                   Compile source to binary AC -> BIN\n"
+            "\t    --no-runtime                Do not link the runtime library\n"
+            "\t    --no-std                    Do not link the standard library\n"
+            "\t-g, --gui                       GUI mode\n"
+            "\t-c, --console                   Console mode\n"
+            "\t-w, --warnings-as-errors        Treat warnings as errors\n"
+            "\t    --debug                     Emit debug symbols in the assembly representation\n"
+            "\t-S                              Emit assembly and stop AC -> ASM\n\n"
+
+        "ASSEMBLER OPTIONS:\n"
+            "\t-A, --assemble                  Assemble ASM -> BIN\n\n"
 
         "DISASSEMBLER OPTIONS:\n"
+            "\t--disassemble                   Disassemble BIN -> DSM\n"
             "\t    --16                        Disassemble as 16-bit code\n"
             "\t    --32                        Disassemble as 32-bit code (default)\n\n"
 
         "INFORMATION:\n"
             "\t-V, --version                   Show version info and exit\n"
-            "\t-v, --verbose                   Enable verbose output\n"
-            "\t-q, --quiet                     Suppress normal output\n"
-            "\t-h, --help                      Display this help and exit\n"
             "\t-i, --info <[asm|c]=<keyword>>  Info about register/directive/symbol/type\n"
     );
 }
@@ -68,10 +78,11 @@ ASTRAC_ARGS* GET_ARGS() { return &args; }
  *
  *  Dispatch to the correct pipeline stage(s) based on args.build_type:
  *
- *   -A  (ASSEMBLE)     ->  Preprocess -> Lex -> AST -> Verify -> Optimize -> Gen
- *   -C  (COMPILE)      ->  (not yet implemented)
- *   -D  (DISASSEMBLE)  ->  (not yet implemented)
- *   -B  (BUILD)        ->  Compile then Assemble (not yet implemented)
+ *   -A  (ASSEMBLE)        ->  Preprocess -> Lex -> AST -> Verify -> Optimize -> Gen
+ *   -C  (COMPILE)         ->  Preprocess -> Lex -> Parse -> Verify -> Codegen (.ASM)
+ *   -D  (DISASSEMBLE)     ->  Binary -> human-readable ASM
+ *   -B  (BUILD)           ->  Compile then Assemble (C -> ASM -> BIN)
+ *   -E  (PREPROCESS_ONLY) ->  Preprocess only
  *
  *  Returns ASTRAC_OK on success, or an ASTRAC_ERR_* code on failure.
  */
@@ -85,15 +96,19 @@ ASTRAC_RESULT START_WORKLOAD() {
             if (!args.quiet) printf("[ASTRAC] Starting disassembler pipeline...\n");
             return START_DISSASEMBLER();
         }
+        case PREPROCESS_ONLY:
+            if (!args.quiet) printf("[ASTRAC] Starting preprocessor only...\n");
+            /* fall through to compiler which runs preprocessing */
+            return START_COMPILER();
         case COMPILE:
-            printf("[ASTRAC] C compilation not yet implemented.\n");
-            return ASTRAC_ERR_COMPILE;
+            if (!args.quiet) printf("[ASTRAC] Starting compiler pipeline...\n");
+            return START_COMPILER();
+        case BUILD:
+            if (!args.quiet) printf("[ASTRAC] Starting full build pipeline...\n");
+            return START_COMPILER();
         case ASSEMBLE:
             if (!args.quiet) printf("[ASTRAC] Starting assembler pipeline...\n");
             return START_ASSEMBLING();
-        case BUILD:
-            printf("[ASTRAC] Full build pipeline not yet implemented.\n");
-            return ASTRAC_ERR_COMPILE;
         default:
             printf("[ASTRAC] Error: unknown build mode 0x%X\n", args.build_type);
             return ASTRAC_ERR_INTERNAL;
@@ -115,21 +130,27 @@ VOID FREE_ARGS() {
 
 /*
  * Derive a default output filename from the first input file:
- *   foo.ASM  + ASSEMBLE     -> foo.BIN
- *   foo.C    + COMPILE      -> foo.ASM
- *   foo.BIN  + DISASSEMBLE  -> foo.DSM
+ *   foo.ASM  + ASSEMBLE         -> foo.BIN
+ *   foo.AC   + COMPILE (-S)     -> foo.ASM
+ *   foo.AC   + COMPILE          -> foo.BIN  (via BUILD)
+ *   foo.BIN  + DISASSEMBLE      -> foo.DSM
+ *   foo.AC   + PREPROCESS_ONLY  -> foo.AC   (preprocessed)
  */
 static VOID DERIVE_OUTPUT_NAME() {
     args.outfile = STRDUP(args.input_files[0]);
     PU8 dot = STRRCHR(args.outfile, '.');
     if (dot) *dot = '\0';
-    if (args.build_type & COMPILE)
-        STRCAT(args.outfile, ".ASM");
-     else if (args.build_type & ASSEMBLE)
+    if (args.build_type == PREPROCESS_ONLY)
+        STRCAT(args.outfile, ".PP");             /* preprocessed source */
+    else if (args.emit_asm_only)
+        STRCAT(args.outfile, ".ASM");            /* -S: stop after compile */
+    else if (args.build_type & ASSEMBLE)
         STRCAT(args.outfile, ".BIN");
-     else if (args.build_type & DISASSEMBLE)
+    else if (args.build_type & COMPILE)
+        STRCAT(args.outfile, ".ASM");            /* -C without -A */
+    else if (args.build_type & DISASSEMBLE)
         STRCAT(args.outfile, ".DSM");
-     else
+    else
         STRCAT(args.outfile, ".OUT");
 }
 
@@ -151,12 +172,40 @@ U32 main(U32 argc, PPU8 argv) {
         else if (ARG_CMP2("-V", "--version")) { PRINT_VERSION(); return ASTRAC_OK; }
         else if (ARG_CMP2("-v", "--verbose")) { args.verbose = TRUE; }
         else if (ARG_CMP2("-q", "--quiet"))   { args.quiet = TRUE; }
+        /* Pipeline modes */
         else if (ARG_CMP2("-A", "--assemble"))    { args.build_type |= ASSEMBLE; }
-        else if (ARG_CMP2("-C", "--compile"))     { args.build_type |= COMPILE; }
-        else if (ARG_CMP2("-D", "--disassemble")) { args.build_type |= DISASSEMBLE; }
-        else if (ARG_CMP1("--16"))                   { args.dsm_bits = 16; }
-        else if (ARG_CMP1("--32"))                   { args.dsm_bits = 32; }
-        else if (ARG_CMP2("-B", "--build"))       { args.build_type |= BUILD; }
+        else if (ARG_CMP2("-C", "--compile"))     { args.build_type |= BUILD; }
+        else if (ARG_CMP1("--disassemble"))        { args.build_type |= DISASSEMBLE; }
+        else if (ARG_CMP1("-E"))                  { args.build_type |= PREPROCESS_ONLY; }
+        /* Disassembler bitness */
+        else if (ARG_CMP1("--16"))                { args.dsm_bits = 16; }
+        else if (ARG_CMP1("--32"))                { args.dsm_bits = 32; }
+        /* Compiler options */
+        else if (ARG_CMP1("--no-runtime"))        { args.no_runtime = TRUE; }
+        else if (ARG_CMP1("--no-std"))            { args.no_std = TRUE; }
+        else if (ARG_CMP2("-g", "--gui"))         { args.gui = TRUE; }
+        else if (ARG_CMP2("-c", "--console"))     { args.console = TRUE; }
+        else if (ARG_CMP2("-w", "--warnings-as-errors")) { args.warnings_as_errors = TRUE; }
+        else if (ARG_CMP1("--debug"))             { args.debug_symbols = TRUE; }
+        else if (ARG_CMP1("-S"))                  { args.emit_asm_only = TRUE; args.build_type |= COMPILE; }
+        else if (ARG_CMP2("-O", "--org")) {
+            if (++i < argc) {
+                /* Accept decimal or hex (0x...) */
+                BOOL ok = FALSE;
+                PU8 a = argv[i];
+                if (a[0] == '0' && (a[1] == 'x' || a[1] == 'X'))
+                    ok = ATOI_HEX_E(a + 2, &args.org);
+                else
+                    ok = ATOI_E(a, &args.org);
+                if (!ok) {
+                    printf("Error: invalid address after -O: '%s'\n", argv[i]);
+                    return ASTRAC_ERR_ARGS;
+                }
+            } else {
+                printf("Error: missing address after -O\n");
+                return ASTRAC_ERR_ARGS;
+            }
+        }
         else if (ARG_CMP2("-o", "--out")) {
             if (++i < argc) {
                 args.outfile = argv[i];
@@ -178,7 +227,7 @@ U32 main(U32 argc, PPU8 argv) {
                 return ASTRAC_ERR_ARGS;
             }
         }
-        else if (ARG_CMP2("-M", "--macro")) {
+        else if (ARG_CMP1("-D")) {
             if (++i < argc) {
                 PU8 equ = STRCHR(argv[i], '=');
                 PU8 val = NULLPTR;
@@ -191,7 +240,16 @@ U32 main(U32 argc, PPU8 argv) {
                     return ASTRAC_ERR_ARGS;
                 }
             } else {
-                printf("Error: define macros as -M NAME[=VALUE]\n");
+                printf("Error: define macros as -D NAME[=VALUE]\n");
+                return ASTRAC_ERR_ARGS;
+            }
+        }
+        else if (ARG_CMP2("-i", "--info")) {
+            if (++i < argc) {
+                printf("[ASTRAC] Info lookup for '%s': not yet implemented.\n", argv[i]);
+                return ASTRAC_OK;
+            } else {
+                printf("Error: missing keyword after -i (usage: -i [asm|c]=<keyword>)\n");
                 return ASTRAC_ERR_ARGS;
             }
         }
@@ -217,6 +275,9 @@ U32 main(U32 argc, PPU8 argv) {
 
     if (args.dsm_bits == 0)
         args.dsm_bits = 32;
+
+    if (args.org == 0)
+        args.org = 0x10000000;
 
     if (!args.got_outfile)
         DERIVE_OUTPUT_NAME();

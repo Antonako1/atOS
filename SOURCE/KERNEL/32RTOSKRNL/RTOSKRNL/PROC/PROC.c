@@ -656,7 +656,7 @@ BOOLEAN RUN_BINARY(
     }
 
     new_proc->info.pid = get_next_pid();
-    
+    DEBUG_PRINTF("[proc] Assigned PID %u to new process\n", new_proc->info.pid);
     KDEBUG_PUTS("[proc] setup_user_process...\n");
     panic_if(!setup_user_process(new_proc, (U8 *)file, bin_size, heap_size, stack_size, initial_state),
              PANIC_TEXT("Failed to set up user process"), PANIC_OUT_OF_MEMORY);

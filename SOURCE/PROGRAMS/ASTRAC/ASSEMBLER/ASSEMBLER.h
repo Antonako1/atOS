@@ -576,6 +576,7 @@ ASTRAC_RESULT  START_ASSEMBLING();
 
 /* Preprocessor */
 PASM_INFO      PREPROCESS_ASM();
+PASM_INFO      PREPROCESS_C();
 VOID           DESTROY_ASM_INFO(PASM_INFO info);
 
 /* Lexer */

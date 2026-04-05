@@ -121,12 +121,12 @@ ASTRAC_RESULT START_ASSEMBLING() {
     }
 
     /* ── Stage 5: Optimize ──────────────────────────────────────── */
-    // if (cfg->verbose) printf("[ASM] Stage 5/6: Optimizing...\n");
-    // if (!OPTIMIZE(ast_arr)) {
-    //     printf("[ASM] Optimization pass failed.\n");
-    //     result = ASTRAC_ERR_OPTIMIZE;
-    //     goto cleanup;
-    // }
+    if (cfg->verbose) printf("[ASM] Stage 5/6: Optimizing...\n");
+    if (!OPTIMIZE(ast_arr)) {
+        printf("[ASM] Optimization pass failed.\n");
+        result = ASTRAC_ERR_OPTIMIZE;
+        goto cleanup;
+    }
 
     /* ── Stage 6: Generate binary ────────────────────────── */
     if (cfg->verbose) printf("[ASM] Stage 6/6: Generating binary...\n");

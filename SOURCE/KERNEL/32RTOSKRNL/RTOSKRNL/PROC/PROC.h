@@ -22,7 +22,7 @@ and message passing between processes and the kernel.
 // 4 KB. NOTE: Just a padding between binary and stack. Actual HEAP size is defined on the fly
 #define USER_HEAP_SIZE (1024 * 4 * 4) 
 
-#define USER_STACK_SIZE (1 * 1024 * 1024) // 1 MB
+#define USER_STACK_SIZE (4 * 1024 * 1024) // 1 MB
 #define MAX_USER_BINARY_SIZE (16 * 1024 * 1024) // 16 MB max binary size
 #define MAX_USER_MEM_SIZE MEM_USER_SPACE_END_MIN
 

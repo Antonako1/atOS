@@ -1312,6 +1312,7 @@ BOOLEAN GEN_BINARY(ASM_AST_ARRAY *ast, PASM_INFO info) {
     ptrs.rodata  = 0;
     ptrs.current_section = DIR_NONE;
     ptrs.code_type       = DIR_CODE_TYPE_32;
+    ptrs.origin          = cfg->org;
 
     /* ── Open output file ─────────────────────────────────────────────── */
     PU8 outputfile = cfg->outfile;
