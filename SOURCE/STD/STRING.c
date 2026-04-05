@@ -1124,10 +1124,15 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
         BOOL pad_zero = FALSE;
         BOOL left_align = FALSE;
         BOOL is_negative = FALSE;
+        BOOL force_sign = FALSE;
 
-        // Flags
-        if (*fmt == '-') { left_align = TRUE; fmt++; }
-        if (*fmt == '0') { pad_zero = TRUE; fmt++; }
+        // Flags: consume any combination of '-', '0', '+'
+        while (*fmt == '-' || *fmt == '0' || *fmt == '+') {
+            if (*fmt == '-') left_align = TRUE;
+            else if (*fmt == '0') pad_zero = TRUE;
+            else if (*fmt == '+') force_sign = TRUE;
+            fmt++;
+        }
 
         // Width
         if (*fmt == '*') {
@@ -1195,7 +1200,7 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
                     buf[len - 1 - i] = t;
                 }
 
-                I32 total_len = len + (precision ? precision + 1 : 0) + (is_negative ? 1 : 0);
+                I32 total_len = len + (precision ? precision + 1 : 0) + (is_negative ? 1 : 0) + (force_sign && !is_negative ? 1 : 0);
 
                 if (!left_align) {
                     CHAR pad = pad_zero ? '0' : ' ';
@@ -1205,6 +1210,8 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
 
                 if (is_negative)
                     putch('-', ctx);
+                else if (force_sign)
+                    putch('+', ctx);
 
                 for (I32 i = 0; i < len; i++)
                     putch(buf[i], ctx);
@@ -1264,13 +1271,17 @@ VOID VFORMAT(VOID (*putch)(CHAR, VOID*), VOID *ctx, CHAR *fmt, va_list args) {
                     }
                 }
 
-                I32 len = STRLEN(buf) + (is_negative ? 1 : 0);
+                I32 len = STRLEN(buf) + (is_negative ? 1 : 0) + (force_sign && !is_negative ? 1 : 0);
                 if (!left_align) {
                     if (pad_zero && is_negative) putch('-', ctx);
+                    else if (pad_zero && force_sign) putch('+', ctx);
                     for (I32 i = len; i < width; i++) putch(pad_zero ? '0' : ' ', ctx);
                     if (!pad_zero && is_negative) putch('-', ctx);
+                    else if (!pad_zero && force_sign && !is_negative) putch('+', ctx);
                 } else if (is_negative) {
                     putch('-', ctx);
+                } else if (force_sign) {
+                    putch('+', ctx);
                 }
 
                 for (CHAR *p = buf; *p; p++) putch(*p, ctx);
