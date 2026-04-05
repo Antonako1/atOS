@@ -2,6 +2,8 @@
     "files.associations": {
         "*.H": "c",
         "*.C": "c",
+        "*.AC": "c",
+        "*.Ah": "c",
         "*.asm": "nasm",
         "stdlib.h": "c",
         "string.h": "c",
