@@ -1,0 +1,6 @@
+#ifndef PROC_COM_AH
+#define PROC_COM_AH
+
+U0 EXIT(U32 code);
+
+#endif // PROC_COM_AH

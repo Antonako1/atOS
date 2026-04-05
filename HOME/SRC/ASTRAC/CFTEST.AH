@@ -1,0 +1,33 @@
+#ifndef CFTEST_AH
+#define CFTEST_AH
+/*
+
+U8 = base type for 8-bit unsigned integers
+I8 = base type for 8-bit signed integers
+U16 = base type for 16-bit unsigned integers
+I16 = base type for 16-bit signed integers
+U32 = base type for 32-bit unsigned integers
+I32 = base type for 32-bit signed integers
+
+F32 = base type for 32-bit floating point numbers
+
+U0/I0 = void
+
+ASM {}; block allows for inline assembly, syntax is the same as in .ASM files.
+ASM {
+}
+*/
+
+#define U8_MAX 0xFF
+#define I8_MAX 0x7F
+#define I8_MIN (-I8_MAX - 1)
+#define U16_MAX 0xFFFF
+#define I16_MAX 0x7FFF
+#define I16_MIN (-I16_MAX - 1)
+#define U32_MAX 0xFFFFFFFF
+#define I32_MAX 0x7FFFFFFF
+#define I32_MIN (-I32_MAX - 1)
+#define F32_MAX 3.402823466e+38F
+#define F32_MIN 1.175494351e-38F
+
+#endif // CFTEST_AH

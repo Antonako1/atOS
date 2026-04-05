@@ -1,0 +1,43 @@
+U8 str = "Hello, World!";
+U32 TEST_FUNC() {
+    return 0;
+}
+// VOID PRINTF(PU8 fmt) {
+// }
+U32 main(U32 argc, PPU8 argv) {
+    U32 i = 0;    
+    TEST_FUNC("aaaaa", 123, 45.67, i, abc);
+    IF(argc < 2) {
+        RETURN 1;
+    } else if(STRCMP(argv[1], "test") == 0) {
+        U32 res = TEST_FUNC();
+        // PRINTF("TEST_FUNC returned: %u\n", res);
+    } else {
+        // PRINTF("Unknown argument: %s\n", argv[1]);
+    }
+    for(i = 1; i < argc; i++) {
+        IF(STRCMP(argv[i], "test") == 0) {
+            U32 res = TEST_FUNC();
+            // PRINTF("TEST_FUNC returned: %u\n", res);
+        }
+    }
+    while(1) {
+        U32 res = TEST_FUNC();
+    }
+    do
+    {
+        U32 res = TEST_FUNC();
+    } while (1);
+    ASM {
+        0xFF
+    }
+    switch (i) {
+    case 0:
+        // PRINTF("i is zero\n");
+        break;
+    default:
+        // PRINTF("i is non-zero\n");
+        break;
+    }
+    RETURN 0;
+}
