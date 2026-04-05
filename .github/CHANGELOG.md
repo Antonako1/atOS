@@ -26,3 +26,10 @@ Started working on VBR (volume boot record) bootloader.
 - STRI_REPLACE: Added a case-insensitive version of the string replace function.
 - VSNPRINTF: Added a function for formatted string output with a va_list argument, similar to the standard C library function.
 - SNPRINTF: Added a function for formatted string output to a buffer with size limit, similar to the standard C library function.
+
+## 2026.04.05 - 2026.04.xx
+
+### AstaC Compiler
+- Created the AstraC Compiler, which compiles .AC source files to binary. It includes a multi-stage pipeline with tokenization, parsing, AST generation, semantic analysis, and code generation. The compiler supports a C-like syntax with a simple type system, control flow constructs, and function definitions. It also provides detailed error messages during semantic analysis.
+
+- Added +,- support for VFORMAT
