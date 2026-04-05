@@ -101,7 +101,7 @@ static CONST CKEYWORD kw_table[] ATTRIB_RODATA = {
 
 static COMP_TOK_TYPE ident_to_kw(PU8 upper) {
     for (U32 i = 0; kw_table[i].word; i++)
-        if (STRCMP(upper, kw_table[i].word) == 0)
+        if (STRICMP(upper, kw_table[i].word) == 0)
             return kw_table[i].type;
     return CTOK_IDENT;
 }

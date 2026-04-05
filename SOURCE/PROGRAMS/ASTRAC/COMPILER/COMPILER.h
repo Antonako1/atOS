@@ -289,13 +289,28 @@ typedef struct {
     U32 cap;
 } CNODE_ARRAY, *PCNODE_ARRAY;
 
+
+typedef struct {
+    U32 label; // label number for the string literal
+    PCNODE node; // pointer to the original CNODE_STR_LIT node containing the string literal (for reference during .rodata emission)
+} RODATA_STR;
+
 /* ════════════════════════════════════════════════════════════════════════════
  *  COMPILER CONTEXT
  * ════════════════════════════════════════════════════════════════════════════ */
 typedef struct _COMP_CTX {
     PU8  tmp_src;           /* path: preprocessed .AC source temp file */
     PU8  out_asm;           /* path: output .ASM file                   */
+    
     U32  label_counter;     /* auto-increment for generated labels      */
+
+    U32  loop_label_stack[32];  /* for break/continue target labels */
+    U32  loop_label_stack_top;          /* top of the loop label stack */
+
+
+    RODATA_STR rodata_strings[256]; // array of string literal nodes for .rodata emission, indexed by label number
+    U32 rodata_string_count; // count of string literals collected for .rodata section
+
     U32  errors;            /* error count                              */
     U32  warnings;          /* warning count                            */
 } COMP_CTX, *PCOMP_CTX;

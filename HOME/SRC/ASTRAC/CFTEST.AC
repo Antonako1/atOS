@@ -1,32 +1,41 @@
 U8 str = "Hello, World!";
-U32 TEST_FUNC() {
+U32 TEST_FUNC(PU8 a, U32 b, U32 c, U32 d, PU8 e) {
     return 0;
 }
-// VOID PRINTF(PU8 fmt) {
-// }
-U32 main(U32 argc, PPU8 argv) {
+I32 STRCMP(PU8 s1, PU8 s2) {
+    while (*s1 && (*s1 == *s2)) {
+        s1++;
+        s2++;
+    }
+    return s1 - s2;
+}
+U32 _start(U32 argc, PPU8 argv) {
     U32 i = 0;    
-    TEST_FUNC("aaaaa", 123, 45.67, i, abc);
-    IF(argc < 2) {
-        RETURN 1;
+    /*
+    
+    if(argc < 2) {
+        RETURN   1;
     } else if(STRCMP(argv[1], "test") == 0) {
-        U32 res = TEST_FUNC();
+        U32 res = TEST_FUNC("baaaaa", 123, 45.67, i, str);
         // PRINTF("TEST_FUNC returned: %u\n", res);
     } else {
         // PRINTF("Unknown argument: %s\n", argv[1]);
     }
+    */
+
     for(i = 1; i < argc; i++) {
         IF(STRCMP(argv[i], "test") == 0) {
-            U32 res = TEST_FUNC();
+            U32 res = TEST_FUNC("caaaaa", 123, 45.67, i, str);
             // PRINTF("TEST_FUNC returned: %u\n", res);
         }
     }
+    /*
     while(1) {
-        U32 res = TEST_FUNC();
+        U32 res = TEST_FUNC("daaaaa", 123, 45.67, i, str);
     }
     do
     {
-        U32 res = TEST_FUNC();
+        U32 res = TEST_FUNC("eaaaaa", 123, 45.67, i, str);
     } while (1);
     ASM {
         0xFF
@@ -39,5 +48,6 @@ U32 main(U32 argc, PPU8 argv) {
         // PRINTF("i is non-zero\n");
         break;
     }
+    */
     RETURN 0;
 }

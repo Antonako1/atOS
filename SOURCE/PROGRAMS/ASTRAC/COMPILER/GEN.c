@@ -57,6 +57,45 @@ typedef struct {
 
 static U32 new_label(GEN_STATE *gs) { return gs->ctx->label_counter++; }
 
+/*
+Always push loop labels in pairs: first the "continue" target, then the "break" target.
+This simplifies handling of nested loops and switch statements, since we don't need to track which label is
+*/
+static U32 push_loop_label(GEN_STATE *gs, U32 lbl) {
+    if (gs->ctx->loop_label_stack_top < 32) {
+        gs->ctx->loop_label_stack[gs->ctx->loop_label_stack_top++] = lbl;
+        return lbl;
+    }
+    return 0;
+}
+static U32 pop_loop_label(GEN_STATE *gs) {
+    if (gs->ctx->loop_label_stack_top > 0) return gs->ctx->loop_label_stack[--gs->ctx->loop_label_stack_top];
+    return 0;
+}
+
+static void push_rodata_string(GEN_STATE *gs, PCNODE str_node, U32 lbl) {
+    if (gs->ctx->rodata_string_count < 256) {
+        DEBUGM_PRINTF("[COMP GEN] Pushing rodata string literal for label _S%u: \"%s\"\n", lbl, str_node && str_node->txt ? str_node->txt : "");
+        RODATA_STR *rs = &gs->ctx->rodata_strings[gs->ctx->rodata_string_count++];
+        MEMZERO(rs, sizeof(RODATA_STR));
+        rs->node = str_node;
+        rs->label = lbl;
+    }
+}
+static RODATA_STR* pop_rodata_string(GEN_STATE *gs) {
+    if (gs->ctx->rodata_string_count == 0) {
+        DEBUGM_PRINTF("[COMP GEN] pop_rodata_string: no rodata strings to pop\n");
+        return NULLPTR;
+    }
+    RODATA_STR *rs = &gs->ctx->rodata_strings[gs->ctx->rodata_string_count - 1];
+    DEBUGM_PRINTF("[COMP GEN] Popping rodata string literal for label _S%u\n", rs->label);
+    gs->ctx->rodata_string_count--;
+    return rs;
+}
+
+static U32 get_continue_loop_label(GEN_STATE *gs) { return gs->ctx->loop_label_stack_top > 0 ? gs->ctx->loop_label_stack[gs->ctx->loop_label_stack_top - 2] : 0; }
+static U32 get_break_loop_label(GEN_STATE *gs) { return gs->ctx->loop_label_stack_top > 0 ? gs->ctx->loop_label_stack[gs->ctx->loop_label_stack_top - 1] : 0; }
+
 /* ── Local variable helpers ──────────────────────────────────────────────── */
 static LOCAL_VAR *find_local(GEN_STATE *gs, PU8 name) {
     for (U32 i = 0; i < gs->local_count; i++)
@@ -81,14 +120,9 @@ static VOID gen_expr(GEN_STATE *gs, PCNODE n);
 
 static VOID gen_expr(GEN_STATE *gs, PCNODE n) {
     if (!n) return;
-    if(GET_ARGS()->debug_symbols) {
-        EMIT(gs, "\t; gen_expr: node type %u, txt '%s', line %u\n",
-             n->ntype, n->txt ? n->txt : "(null)", n->line);
-        DEBUGM_PRINTF("[COMP GEN] gen_expr: node type %u, txt '%s', line %u\n",
-                      n->ntype, n->txt ? n->txt : "(null)", n->line);
-    }
+    
     switch (n->ntype) {
-
+        
         case CNODE_INT_LIT:
             EMIT(gs, "\tMOV EAX, %u\n", n->ival);
             break;
@@ -126,7 +160,7 @@ static VOID gen_expr(GEN_STATE *gs, PCNODE n) {
         case CNODE_STR_LIT: {
             /* Strings: emit as rodata label, load address */
             U32 lbl = new_label(gs);
-            /* TODO: collect string literals and emit in .rodata section */
+            push_rodata_string(gs, n, lbl);
             EMIT(gs, "\tMOV EAX, _S%u\n", lbl);
             break;
         }
@@ -265,6 +299,9 @@ static VOID gen_expr(GEN_STATE *gs, PCNODE n) {
 
         case CNODE_CALL: {
             if (n->child_count == 0) break;
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_expr: function call with %u args at line %u\n", n->child_count - 1, n->line);
+            }
             /* Push arguments right-to-left */
             U32 arg_count = n->child_count - 1;
             for (U32 i = arg_count; i > 0; i--)
@@ -298,6 +335,8 @@ static VOID gen_expr(GEN_STATE *gs, PCNODE n) {
             gen_expr(gs, n->children[1]);           /* index -> EAX */
 
             // TODO: handle pointer types and get base type size
+            // must work for arrays, pointers, and multi-dimensional indexing
+            // structs and unions should not be indexable, so we can assume it's an array or pointer
             U32 sz_type = COMP_TYPE_SIZE(n->dtype);
             
             EMIT(gs, "\tIMUL EAX, %u\n", sz_type);
@@ -322,19 +361,22 @@ static VOID gen_stmt(GEN_STATE *gs, PCNODE n);
 
 static VOID gen_stmt(GEN_STATE *gs, PCNODE n) {
     if (!n) return;
-    EMIT(gs, "\t; gen_stmt: node type %u, txt '%s', line %u\n",
-         n->ntype, n->txt ? n->txt : "(null)", n->line);
-     DEBUGM_PRINTF("[COMP GEN] gen_stmt: node type %u, txt '%s', line %u\n",
-                   n->ntype, n->txt ? n->txt : "(null)", n->line);
     switch (n->ntype) {
 
         case CNODE_BLOCK:
+            // TODO: handle new scope for variables
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: block with %u statements at line %u\n", n->child_count, n->line);
+            }
             for (U32 i = 0; i < n->child_count; i++)
                 gen_stmt(gs, n->children[i]);
             break;
 
         case CNODE_VAR_DECL: {
             U32 sz = COMP_TYPE_SIZE(n->dtype);
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: var decl '%s' of size %u at line %u\n", n->txt ? n->txt : "(null)", sz, n->line);
+            }
             if (sz == 0) sz = 4;   /* default */
             if (n->txt) alloc_local(gs, n->txt, sz);
             /* If there is an initializer, emit assign code */
@@ -362,6 +404,9 @@ static VOID gen_stmt(GEN_STATE *gs, PCNODE n) {
 
         case CNODE_IF: {
             if (n->child_count < 2) break;
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: if statement at line %u\n", n->line);
+            }
             U32 else_lbl = new_label(gs);
             U32 end_lbl  = new_label(gs);
             gen_expr(gs, n->children[0]);               /* condition */
@@ -380,30 +425,54 @@ static VOID gen_stmt(GEN_STATE *gs, PCNODE n) {
 
         case CNODE_WHILE: {
             if (n->child_count < 2) break;
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: while loop at line %u\n", n->line);
+            }
             U32 loop_lbl = new_label(gs);
             U32 end_lbl  = new_label(gs);
+            push_loop_label(gs, loop_lbl); // cnt
+            push_loop_label(gs, end_lbl);  // brk
             EMIT(gs, "@@L%u:\n", loop_lbl);
             gen_expr(gs, n->children[0]);
             EMIT(gs, "\tCMP EAX, 0\n\tJE @@L%u\n", end_lbl);
             gen_stmt(gs, n->children[1]);
             EMIT(gs, "\tJMP @@L%u\n@@L%u:\n", loop_lbl, end_lbl);
+            /* pop loop labels (break then continue) */
+            pop_loop_label(gs); // brk
+            pop_loop_label(gs); // cnt
             break;
         }
 
         case CNODE_DO_WHILE: {
             if (n->child_count < 2) break;
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: do-while loop at line %u\n", n->line);
+            }
             U32 loop_lbl = new_label(gs);
+            push_loop_label(gs, loop_lbl); // cnt
+            push_loop_label(gs, loop_lbl); // reuse same label for continue and break since condition is at end of loop
             EMIT(gs, "@@L%u:\n", loop_lbl);
             gen_stmt(gs, n->children[0]);
             gen_expr(gs, n->children[1]);
             EMIT(gs, "\tCMP EAX, 0\n\tJNE @@L%u\n", loop_lbl);
+            /* pop the two loop labels we pushed */
+            pop_loop_label(gs); // brk
+            pop_loop_label(gs); // cnt
             break;
         }
 
         case CNODE_FOR: {
             if (n->child_count < 4) break;
+            if(GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: for loop init, cond, incr at line %u\n", n->line);
+            }
             U32 loop_lbl = new_label(gs);
             U32 end_lbl  = new_label(gs);
+
+            // push loop labels in order: first continue target, then break target
+            push_loop_label(gs, loop_lbl); // cnt
+            push_loop_label(gs, end_lbl);  // brk
+
             gen_stmt(gs, n->children[0]);               /* init */
             EMIT(gs, "@@L%u:\n", loop_lbl);
             if (n->children[1]) {
@@ -413,15 +482,27 @@ static VOID gen_stmt(GEN_STATE *gs, PCNODE n) {
             gen_stmt(gs, n->children[3]);               /* body */
             if (n->children[2]) gen_expr(gs, n->children[2]);  /* incr */
             EMIT(gs, "\tJMP @@L%u\n@@L%u:\n", loop_lbl, end_lbl);
+
+            // after loop, pop labels in reverse order
+            pop_loop_label(gs); // brk
+            pop_loop_label(gs); // cnt
             break;
         }
 
         case CNODE_BREAK:
-            EMIT(gs, "\t; TODO: break — needs loop-end label tracking\n");
+            // Jump to break target label from loop label stack
+            EMIT(gs, "\tJMP @@L%u\n", get_break_loop_label(gs)); // brk
             break;
 
         case CNODE_CONTINUE:
-            EMIT(gs, "\t; TODO: continue — needs loop-start label tracking\n");
+            // Jump to continue target label from loop label stack
+            EMIT(gs, "\tJMP @@L%u\n", get_continue_loop_label(gs)); // cnt
+            break;
+
+        case CNODE_SWITCH:
+        case CNODE_CASE:
+        case CNODE_DEFAULT:
+            EMIT(gs, "\t; TODO: unimplemented switch/case/default\n");
             break;
 
         case CNODE_LABEL:
@@ -434,9 +515,10 @@ static VOID gen_stmt(GEN_STATE *gs, PCNODE n) {
             break;
 
         case CNODE_ASM_BLOCK:
-            EMIT(gs, "\t; <<< inline asm >>>\n");
+            if (GET_ARGS()->debug_symbols) {
+                EMIT(gs, "\t; gen_stmt: inline asm block, line %u\n", n->line);
+            }
             if (n->txt) EMIT(gs, "%s\n", n->txt);
-            EMIT(gs, "\t; <<< end inline asm >>>\n");
             break;
 
         default:
@@ -510,6 +592,9 @@ static VOID gen_function(GEN_STATE *gs, PCNODE func) {
 
 /* ── Top-level traversal ──────────────────────────────────────────────────── */
 static VOID gen_toplevel(GEN_STATE *gs, PCNODE program) {
+    EMIT(gs, ".USE32\n");
+    EMIT(gs, ".ORG 0x%X\n\n", GET_ARGS()->org);
+
     /* Phase 1: global variables in .data section */
     BOOL has_globals = FALSE;
     for (U32 i = 0; i < program->child_count; i++) {
@@ -522,6 +607,12 @@ static VOID gen_toplevel(GEN_STATE *gs, PCNODE program) {
         EMIT(gs, "\t; global variable '%s'\n", n->txt ? n->txt : "(null)");
         U32 sz = COMP_TYPE_SIZE(n->dtype);
         if (sz == 0) sz = 4;
+
+        if(n->child_count > 0 && n->children[0] && n->children[0]->ntype == CNODE_STR_LIT) {
+            /* String literal initializer: emit as label with DB */
+            EMIT(gs, "%s DB \"%s\", 0\n", n->txt ? n->txt : "_str", n->children[0]->txt ? n->children[0]->txt : "");
+            continue;
+        }
         PU8 decl_type = (sz == 1) ? "DB" : (sz == 2) ? "DW" : "DD";
         if (n->child_count > 0 && n->children[0] && n->children[0]->ntype == CNODE_INT_LIT)
             EMIT(gs, "%s %s %u\n", n->txt ? n->txt : "_data", decl_type, n->children[0]->ival);
@@ -531,13 +622,26 @@ static VOID gen_toplevel(GEN_STATE *gs, PCNODE program) {
 
     /* Phase 2: functions in .code section */
     EMIT(gs, "\n.CODE\n");
-    EMIT(gs, ".USE32\n");
-    EMIT(gs, ".ORG 0x%X\n\n", GET_ARGS()->org);
+    EMIT(gs, "jmp _start\n\n");  /* entry point */
 
     for (U32 i = 0; i < program->child_count; i++) {
         PCNODE n = program->children[i];
         if (!n || n->ntype != CNODE_FUNC_DECL) continue;
         gen_function(gs, n);
+    }
+
+    /* Phase 3: rodata strings at end of .code section */
+    if (gs->ctx->rodata_string_count > 0) {
+        EMIT(gs, "\n; Read-only string literals\n");
+        EMIT(gs, ".RODATA\n");
+        U32 rc = gs->ctx->rodata_string_count;
+        for (U32 i = 0; i < rc; i++) {
+            RODATA_STR *rs = pop_rodata_string(gs);
+            if (!rs) break;
+            PU8 txt = rs->node && rs->node->txt ? rs->node->txt : "";
+            DEBUGM_PRINTF("[COMP GEN] Emitting rodata string label _S%u: \"%s\"\n", rs->label, txt);
+            EMIT(gs, "_S%u DB \"%s\", 0\n", rs->label, txt);
+        }
     }
 }
 
