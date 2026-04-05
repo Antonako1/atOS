@@ -18,20 +18,20 @@
  * It is recommended to add ATTRIB_DATA so it will be included inside the .data section,
  * otherwise it can appear in the .bss section, which might point to some location outside the binary bounds and corrupt memory!
  */ 
-#define ATTRIB_DATA __attribute__((section(".data")))
-#define ATTRIB_RODATA __attribute__((section(".rodata")))
-#define ATTRIB_CODE __attribute__((section(".text")))
-#define ATTRIB_PACKED __attribute__((packed))
-#define ATTRIB_ALIGNED(x) __attribute__((aligned(x)))
-#define ATTRIB_NOINLINE __attribute__((noinline))
-#define ATTRIB_UNUSED __attribute__((unused))
-#define ATTRIB_USED __attribute__((used))
-#define ATTRIB_WEAK __attribute__((weak))
-#define ATTRIB_DEPRECATED __attribute__((deprecated))
-#define ATTRIB_COLD __attribute__((cold))
-#define ATTRIB_HOT __attribute__((hot))
-#define ATTRIB_NAKED __attribute__((naked))
-#define ATTRIB_NORETURN __attribute__((noreturn))
+#define ATTRIB_DATA __attribute__((section(".data")))       // Place in .data section (initialized data)
+#define ATTRIB_RODATA __attribute__((section(".rodata")))   // Place in .rodata section (read-only data)
+#define ATTRIB_CODE __attribute__((section(".text")))       // Place in .text section (code)
+#define ATTRIB_PACKED __attribute__((packed))               // Packed struct (no padding)
+#define ATTRIB_ALIGNED(x) __attribute__((aligned(x)))       // Align to x bytes
+#define ATTRIB_NOINLINE __attribute__((noinline))           // Do not inline this function
+#define ATTRIB_UNUSED __attribute__((unused))               // Suppress unused variable/function warnings
+#define ATTRIB_USED __attribute__((used))                   // Ensure variable/function is emitted even if not referenced
+#define ATTRIB_WEAK __attribute__((weak))                   // Weak symbol (can be overridden by other definitions)
+#define ATTRIB_DEPRECATED __attribute__((deprecated))       // Mark as deprecated (generates warning if used)
+#define ATTRIB_COLD __attribute__((cold))                   // Mark as cold (unlikely to be executed, optimize for size)
+#define ATTRIB_HOT __attribute__((hot))                     // Mark as hot (likely to be executed, optimize for speed)
+#define ATTRIB_NAKED __attribute__((naked))                 // Naked function (no prologue/epilogue)
+#define ATTRIB_NORETURN __attribute__((noreturn))           // Function does not return
 
 // Keywords
 #define STATIC       static
