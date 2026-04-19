@@ -1,6 +1,6 @@
 # AstraC — A 16 and 32-bit Compiler, Assembler & Disassembler for atOS
 
-AstraC is the native toolchain for atOS.  It takes C source or assembly and
+AstraC is the native toolchain for atOS. It takes AC source or assembly and
 produces flat binaries that run on the atOS kernel.
 
 ## Directory layout
@@ -12,26 +12,26 @@ produces flat binaries that run on the atOS kernel.
 | `DISSASEMBLER/` | Binary → readable ASM disassembler |
 | `SHARED/`    | Code shared across all three tools (preprocessor, macros) |
 
-## Build pipeline (As of now)
+## Build pipeline (simplified)
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌──────────────┐
-│  C Source   │───>│  Compiler   │───>│  ASM Source  │
-│  (.C)       │    │  (-C)       │    │  (.ASM)      │
-└─────────────┘    └─────────────┘    └──────┬───────┘
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌──────────────┐
+│  AC Source  │───>│ Preprocessor│───>│  Compiler   │───>│  ASM Source  │
+│  (.AC)      │    │             │    │  (-CA)      │    │  (.ASM)      │
+└─────────────┘    └─────────────┘    └─────────────┘    └──────┬───────┘
+                                                                │
+                      ┌─────────────────────────────────────────┘
+                      ▼
+                   ┌─────────────┐    ┌─────────────┐
+                   │   Lexer     │───>│  AST Build  │
+                   │             │    │             │
+                   └─────────────┘    └──────┬──────┘
                                              │
                       ┌──────────────────────┘
                       ▼
                ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-               │ Preprocessor│───>│   Lexer     │───>│  AST Build  │
-               │             │    │             │    │             │
-               └─────────────┘    └─────────────┘    └──────┬──────┘
-                                                            │
-                      ┌─────────────────────────────────────┘
-                      ▼
-               ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
                │  Verify AST │───>│  Optimise   │───>│  Codegen    │
-               │             │    │             │    │  -> .BIN    │
+               │             │    │   (lightly) │    │  -> .BIN    │
                └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
@@ -40,37 +40,43 @@ produces flat binaries that run on the atOS kernel.
 | Flag | Name | Input | Output |
 |------|------|-------|--------|
 | `-A` | Assemble    | `.ASM` | `.BIN` |
-| `-C` | Compile     | `.C`   | `.ASM` |
+| `-C` | Compile     | `.AC`   | `.ASM` |
 | `-D` | Disassemble | `.BIN` | `.DSM` |
-| `-B` | Build       | `.C`   | `.BIN` (compile + assemble) |
+| `-B` | Build       | `.AC`   | `.BIN` (compile + assemble) |
 
 ## Usage
 
 ```sh
-ASTRAC.BIN {files.{C|ASM|BIN}...} [options]
+ASTRAC.BIN {file.{AC|ASM|BIN}} [options]
 
-OPTIONS:
-    -o, --out <file>                Specify output file name (default: derived from input)
-    -A, --assemble                  Assemble input ASM files into object binaries
-    -C, --compile                   Compile C source files into object binaries
-    -D, --disassemble               Disassemble a binary back into readable ASM (.DSM)
-    -E, --preprocess                Run preprocessor only (for C files)
-    -B, --build                     Perform full build pipeline (compile + assemble)
+    GENERAL OPTIONS:
+        -h, --help                      Show this help message
+        --version                       Show compiler version
+        -v, --verbose                   Increase verbosity
+        -o <file>                       Write output to <file>
+        -q, --quiet                     Suppress non-error output
+        -o, --out <file>                Specify output file name
+        -D <macro>[=val]                Define macro for preprocessor (like -DNAME=1)
+        -E,                             Preprocess only, do not assemble/compile AC -> AC/ ASM -> ASM
+        -O, --org <address>             Set origin address for assembly output (default: 0x10000000)
 
-    -I, --include <dir>             Add an include directory for headers
-    -M, --macro <NAME[=VALUE]>      Define a preprocessor macro
+    COMPILER OPTIONS:
+        -C, --compile                   Compile source to binary AC -> BIN
+        --no-runtime                    Do not link the runtime library
+        --no-std                        Do not link the standard library
+        -g, --gui                       GUI mode
+        -c, --console                   Console mode
+        -w, --warnings-as-errors        Treat warnings as errors
+        --debug                         Emit debug symbols in the assembly representation
+        -S                              Emit assembly and stop AC -> ASM
 
-    -V, --version                   Show version info and exit
-    -v, --verbose                   Enable verbose output
-    -q, --quiet                     Suppress normal output
-    -h, --help                      Display this help and exit
-    -i, --info <[asm|c]=<keyword>>  Info about a register, directive, symbol, or type
-
-EXAMPLES:
-    ASTRAC.BIN -A src/BOOT/VBR.ASM -o VBR.BIN
-    ASTRAC.BIN -C src/TESTS/HELLO.C -o HELLO.ASM
-    ASTRAC.BIN -D src/BOOT/VBR.BIN -o VBR.DSM
-    ASTRAC.BIN -B src/TESTS/HELLO.C -o HELLO.BIN
+    ASSEMBLER OPTIONS:
+        -A, --assemble                  Assemble ASM -> BIN
+        
+    DISASSEMBLER OPTIONS:
+        --disassemble                   Disassemble BIN -> DSM
+        --16                            Disassemble as 16-bit code
+        --32                            Disassemble as 32-bit code (default)
 ```
 
 ## Return codes

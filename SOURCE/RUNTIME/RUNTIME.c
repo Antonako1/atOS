@@ -78,6 +78,7 @@ void _start(U32 argc, PPU8 argv)
         DEBUG_PRINTF("[RUNTIME_ATGL] ATGL_MAIN returned %d, exiting\n", code);
         EXIT(code);
     }
+    DEBUG_PRINTF("[RUNTIME_ATGL] Entering main event/render loop!\n");
 
     /* Main event/render loop */
     ATGL_EVENT ev;

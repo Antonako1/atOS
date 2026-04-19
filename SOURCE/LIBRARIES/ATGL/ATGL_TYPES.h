@@ -262,7 +262,7 @@ typedef struct {
 /*                          NODE TREE                               */
 /* ================================================================ */
 
-#define ATGL_MAX_CHILDREN    32
+#define ATGL_MAX_CHILDREN    (8*8)
 #define ATGL_NODE_MAX_TEXT  128
 
 typedef struct _ATGL_NODE ATGL_NODE, *PATGL_NODE;

@@ -14,6 +14,5 @@ dissasembled_output.txt
 
 # Allowlist for specific files that are still needed in the repository
 
-# Allow VBR.BIN if it exists, since it's needed for the bootloader
-!VBR.BIN
-!VKR.BIN
+# Allow everything in the HOME directory, as it contains source code and other important files
+!HOME/**

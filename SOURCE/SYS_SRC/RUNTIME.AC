@@ -1,0 +1,8 @@
+#include <STD/_ALL.AC>
+
+U0 _start(U32 argc, PPU8 argv) {
+
+    U32 code = main(argc, argv);
+
+    EXIT(code);
+}

@@ -814,6 +814,11 @@ VOID HANDLE_LE_CTRL_L(VOID) {
     PUT_SHELL_START();
 }
 
+VOID HANDLE_LE_TAB(VOID) {
+    /* For simplicity, just insert a tab character (expanded to spaces in output) */
+    HANDLE_LE_DEFAULT(&(KEYPRESS){.keycode = 0}, NULLPTR);
+}
+
 VOID HANDLE_CTRL_C(VOID) {
     TSHELL_INSTANCE *sh = GET_SHNDL();
     U32 pid = sh->focused_pid;

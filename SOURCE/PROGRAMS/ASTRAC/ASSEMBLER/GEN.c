@@ -1,5 +1,6 @@
 #include <PROGRAMS/ASTRAC/ASTRAC.h>
 #include <PROGRAMS/ASTRAC/ASSEMBLER/ASSEMBLER.h>
+#include <PROGRAMS/ASTRAC/AC_FH.h>
 
 /*
  * ════════════════════════════════════════════════════════════════════════════
@@ -7,18 +8,18 @@
  * ════════════════════════════════════════════════════════════════════════════
  */
 typedef struct {
-    PU8 name;
-    U32 offset;
+    PU8 name; // label/symbol name
+    U32 offset; // file offset (NOT including origin)
     U32 byte_size;          /* byte size for variables (used for $VAR) */
-    ASM_DIRECTIVE section;
+    ASM_DIRECTIVE section; // which section this label belongs to (code/data/rodata) - affects how origin is applied when resolving addresses
 } ASM_PTR;
 
 #define MAX_PTRS 1024
 
 typedef struct {
-    U32 code;
-    U32 data;
-    U32 rodata;
+    U32 code; // current code section offset
+    U32 data; // current data section offset
+    U32 rodata; // current rodata section offset
     U32 origin;             /* .org base address    */
     ASM_DIRECTIVE current_section;
     ASM_DIRECTIVE code_type;
@@ -1312,6 +1313,8 @@ BOOLEAN GEN_BINARY(ASM_AST_ARRAY *ast, PASM_INFO info) {
     ptrs.rodata  = 0;
     ptrs.current_section = DIR_NONE;
     ptrs.code_type       = DIR_CODE_TYPE_32;
+    ptrs.origin          = cfg->org;
+    DEBUGM_PRINTF("[ASM GEN] Offsets reset for Pass 2: code=0, data=0, rodata=0, origin=0x%X\n", ptrs.origin);
 
     /* ── Open output file ─────────────────────────────────────────────── */
     PU8 outputfile = cfg->outfile;
@@ -1326,14 +1329,44 @@ BOOLEAN GEN_BINARY(ASM_AST_ARRAY *ast, PASM_INFO info) {
         return FALSE;
     }
 
+    ASM_PTR *main_ptr = FIND_ASM_PTR("_start");
+    DEBUGM_PRINTF("[ASM GEN] Entry point '_start' offset: 0x%X\n", main_ptr ? main_ptr->offset : OFFSET_NON_EXISTENT);
     /* ──────────────────────────────────────────────────────────────────
      *  Pass 2:  Emit binary
      * ────────────────────────────────────────────────────────────────── */
     CURRENT_PASS = SECOND_PASS;
+    DEBUGM_PRINTF("[ASM GEN] Starting Pass 2: emitting binary to %s\n", outputfile);
+
+    AC_FILE_HEADER h = { 0 };
+    MEMZERO(&h, sizeof(AC_FILE_HEADER));
+    MEMCPY(h.magic, AC_FILE_MAGIC, AC_FILE_MAGIC_LEN);
+
+    MEMZERO(h.reserved, sizeof(AC_FILE_RESERVED_SIZE));
+    h.version = AC_FILE_VERSION;
+
+    h.entry_point_offset = main_ptr ? main_ptr->offset : OFFSET_NON_EXISTENT;
+
+    h.code_offset = ptrs.code;
+    h.data_offset = ptrs.data;
+    h.rodata_offset = ptrs.rodata;
+    h.bss_offset = 0;
+
+    h.code_size = 0;
+    h.data_size = 0;
+    h.rodata_size = 0;
+    h.bss_size = 0;
+    
+    DEBUGM_PRINTF("[ASM GEN] Writing file header with entry point offset: 0x%X\n", h.entry_point_offset);
+
+    EMIT(out, (U8 *)&h, sizeof(h));
+
     if (!GEN_EMIT_PASS(out, ast, cfg)) {
         FCLOSE(out);
         return FALSE;
     }
+
+    DEBUGM_PRINTF("[ASM GEN] Pass 2 complete: code=%u bytes, data=%u bytes, rodata=%u bytes\n",
+                 ptrs.code, ptrs.data, ptrs.rodata);
 
     if (cfg->verbose) printf("[ASM GEN] Finished writing output file: %s, sz %u bytes\n", outputfile, out->sz);
     FCLOSE(out);

@@ -39,6 +39,10 @@ set(Sources
     # Compiler front-end
     ${CUR_DIR}/COMPILER/COMPMAIN.c
     ${CUR_DIR}/COMPILER/PARSER.c
+    ${CUR_DIR}/COMPILER/LEX.c
+    ${CUR_DIR}/COMPILER/GEN.c
+    ${CUR_DIR}/COMPILER/AST.c
+    ${CUR_DIR}/COMPILER/VERIFY_AST.c
 
     # Standard library (atOS)
     ${STD_SOURCES}
@@ -68,8 +72,7 @@ set(CompArgs
     -D__UP__
     -D__${ProgramName}__
     
-    # 🛑 Disables ALL warnings (including those enabled by -Wall/-Wextra)
-    -w
+    -w    
     
     # -Wno-comment (No longer needed if using -w)
     # -Wno-comments (No longer needed if using -w)

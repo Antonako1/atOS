@@ -26,7 +26,9 @@ ATGL_STATE atgl ATTRIB_DATA = { 0 };
 
 VOID ATGL_CREATE_SCREEN(ATGL_SCREEN_ATTRIBS attrs)
 {
-    if (atgl.initialized) return;
+    if (!atgl.initialized) {
+        ATGL_INIT();
+    };
 
     VBE_MODEINFO *mode = GET_VBE_MODE();
     atgl.width  = mode ? mode->XResolution : ATGL_SCREEN_WIDTH;
@@ -106,6 +108,7 @@ VOID ATGL_INIT(VOID)
     }
 
     DEBUG_PRINTF("[ATGL] Initialized (%dx%d)\n", atgl.width, atgl.height);
+    
 }
 
 VOID ATGL_DESTROY_SCREEN(VOID)

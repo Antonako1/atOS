@@ -18,11 +18,12 @@
  * They can be combined (BUILD = COMPILE | ASSEMBLE).
  */
 typedef enum {
-    NONE        = 0x0000,
-    COMPILE     = 0x0001,   /* C source  -> ASM output          */
-    ASSEMBLE    = 0x0002,   /* ASM input -> binary output        */
-    BUILD       = COMPILE | ASSEMBLE,  /* Full pipeline: C -> ASM -> BIN */
-    DISASSEMBLE = 0x0004,   /* Binary    -> readable ASM output  */
+    NONE            = 0x0000,
+    COMPILE         = 0x0001,   /* C source  -> ASM output          */
+    ASSEMBLE        = 0x0002,   /* ASM input -> binary output        */
+    BUILD           = COMPILE | ASSEMBLE,  /* Full pipeline: C -> ASM -> BIN */
+    DISASSEMBLE     = 0x0004,   /* Binary    -> readable ASM output  */
+    PREPROCESS_ONLY = 0x0008,   /* Preprocess only: AC/ASM -> AC/ASM */
 } BUILD_TYPE;
 
 /*
@@ -106,7 +107,17 @@ typedef struct _ASTRAC_ARGS {
     BOOL verbose;
     BOOL quiet;
 
-    U8 dsm_bits;            /* Disassembler code mode: 16 or 32 (default 32) */
+    U8  dsm_bits;               /* Disassembler code mode: 16 or 32 (default 32) */
+    U32 org;                    /* -O/--org: binary origin address (default 0x10000000) */
+
+    /* Compiler flags */
+    BOOL no_runtime;            /* --no-runtime: skip runtime library              */
+    BOOL no_std;                /* --no-std: skip standard library                 */
+    BOOL gui;                   /* -g/--gui: build as GUI application              */
+    BOOL console;               /* -c/--console: build as console application      */
+    BOOL warnings_as_errors;    /* -w/--warnings-as-errors                         */
+    BOOL debug_symbols;         /* --debug: emit debug info in assembly output     */
+    BOOL emit_asm_only;         /* -S: compile to .ASM only, do not assemble       */
 
     BUILD_TYPE build_type;
 } ASTRAC_ARGS;

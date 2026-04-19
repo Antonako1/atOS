@@ -39,13 +39,13 @@
 #define BPB_ROOT_CLUSTER    0x7C2C   ; dword - first cluster of root directory
 
 ; ── FAT32 VBR header ─────────────────────────────────────────────────────────
-; Byte 0-2  : EB 58 90  →  JMP SHORT to code_start (+0x5A from VBR base) + NOP
+; Byte 0-2  : EB 58 90  →  JMP SHORT to _start (+0x5A from VBR base) + NOP
 ; Byte 3-89 : FAT32 BPB (87 bytes) — overwritten by mkfs.fat
 
 ; ─────────────────────────────────────────────────────────────────────────────
-;  code_start  (byte offset 0x5A = 90 from the VBR base = 0x7C5A physical)
+;  _start  (byte offset 0x5A = 90 from the VBR base = 0x7C5A physical)
 ; ─────────────────────────────────────────────────────────────────────────────
-code_start:
+_start:
     cli
     xor ax, ax
     mov ds, ax
