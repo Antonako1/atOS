@@ -2,6 +2,7 @@
 .use16
 .org 0x2000
 
+_start:
 cli
 mov [drive_number], dl
 
