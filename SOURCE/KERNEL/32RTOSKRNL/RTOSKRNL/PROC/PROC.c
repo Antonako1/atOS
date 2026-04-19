@@ -14,6 +14,7 @@
 #include <STD/STRING.h>
 #include <STD/MEM.h>
 #include <STD/BINARY.h>
+#include <STD/DEBUG.h>
 
 #include <ERROR/ERROR.h>
 
@@ -21,6 +22,8 @@
 #include <CPU/ISR/ISR.h> // for regs struct
 #include <CPU/PIC/PIC.h>
 #include <CPU/FPU/FPU.h>
+
+#include <PROGRAMS/ASTRAC/AC_FH.h>
 
 #include <DEBUG/KDEBUG.h>
 #define EFLAGS_IF 0x0200
@@ -540,7 +543,24 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
     }
 
     // Initialize trap frame
-    init_task_context(proc, (void (*)(void))USER_BINARY_VADDR, stack_size, initial_state);
+
+    U32 entry_point = USER_BINARY_VADDR; // Entry point is the start of the binary
+    
+    AC_FILE_HEADER *fh = (AC_FILE_HEADER *)binary_data;
+    if (STRNCMP((char *)fh->magic, AC_FILE_MAGIC, AC_FILE_MAGIC_LEN) == 0) {
+        if(fh->entry_point_offset == OFFSET_NON_EXISTENT) {
+            destroy_process_pagedir(proc->pagedir_phys);
+            KDEBUG_PUTS("[proc] Error: ASTRAC binary has no entry point\n");
+            return NULL;
+        }
+        entry_point = USER_BINARY_VADDR + fh->entry_point_offset + sizeof(AC_FILE_HEADER); // entry point offset is from the start of the binary, so we add USER_BINARY_VADDR and size of header
+        DEBUG_MEMORY_DUMP((U8 *)fh, sizeof(AC_FILE_HEADER));
+        KDEBUG_PUTS("[proc] Detected ASTRAC binary, entry point =");
+        KDEBUG_HEX32(entry_point);
+        KDEBUG_PUTS("\n");
+    }
+
+    init_task_context(proc, (void (*)(void))entry_point, stack_size, initial_state);
     KDEBUG_PUTS("[proc] Trapframe initialized\n");
 
     // init fpu
