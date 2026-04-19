@@ -27,9 +27,15 @@ Started working on VBR (volume boot record) bootloader.
 - VSNPRINTF: Added a function for formatted string output with a va_list argument, similar to the standard C library function.
 - SNPRINTF: Added a function for formatted string output to a buffer with size limit, similar to the standard C library function.
 
-## 2026.04.05 - 2026.04.xx
+## 2026.04.05 - 2026.04.19
 
 ### AstaC Compiler
-- Created the AstraC Compiler, which compiles .AC source files to binary. It includes a multi-stage pipeline with tokenization, parsing, AST generation, semantic analysis, and code generation. The compiler supports a C-like syntax with a simple type system, control flow constructs, and function definitions. It also provides detailed error messages during semantic analysis.
+- Created the AstraC Compiler, which compiles .AC source files to assembly as of now. It includes a multi-stage pipeline with tokenization, parsing, AST generation, semantic analysis, and code generation. The compiler supports variables, functions, control flow statements, and basic data types. It also provides detailed error messages during semantic analysis.
 
 - Added +,- support for VFORMAT
+
+- Added chess 1v1 game to the atOS games collection, AI is still under development.
+
+- Updated ATGL nodes to support more child nodes.
+
+- Added AC_FH.h, a binary fileheader format for AstraC compiled files. It includes a magic number, version, and section headers for code and data.
