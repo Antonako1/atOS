@@ -36,6 +36,13 @@ VOID UPDATE_KP_MOUSE_DATA(void) {
         g_input.kb.cur.ASCII = KEYPRESS_TO_CHARS(g_input.kb.cur.keycode);
         g_input.kb.seq++;
         g_input.kb_event = TRUE;
+
+        U8 next_tail = (g_input.kb.queue_tail + 1) % KB_EVENT_QUEUE_SIZE;
+        if (next_tail != g_input.kb.queue_head) {
+            g_input.kb.event_queue[g_input.kb.queue_tail].key = ev.key;
+            g_input.kb.event_queue[g_input.kb.queue_tail].mods = g_input.kb.mods;
+            g_input.kb.queue_tail = next_tail;
+        }
     }
 
     else if (ev.type == PS2_EVT_MOUSE) {
