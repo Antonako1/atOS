@@ -94,6 +94,17 @@ PS2_KB_DATA *kb_poll(void) {
 
     volatile PS2_KB_DATA *kb = &input.shared->kb;
 
+    if (kb->queue_head != kb->queue_tail) {
+        static PS2_KB_DATA result ATTRIB_DATA;
+        U8 head = kb->queue_head;
+        result.cur = kb->event_queue[head].key;
+        result.mods = kb->event_queue[head].mods;
+        result.seq = kb->seq;
+        kb->queue_head = (head + 1) % KB_EVENT_QUEUE_SIZE;
+        input.last_kb_seq = kb->seq;
+        return &result;
+    }
+
     if (kb->seq != input.last_kb_seq) {
         input.last_kb_seq = kb->seq;
         return (PS2_KB_DATA *)&kb->cur;
@@ -103,7 +114,19 @@ PS2_KB_DATA *kb_poll(void) {
 
 PS2_KB_DATA *kb_peek(void) {
     if (!input.shared) return NULLPTR;
-    return &input.shared->kb.cur;
+
+    volatile PS2_KB_DATA *kb = &input.shared->kb;
+
+    if (kb->queue_head != kb->queue_tail) {
+        static PS2_KB_DATA result ATTRIB_DATA;
+        U8 head = kb->queue_head;
+        result.cur = kb->event_queue[head].key;
+        result.mods = kb->event_queue[head].mods;
+        result.seq = kb->seq;
+        return &result;
+    }
+
+    return (PS2_KB_DATA *)&kb->cur;
 }
 
 PS2_KB_DATA *kb_last(void) {

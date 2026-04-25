@@ -145,13 +145,12 @@ static VOID render_visible(VOID) {
     /* Clamp so we don't go negative */
     I32 bottom_sb = (I32)tout->scrollback.write_row - (I32)offset;
 
-    /* Move window cursor to (0,0) and redraw full screen */
-    ATUI_WMOVE(win, 0, 0);
-
     /* Cursor overlay coordinates (prompt_row in scrollback, column) */
     U32 cur_sb_row = tout->prompt_row;
     U32 cur_col    = tout->prompt_length + tout->edit_pos;
     if (cur_col >= vis_cols) cur_col = vis_cols - 1;
+
+    BOOL any_change = FALSE;
 
     for (U32 vr = 0; vr < vis_rows; vr++) {
         I32 sb_idx = bottom_sb - (I32)(vis_rows - 1) + (I32)vr;
@@ -162,6 +161,7 @@ static VOID render_visible(VOID) {
 
         for (U32 vc = 0; vc < vis_cols; vc++) {
             SCROLLBACK_CELL *cell = &tout->scrollback.cells[sb_idx][vc];
+            SCROLLBACK_CELL *last = &tout->scrollback.last_render[vr][vc];
             VBE_COLOUR fg = cell->fg;
             VBE_COLOUR bg = cell->bg;
 
@@ -190,13 +190,24 @@ static VOID render_visible(VOID) {
                 bg = tmp;
             }
 
-            ATUI_WSET_COLOR(win, fg, bg);
-            ATUI_WMOVE(win, vr, vc);
-            ATUI_WADDCH(win, cell->c);
+            /* Only update cells that actually changed */
+            if (last->c != cell->c || last->fg != fg || last->bg != bg) {
+                ATUI_WSET_COLOR(win, fg, bg);
+                ATUI_WMOVE(win, vr, vc);
+                ATUI_WADDCH(win, cell->c);
+                any_change = TRUE;
+            }
+
+            /* Remember what we actually rendered (with overlay applied) */
+            last->c  = cell->c;
+            last->fg = fg;
+            last->bg = bg;
         }
     }
 
-    ATUI_WREFRESH(win);
+    if (any_change) {
+        ATUI_WREFRESH(win);
+    }
 }
 
 /* ================================================================== */

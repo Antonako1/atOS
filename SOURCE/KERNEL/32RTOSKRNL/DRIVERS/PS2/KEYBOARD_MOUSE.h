@@ -652,11 +652,22 @@ typedef struct _MOUSE_DATA{
     U32 scroll_wheel;
 } MOUSE_DATA;
 
+#define KB_EVENT_QUEUE_SIZE 32
+
+typedef struct _KB_EVENT {
+    KEYPRESS key;
+    MODIFIERS mods;
+} KB_EVENT;
+
 typedef struct _PS2_KB_DATA{
     KEYPRESS cur;
     KEYPRESS prev;
     MODIFIERS mods;
     U32 seq; // incremented by kernel on every new keypress. if prev_seq != seq, new keypress has happened
+
+    KB_EVENT event_queue[KB_EVENT_QUEUE_SIZE];
+    volatile U8 queue_head;
+    volatile U8 queue_tail;
 } PS2_KB_DATA;
 
 typedef struct _PS2_MOUSE_DATA{
