@@ -71,6 +71,12 @@
 #define MEM_USER_SPACE_END_MIN      0x20000000   // 256 MiB user space min
 
 // ----------------------------------------------------------
+// Dynamic Library Area
+// ----------------------------------------------------------
+#define MEM_LIBRARY_BASE              0x20000000   // Base address for dynamic libraries
+#define MEM_LIBRARY_END               0x30000000   // End of library area (256 MiB for libraries)
+
+// ----------------------------------------------------------
 // System Memory Limits
 // ----------------------------------------------------------
 #define MIN_ALLOWED_MEMORY          0x100000    // 1 MiB minimum

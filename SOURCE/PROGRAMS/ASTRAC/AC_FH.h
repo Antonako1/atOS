@@ -3,7 +3,7 @@
  */
 #ifndef AC_FH_H
 #define AC_FH_H
-#include <STD/STRING.h>
+#include <STD/TYPEDEF.h>
 
 #define OFFSET_NON_EXISTENT ((U32)(-1))
 
@@ -15,9 +15,17 @@
 
 #define AC_FILE_VERSION ((U32)AC_FILE_VERSION_MAJOR << 16 | AC_FILE_VERSION_MINOR)
 
+enum {
+    AC_FLAG_NONE = 0,
+    AC_FLAG_EXECUTABLE = 1 << 0, /* Indicates this file is executable */
+    AC_FLAG_DYNAMIC = 1 << 1,    /* Indicates this file is a dynamic library */
+};
+
 typedef struct {
     U8  magic[AC_FILE_MAGIC_LEN];   /* "ACFH" */
     U32 version;    /* file format version */
+
+    U32 flags;      /* bitfield */
 
     U32 entry_point_offset;/* offset to entry point code */
 
