@@ -8,6 +8,7 @@ VOID CMD_DIR(PU8 raw_line) {
     if (STRCMP(path_arg, "-") == 0) path_arg = GET_PREV_PATH();
     else if (STRCMP(path_arg, "~") == 0) path_arg = (PU8)"/HOME";
     else if (!path_arg || *path_arg == '\0') path_arg = (PU8)".";
+    else path_arg = rel_to_abs_path(path_arg);
     PRINT_CONTENTS_PATH(path_arg);
     PRINTNEWLINE();
 }

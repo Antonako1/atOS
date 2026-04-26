@@ -8,6 +8,7 @@ VOID CMD_TYPE(PU8 raw_line) {
         PUTS("\ntype: missing file path.\n");
         return;
     }
+    path_arg = rel_to_abs_path(path_arg);
 
     FAT_LFN_ENTRY entry;
     if (!FAT32_PATH_RESOLVE_ENTRY(path_arg, &entry)) {

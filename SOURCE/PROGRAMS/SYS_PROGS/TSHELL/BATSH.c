@@ -1548,6 +1548,20 @@ BOOLEAN RUN_PROCESS(PU8 line) {
         }
     }
 
+    for(U32 i = 0; i < argc; i++) {
+        if (argv[i]) {
+            PU8 tmp = rel_to_abs_path(argv[i]);
+            if(tmp) {
+                if(FILE_EXISTS(tmp) || DIR_EXISTS(tmp)) { 
+                    MFree(argv[i]);
+                    argv[i] = tmp;
+                } else {
+                    MFree(tmp);
+                }
+            }
+        }
+    }
+
     PU8 ext = STRRCHR(abs_path_buf, '.');
     ext = ext ? (ext + 1) : (PU8)"";
     BOOLEAN result = FALSE;
