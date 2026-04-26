@@ -21,6 +21,7 @@
 /* ===================================================
  * Internal Shell State
  * =================================================== */
+// global variables for shell state; these are not process-specific since BATSH is single-threaded and runs in the shell process itself
 static ShellVar shell_vars[MAX_VARS] ATTRIB_DATA = {0};
 static U32 shell_var_count ATTRIB_DATA = 0;
 
@@ -1416,6 +1417,14 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     STRNCPY(prog_copy, original_line, prog_len);
     prog_copy[prog_len] = 0;
 
+    /* --- Resolve prog_copy to absolute path upfront --- */
+    U8 resolved_prog[512] = {0};
+    if (ResolvePath(prog_copy, resolved_prog, sizeof(resolved_prog))) {
+        MFree(prog_copy);
+        prog_copy = STRDUP(resolved_prog);
+    }
+    /* -------------------------------------------------- */
+
     PU8 prog_name = STRDUP(prog_copy);
     PU8 last_slash = STRRCHR(prog_name, '/');
     if (last_slash) {
@@ -1430,31 +1439,29 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     BOOLEAN is_found_as_bin = FALSE;
     BOOLEAN is_found_as_sh  = FALSE;
 
-    /* Try direct path */
-    if (ResolvePath(prog_copy, abs_path_buf, sizeof(abs_path_buf))) {
-        if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
-            found = TRUE;
+    /* Try direct (already-absolute) path */
+    STRNCPY(abs_path_buf, prog_copy, sizeof(abs_path_buf) - 1);
+    if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
+        found = TRUE;
+    } else {
+        U8 candidate[512];
+        STRCPY(candidate, abs_path_buf);
+        STRNCAT(candidate, ".BIN", sizeof(candidate) - STRLEN(candidate) - 1);
+        if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
+            STRCPY(abs_path_buf, candidate);
+            found = TRUE; is_found_as_bin = TRUE;
         } else {
-            U8 candidate[512];
             STRCPY(candidate, abs_path_buf);
-            STRNCAT(candidate, ".BIN", sizeof(candidate) - STRLEN(candidate) - 1);
+            STRNCAT(candidate, ".SH", sizeof(candidate) - STRLEN(candidate) - 1);
             if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
                 STRCPY(abs_path_buf, candidate);
-                found = TRUE;
-                is_found_as_bin = TRUE;
-            } else {
-                STRCPY(candidate, abs_path_buf);
-                STRNCAT(candidate, ".SH", sizeof(candidate) - STRLEN(candidate) - 1);
-                if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
-                    STRCPY(abs_path_buf, candidate);
-                    found = TRUE;
-                    is_found_as_sh = TRUE;
-                }
+                found = TRUE; is_found_as_sh = TRUE;
             }
         }
     }
 
-    /* Search PATH */
+    /* Search PATH if not found and no slash in original prog_copy token */
+    PU8 orig_prog_nopath = STRDUP(prog_name); /* basename only */
     if (!found) {
         PU8 path_val = GET_VAR((PU8)"PATH");
         if (path_val && *path_val) {
@@ -1464,29 +1471,33 @@ BOOLEAN RUN_PROCESS(PU8 line) {
             while (tok && !found) {
                 if (*tok) {
                     U8 candidate[512] = {0};
-                    STRNCPY(candidate, tok, sizeof(candidate) - 1);
-                    U32 clen = STRLEN(candidate);
-                    if (clen && candidate[clen - 1] != '/' && candidate[clen - 1] != '\\')
-                        STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
-                    STRNCAT(candidate, prog_name, sizeof(candidate) - STRLEN(candidate) - 1);
+                    /* Resolve each PATH entry to absolute */
+                    U8 abs_tok[512] = {0};
+                    if (!ResolvePath(tok, abs_tok, sizeof(abs_tok)))
+                        STRNCPY(abs_tok, tok, sizeof(abs_tok) - 1);
 
-                    if (ResolvePath(candidate, abs_path_buf, sizeof(abs_path_buf))) {
-                        if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
-                            found = TRUE; break;
-                        }
-                        U8 try_ext[512];
-                        STRCPY(try_ext, abs_path_buf);
-                        STRNCAT(try_ext, ".BIN", sizeof(try_ext) - STRLEN(try_ext) - 1);
-                        if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
-                            STRCPY(abs_path_buf, try_ext);
-                            found = TRUE; is_found_as_bin = TRUE; break;
-                        }
-                        STRCPY(try_ext, abs_path_buf);
-                        STRNCAT(try_ext, ".SH", sizeof(try_ext) - STRLEN(try_ext) - 1);
-                        if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
-                            STRCPY(abs_path_buf, try_ext);
-                            found = TRUE; is_found_as_sh = TRUE; break;
-                        }
+                    STRNCPY(candidate, abs_tok, sizeof(candidate) - 1);
+                    U32 clen = STRLEN(candidate);
+                    if (clen && candidate[clen - 1] != '/') 
+                        STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
+                    STRNCAT(candidate, orig_prog_nopath, sizeof(candidate) - STRLEN(candidate) - 1);
+
+                    STRNCPY(abs_path_buf, candidate, sizeof(abs_path_buf) - 1);
+                    if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
+                        found = TRUE; break;
+                    }
+                    U8 try_ext[512];
+                    STRCPY(try_ext, abs_path_buf);
+                    STRNCAT(try_ext, ".BIN", sizeof(try_ext) - STRLEN(try_ext) - 1);
+                    if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
+                        STRCPY(abs_path_buf, try_ext);
+                        found = TRUE; is_found_as_bin = TRUE; break;
+                    }
+                    STRCPY(try_ext, abs_path_buf);
+                    STRNCAT(try_ext, ".SH", sizeof(try_ext) - STRLEN(try_ext) - 1);
+                    if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
+                        STRCPY(abs_path_buf, try_ext);
+                        found = TRUE; is_found_as_sh = TRUE; break;
                     }
                 }
                 tok = STRTOK_R(NULL, ";", &saveptr);
@@ -1494,6 +1505,7 @@ BOOLEAN RUN_PROCESS(PU8 line) {
             MFree(path_dup);
         }
     }
+    MFree(orig_prog_nopath);
 
     if (!found) {
         PUTS("\nError: Failed to resolve path.\n");

@@ -29,7 +29,10 @@ VOID HANDLE_KB_EDIT_LINE(KEYPRESS *kp, MODIFIERS *mod) {
         break;
     case KEY_HOME:      HANDLE_LE_HOME(); break;
     case KEY_END:       HANDLE_LE_END(); break;
-    case KEY_TAB:       HANDLE_LE_TAB(); break;
+    case KEY_TAB:
+        if (mod->shift) HANDLE_LE_SHIFT_TAB();
+        else            HANDLE_LE_TAB();
+        break;
     
     case KEY_ARROW_DOWN:
         HANDLE_LE_ARROW_DOWN();

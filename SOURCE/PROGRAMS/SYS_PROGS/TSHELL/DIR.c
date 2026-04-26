@@ -58,15 +58,22 @@ static VOID NormalizePath(PU8 path) {
         }
         token = (PU8)STRTOK(NULL, "/");
     }
-    PU8 p = path;
+
+    U8 tmp_path[CUR_LINE_MAX_LENGTH];
+    PU8 p = tmp_path;
     *p++ = '/';
-    if (part_count == 0) { *p = '\0'; return; }
+    if (part_count == 0) {
+        *p = '\0';
+        STRCPY(path, tmp_path);
+        return;
+    }
     for (U32 i = 0; i < part_count; i++) {
         STRCPY(p, parts[i]);
         p += STRLEN(parts[i]);
         if (i < part_count - 1) *p++ = '/';
     }
     *p = '\0';
+    STRCPY(path, tmp_path);
 }
 
 static VOID StripLeadingDotSlash(PU8 *path_ptr) {

@@ -4,3 +4,4 @@
 ./BATSH.c
 ./DIR.c
 ./INPUTS.c
+./AUTOCOMPLETE.c

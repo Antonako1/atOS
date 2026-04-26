@@ -9,4 +9,4 @@ kill 1 -q
 # jot
 # ASTRAC.BIN -o /A.BIN -v -A /HOME/SRC/TEST/TEST.ASM
 
-chess
+# chess
