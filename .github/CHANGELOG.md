@@ -39,3 +39,23 @@ Started working on VBR (volume boot record) bootloader.
 - Updated ATGL nodes to support more child nodes.
 
 - Added AC_FH.h, a binary fileheader format for AstraC compiled files. It includes a magic number, version, and section headers for code and data.
+
+## 2026.04.25 - 2026.05.xx
+
+### PS/2 keyboard driver updates
+
+[PR36](https://github.com/Antonako1/atOS/pull/36) - @retroaalto improved the PS/2 keyboard driver by adding a ring buffer to keyboard events to prevent event loss during high input rates.  
+
+### YIELD
+
+Added a 0x81 interrupt for yielding the current process's time slice voluntarily. This allows processes to give up the CPU when they are idle or waiting for something, improving overall system responsiveness and efficiency.
+
+### Dynamic Libraries
+
+Added support for dynamic libraries in atOS. Libraries can now be loaded at runtime, allowing for more modular and flexible software development.
+
+### TSHELL
+
+Tab autocompletes now pathnames for commands, binaryes and scripts in the current directory and path. This makes it easier to run commands without having to type the full name, especially for long filenames.
+
+Fixed relative path handling in TSHELL, so that commands like `./myprogram` or `../otherdir/script` work correctly regardless of the current working directory. This improves usability and consistency when running programs from the shell.
