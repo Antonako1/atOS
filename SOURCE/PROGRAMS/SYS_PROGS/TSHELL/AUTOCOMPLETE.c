@@ -161,10 +161,14 @@ static VOID handle_tab_internal(BOOLEAN reverse) {
             while (tok && match_count < AC_MAX_MATCHES) {
                 U8 abs_path_dir[512] = {0};
                 if (ResolvePath(tok, abs_path_dir, sizeof(abs_path_dir))) {
-                    U32 pc = resolve_dir_cluster(abs_path_dir);
-                    if (pc)
-                        match_count = collect_matches_in_cluster(pc, file_prefix, prefix_len,
-                                                                  saved_matches, match_count);
+                    FAT_LFN_ENTRY ent = {0};
+                    FAT32_PATH_RESOLVE_ENTRY(abs_path_dir, &ent.entry);
+                    if(!FAT32_DIR_ENTRY_IS_DIR(&ent.entry)) {
+                        U32 pc = resolve_dir_cluster(abs_path_dir);
+                        if (pc)
+                            match_count = collect_matches_in_cluster(pc, file_prefix, prefix_len,
+                                                                      saved_matches, match_count);
+                    }
                 }
                 tok = STRTOK_R(NULL, ";", &saveptr);
             }
