@@ -21,8 +21,6 @@
 #define NOP ASM_VOLATILE("nop")
 #define CLI ASM_VOLATILE("cli")
 #define STI ASM_VOLATILE("sti")
-// #define YIELD() ASM_VOLATILE("int $0x81")
-#define YIELD() HALT
 
 /* 
  * Port I/O macros (legacy, kept for compatibility)

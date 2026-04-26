@@ -45,8 +45,10 @@ void set_next_task_num_switches(U32 num_switches);
 void update_next_cr3();
 
 void isr_pit(void);
+void isr_yield(void);
 
 void SCHEDULER_YIELD(void);
+
 #endif
 
 

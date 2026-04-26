@@ -13,7 +13,9 @@
 #include <PROGRAMS/SHELL/VOUTPUT.h>
 #include <CPU/PIT/PIT.h>
 // Include for DEBUG_PRINTF
-#include <STD/DEBUG.h> 
+#include <STD/DEBUG.h>
+#include <STD/TASK.h>
+
 
 static BOOLEAN draw_access_granted ATTRIB_DATA = FALSE;
 static BOOLEAN keyboard_access_granted ATTRIB_DATA = FALSE;
@@ -253,5 +255,5 @@ VOID EXIT_SHELL() {
     msg = CREATE_PROC_MSG(0, PROC_KILL_SHELL_PROC, NULL, 0, 0);
     SEND_MESSAGE(&msg);
     KILL_SELF();
-    for(;;) YIELD();
+    for(;;);
 }

@@ -4,6 +4,7 @@
 #include <STD/STRING.h>
 #include <PROC/PROC.h>
 #include <STD/DEBUG.h>
+#include <STD/TASK.h>
 
 static TCB process ATTRIB_DATA = {0};
 static BOOLEAN process_fetched ATTRIB_DATA = FALSE;
@@ -306,6 +307,7 @@ void PROC_INIT_CONSOLE() {
     ___STDOUT_CREATED = FALSE;
     ___INFO_ARR = FALSE;
     DEBUG_PRINTF("[PROC_COM] Messages sent succesfully by: %s, pid 0x%x\n", process.info.name, process.info.pid);
+    YIELD();
 }
 BOOLEAN IS_PROC_INITIALIZED() {
 

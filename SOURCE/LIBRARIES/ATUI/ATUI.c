@@ -1,4 +1,5 @@
 #define ATUI_INTERNALS
+#include <STD/TASK.h>
 #include <LIBRARIES/ATUI/ATUI_TYPES.h>
 #include <LIBRARIES/ATUI/ATUI.h>
 #include <STD/FS_DISK.h>

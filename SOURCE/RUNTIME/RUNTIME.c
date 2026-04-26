@@ -42,7 +42,7 @@ void _start(U32 argc, PPU8 argv)
         };
     }
 
-    DEBUG_PRINTF("[RUNTIME] Entering main!\n");
+    DEBUG_PRINTF("[RUNTIME] Entering main! timeout=%d\n", timeout);
     KB_MS_INIT();
     
     U32 code = main(argc, argv);

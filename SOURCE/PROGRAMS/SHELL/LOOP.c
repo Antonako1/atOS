@@ -13,6 +13,7 @@
 #include <CPU/SYSCALL/SYSCALL.h>
 #include <PROGRAMS/SHELL/VOUTPUT.h>
 #include <CPU/PIT/PIT.h>
+#include <STD/TASK.h>
 
 
 /**
@@ -121,7 +122,7 @@ U0 EDIT_LINE_MSG_LOOP() {
             
             case PROC_KILL_SHELL_KRNL: {
                 EXIT_SHELL();
-                for(;;) YIELD();; // 
+                for(;;);
             } break;
             case SHELL_CMD_CREATE_STDOUT: {
                 PROC_MESSAGE res;
