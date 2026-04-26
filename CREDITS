@@ -13,6 +13,9 @@
    - AC'97 Audio driver
    - Serial port debugging
    - Production worthy shell text rendering
+   - Fixed the PS/2 keyboard driver, which lost input when the system was under load.
+      - Subsequently fixed STD/IO's kb_poll() and kb_peek() functions to work correctly with the updated keyboard driver.
+   - Optimized TSHELL terminal rendering.
       Thanks to retroaalto for his atOS contributions!
       
   - Jooapa (https://github.com/jooapa)
