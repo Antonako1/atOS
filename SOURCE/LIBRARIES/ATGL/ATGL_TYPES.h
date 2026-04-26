@@ -164,6 +164,7 @@ typedef struct {
     VBE_COLOUR progress_bg;
     VBE_COLOUR progress_fill;
     VBE_COLOUR progress_text;
+    VBE_COLOUR progress_text_bg;
 
     /* Listbox */
     VBE_COLOUR list_bg;

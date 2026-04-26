@@ -405,9 +405,10 @@ static VOID render_progressbar(PATGL_NODE node)
         I32 tx = r->x + (r->w - (I32)tw) / 2;
         I32 ty = r->y + (r->h - (I32)t->char_h) / 2;
         /* Use the fill or bg color behind the text so it reads cleanly */
-        VBE_COLOUR text_bg = (fill_w > 0 && tx >= r->x + 2 &&
-                              tx < r->x + 2 + fill_w)
-                             ? t->progress_fill : t->progress_bg;
+        // VBE_COLOUR text_bg = (fill_w > 0 && tx >= r->x + 2 &&
+        //                       tx < r->x + 2 + fill_w)
+        //                      ? t->progress_fill : t->progress_bg;
+        VBE_COLOUR text_bg = t->progress_text_bg;
         ATGL_DRAW_TEXT(tx, ty, (PU8)buf, t->progress_text, text_bg);
     }
 }
