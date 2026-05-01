@@ -70,6 +70,14 @@ echo @{var}
 
 * Advanced variable substitution (`@{CD}`, `@{PATH}`, `@{HOME}`, `@{DOCS}`).
 
+#### Variables in script files
+
+* Variables defined in a script file are only available within that script's execution context.
+* They are not accessible in the interactive shell or other scripts.
+* This allows for encapsulation and prevents unintended side effects between scripts.
+* To create/modify global variables, you need to use ``@@globalVar=value``, accessing works with either `@{globalVar}` or `@@{globalVar}`.
+
+
 ### Arithmetic Expressions
 
 * Only evaluated inside `IF`, `LOOP`, or variable assignments:
