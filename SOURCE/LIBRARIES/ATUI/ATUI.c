@@ -24,19 +24,8 @@ static VOID atui_cursor_move(U32 new_row, U32 new_col) {
     if (new_col >= d->cols) new_col = d->cols - 1;
     if (new_row >= d->rows) new_row = d->rows - 1;
 
-    // mark old position dirty
-    U32 old = d->cursor.row * d->cols + d->cursor.col;
-    d->dirty[old] = TRUE;
-
-    d->cursor.prev_col = d->cursor.col;
-    d->cursor.prev_row = d->cursor.row;
-
     d->cursor.col = new_col;
     d->cursor.row = new_row;
-
-    // mark new position dirty
-    U32 now = d->cursor.row * d->cols + d->cursor.col;
-    d->dirty[now] = TRUE;
 }
 
 static VOID atui_shift_left(U32 row, U32 col) {
@@ -251,6 +240,15 @@ err:
 
 VOID ATUI_REFRESH() {
     INIT_CHECK_VOID();
+    
+    // Mark previous cursor position dirty so it clears
+    display.dirty[display.cursor.prev_row * display.cols + display.cursor.prev_col] = TRUE;
+    // Mark current cursor position dirty so it draws
+    display.dirty[display.cursor.row * display.cols + display.cursor.col] = TRUE;
+
+    display.cursor.prev_row = display.cursor.row;
+    display.cursor.prev_col = display.cursor.col;
+
     ATUI_COPY_TO_TCB_FRAMEBUFFER();
 }
 
@@ -260,19 +258,8 @@ VOID ATUI_MOVE(U32 y, U32 x) {
     if (x >= display.cols) x = display.cols - 1;
     if (y >= display.rows) y = display.rows - 1;
 
-    // mark old cursor dirty
-    U32 old = display.cursor.row * display.cols + display.cursor.col;
-    display.dirty[old] = TRUE;
-
-    display.cursor.prev_col = display.cursor.col;
-    display.cursor.prev_row = display.cursor.row;
-
     display.cursor.col = x;
     display.cursor.row = y;
-
-    // mark new cursor dirty
-    U32 now = y * display.cols + x;
-    display.dirty[now] = TRUE;
 }
 
 VOID ATUI_GETYX(U32 *y, U32 *x){
