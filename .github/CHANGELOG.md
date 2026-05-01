@@ -52,10 +52,22 @@ Added a 0x81 interrupt for yielding the current process's time slice voluntarily
 
 ### Dynamic Libraries
 
-Added support for dynamic libraries in atOS. Libraries can now be loaded at runtime, allowing for more modular and flexible software development.
+Started working on dynamic library support in atOS.
+
+### AMPLITE
+
+Amplite is a AC97 tone generator program that allows users to create and play custom tones by adjusting parameters like amplitude, frequency, duration, and waveform type. It features a simple GUI with sliders and checkboxes for controlling these parameters, and it uses the AC97 audio interface to generate sound.
+
+### Kernel
+
+Added support for the 0x81 YIELD interrupt, allowing processes to voluntarily yield their time slice to improve multitasking performance.
+
+Fixed loading FAT filesystem if one already exists, by properly checking for the presence of a valid FAT header and handling it accordingly.
 
 ### TSHELL
 
 Tab autocompletes now pathnames for commands, binaryes and scripts in the current directory and path. This makes it easier to run commands without having to type the full name, especially for long filenames.
 
 Fixed relative path handling in TSHELL, so that commands like `./myprogram` or `../otherdir/script` work correctly regardless of the current working directory. This improves usability and consistency when running programs from the shell.
+
+Small bug fixes for the BATSH language, most features are now working as intended. 
