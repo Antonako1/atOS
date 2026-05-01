@@ -70,11 +70,132 @@ BOOL FAT_READ_CLUSTER(U32 cluster, U8 *buf) {
 }
 
 
-BOOLEAN READ_FAT(){
+BOOLEAN READ_FAT() {
+    KDEBUG_PUTS("[FAT] Loading FAT from disk...\n");
+    if (fat32) {
+        KFREE(fat32);
+        fat32 = NULLPTR;
+    }
+
+    U32 fat_sectors  = bpb.EXBR.SECTORS_PER_FAT;
+    U32 fat_size     = fat_sectors * bpb.BYTES_PER_SECTOR;
+    U32 fat_lba      = bpb.RESERVED_SECTORS;
+
+    fat32 = (U32 *)KMALLOC(fat_size);
+    if (!fat32) return FALSE;
+
+    /* ATA PIO is limited to 255 sectors per request — read in chunks */
+    #define FAT_READ_CHUNK 127
+    U8 *dst = (U8 *)fat32;
+    U32 lba = fat_lba;
+    U32 remaining = fat_sectors;
+    while (remaining > 0) {
+        U32 count = remaining > FAT_READ_CHUNK ? FAT_READ_CHUNK : remaining;
+        if (!ATA_PIO_READ_SECTORS(lba, count, dst)) {
+            KFREE(fat32);
+            fat32 = NULLPTR;
+            KDEBUG_PUTS("[FAT] Failed to read FAT from disk.\n");
+            return FALSE;
+        }
+        dst       += count * bpb.BYTES_PER_SECTOR;
+        lba       += count;
+        remaining -= count;
+    }
+    #undef FAT_READ_CHUNK
+
+    KDEBUG_PUTS("[FAT] FAT loaded successfully.\n");
     return TRUE;
 }
-BOOLEAN READ_ROOT_DIR(){
-    // root_dir_end
+
+BOOLEAN READ_ROOT_DIR() {
+    if (!fat32) return FALSE;
+
+    if (root_dir) {
+        KFREE(root_dir);
+        root_dir = NULLPTR;
+        root_dir_end = 0;
+    }
+
+    /* --- Pass 1: count valid entries across the entire root chain --- */
+    U32 total = 0;
+    U32 cluster = bpb.EXBR.ROOT_CLUSTER;
+
+    U8 *buf = KMALLOC(CLUSTER_SIZE);
+    if (!buf) return FALSE;
+    KDEBUG_PUTS("[FAT] Reading root directory from disk...\n");
+    BOOL pass1_done = FALSE;
+    while (!pass1_done && cluster >= FIRST_ALLOWED_CLUSTER_NUMBER && cluster < FAT32_END_OF_CHAIN) {
+        if (!FAT_READ_CLUSTER(cluster, buf)) {
+            KFREE(buf);
+            KDEBUG_PUTS("[FAT] Failed to read cluster for root directory inside pass 1.\n");
+            return FALSE;
+        }
+        for (U32 off = 0; off < CLUSTER_SIZE; off += sizeof(DIR_ENTRY)) {
+            DIR_ENTRY *e = (DIR_ENTRY *)(buf + off);
+            if (e->FILENAME[0] == 0x00) { pass1_done = TRUE; break; } /* end of directory */
+            if (e->FILENAME[0] == FAT32_DELETED_ENTRY)  continue;
+            if (e->ATTRIB == FAT_ATTRIB_LFN)             continue;
+            total++;
+        }
+        if (!pass1_done) cluster = fat32[cluster];
+    }
+
+    if (total == 0) {
+        KFREE(buf);
+        root_dir_end = 0;
+        KDEBUG_PUTS("[FAT] No valid entries found in root directory.\n");
+        return TRUE;
+    }
+
+    root_dir = (DIR_ENTRY *)KMALLOC(total * sizeof(DIR_ENTRY));
+    if (!root_dir) {
+        KFREE(buf);
+        KDEBUG_PUTS("[FAT] Failed to allocate memory for root directory entries.\n");
+        return FALSE;
+    }
+
+    /* --- Pass 2: fill root_dir --- */
+    U32 idx = 0;
+    cluster = bpb.EXBR.ROOT_CLUSTER;
+
+    while (cluster >= FIRST_ALLOWED_CLUSTER_NUMBER && cluster < FAT32_END_OF_CHAIN) {
+        if (!FAT_READ_CLUSTER(cluster, buf)) {
+            KFREE(buf);
+            KFREE(root_dir);
+            root_dir = NULLPTR;
+            root_dir_end = 0;
+            KDEBUG_PUTS("[FAT] Failed to read cluster for root directory inside pass 2.\n");
+            return FALSE;
+        }
+        for (U32 off = 0; off < CLUSTER_SIZE; off += sizeof(DIR_ENTRY)) {
+            DIR_ENTRY *e = (DIR_ENTRY *)(buf + off);
+            if (e->FILENAME[0] == 0x00) goto done;
+            if (e->FILENAME[0] == FAT32_DELETED_ENTRY)  continue;
+            if (e->ATTRIB == FAT_ATTRIB_LFN)             continue;
+            if (idx < total) root_dir[idx++] = *e;
+        }
+        cluster = fat32[cluster];
+    }
+
+done:
+    KFREE(buf);
+    root_dir_end = idx;
+    DEBUG_PRINTF("[FAT] Root directory loaded with 0x%X entries.\n", root_dir_end);
+    return TRUE;
+}
+
+BOOLEAN VERIFY_BPB(){
+    U8 buf[3] = {0};
+    buf[0] = 0xEB;
+    buf[1] = sizeof(BPB);
+    buf[2] = 0x90;
+    if(MEMCMP(bpb.JMPSHORT, buf, 3) != 0) return FALSE;
+    if (STRNCMP(bpb.OEM_IDENT, "MSWIN4.1", 8) != 0) return FALSE;
+    if (bpb.BYTES_PER_SECTOR != 512) return FALSE;
+    if (bpb.SECTORS_PER_CLUSTER == 0 || (bpb.SECTORS_PER_CLUSTER & (bpb.SECTORS_PER_CLUSTER - 1)) != 0) return FALSE;
+    if (bpb.NUM_OF_FAT == 0) return FALSE;
+    if (bpb.EXBR.BOOT_SIGNATURE != 0x29) return FALSE;
+    if (STRNCMP(bpb.EXBR.FILE_SYSTEM_TYPE, "FAT32   ", 8) != 0) return FALSE;
     return TRUE;
 }
 
@@ -86,16 +207,39 @@ BOOLEAN LOAD_BPB() {
         return FALSE;
     }
     MEMCPY(&bpb, buf, sizeof(BPB));
+    KDEBUG_PUTS("[FAT] BPB loaded from disk:\n");
+    DEBUG_PRINTF("[FAT] OEM: %.8s, Bytes/Sector: %u, Sectors/Cluster: %u, Reserved Sectors: %u, FATs: %u, Total Sectors: %u\n",
+        bpb.OEM_IDENT, bpb.BYTES_PER_SECTOR, bpb.SECTORS_PER_CLUSTER, bpb.RESERVED_SECTORS,
+        bpb.NUM_OF_FAT, (bpb.TOTAL_SECTORS != 0) ? bpb.TOTAL_SECTORS : bpb.LARGE_SECTOR_COUNT);
 
     Free(buf);
-    if(!READ_FAT()) return FALSE;
-    if(!READ_ROOT_DIR()) return FALSE;
+    if(!READ_FAT()) {
+        KDEBUG_PUTS("[FAT] Failed to read FAT from disk.\n");
+        return FALSE;
+    }
+    if(!READ_ROOT_DIR()) {
+        KDEBUG_PUTS("[FAT] Failed to read root directory from disk.\n");
+        return FALSE;
+    }
     bpb_loaded = TRUE;
     return TRUE;
 }
-BOOLEAN GET_BPB_LOADED(){ 
-    // TODO: read from disk and check ids, if IDs, LOAD_BPB()
-    return TRUE; 
+
+BOOLEAN ENSURE_BPB_LOADED() {
+    KDEBUG_STR_HEX_LN("[FAT] Ensuring BPB loaded... currently loaded: ", bpb_loaded);
+    if (!bpb_loaded) {
+        if (!LOAD_BPB()) {
+            KDEBUG_PUTS("[FAT] Failed to load BPB from disk.\n");
+            return FALSE;
+        }
+    }
+    BOOLEAN res = VERIFY_BPB();
+    KDEBUG_STR_HEX_LN("[FAT] BPB verification result: ", res);
+    if (!res) {
+        bpb_loaded = FALSE;
+        return FALSE;
+    }
+    return TRUE;
 }
 
 
@@ -151,6 +295,7 @@ BOOLEAN WRITE_DISK_BPB() {
     bpb_loaded = TRUE;
     return res;
 }
+
 #include <STD/DEBUG.h>
 BOOLEAN POPULATE_BOOTLOADER(VOIDPTR BOOTLOADER_BIN, U32 sz) {
     // VBR.BIN is a full 512-byte sector image: [JMP+BPB placeholder (90 bytes)][boot code (422 bytes)].

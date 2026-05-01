@@ -52,7 +52,10 @@ void rtos_kernel(U0) {
     
     PCI_INITIALIZE();
     KDEBUG_PUTS("[atOS] PCI enumerated\n");
+    
     // panic_if(!ATA_PIIX3_INIT(), PANIC_TEXT("Failed to initialize ATA DMA"), PANIC_INITIALIZATION_FAILED);
+    // KDEBUG_PUTS("[atOS] ATA PIIX3 DMA OK\n");
+
     if (AC97_INIT()) {
         KDEBUG_PUTS("[atOS] AC97 init OK\n");
     } else {
