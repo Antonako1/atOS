@@ -14,6 +14,8 @@
 #include <STD/MEM.h>
 #include <STD/DEBUG.h>
 #include <CPU/PIT/PIT.h>
+#include <STD/TASK.h>
+
 
 /* ---- Singleton shell handle ---- */
 static TSHELL_INSTANCE *shndl ATTRIB_DATA = NULLPTR;

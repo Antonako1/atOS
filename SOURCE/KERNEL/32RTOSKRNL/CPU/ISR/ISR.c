@@ -32,6 +32,7 @@ REMARKS
 #include <RTL8139/RTL8139.h>
 #include <RTOSKRNL/PROC/PROC.h>
 #include <STD/MEM.h>
+#include <CPU/YIELD/YIELD.h>
 #include <CPU/FPU/FPU.h>
 static ISRHandler g_Handlers[IDT_COUNT] __attribute__((section(".data"))) = { 0 };
 #else // __RTOS__
@@ -195,7 +196,7 @@ void isr_dispatch_c(int vector, U32 errcode, regs *regs_ptr) {
         regs_ptr->eax = ret; // Return value in eax
         return;
     }else if (vector == YIELD_VECTOR) {
-        yield_handler(vector, errcode);
+        SCHEDULER_YIELD();
         return;
     }
     

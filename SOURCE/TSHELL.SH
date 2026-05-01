@@ -5,8 +5,7 @@ echo See /ATOS and /PROGRAMS!
 
 # kill the old legacy shell, it is used anymore 
 kill 1 -q
-# @@tmp=type
+# @tmp=type
 # jot
 # ASTRAC.BIN -o /A.BIN -v -A /HOME/SRC/TEST/TEST.ASM
-
-chess
+# chess

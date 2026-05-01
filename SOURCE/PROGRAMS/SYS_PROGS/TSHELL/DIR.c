@@ -23,6 +23,17 @@ VOID INITIALIZE_DIR(TSHELL_INSTANCE *sh) {
     STRCPY(sh->fat_info.prev_path, "/");
 }
 
+PU8 rel_to_abs_path(PU8 path) {
+    if (!path || !*path) return path;
+    if (path[0] == '/') return STRDUP(path);
+
+    U8 abs_buf[CUR_LINE_MAX_LENGTH];
+    if (ResolvePath(path, abs_buf, sizeof(abs_buf))) {
+        return STRDUP(abs_buf);
+    }
+    return STRDUP(path);
+}
+
 PU8 PARSE_CD_RAW_LINE(PU8 line, U32 cut_index) {
     if (!line) return line;
     str_trim(line);
@@ -58,15 +69,22 @@ static VOID NormalizePath(PU8 path) {
         }
         token = (PU8)STRTOK(NULL, "/");
     }
-    PU8 p = path;
+
+    U8 tmp_path[CUR_LINE_MAX_LENGTH];
+    PU8 p = tmp_path;
     *p++ = '/';
-    if (part_count == 0) { *p = '\0'; return; }
+    if (part_count == 0) {
+        *p = '\0';
+        STRCPY(path, tmp_path);
+        return;
+    }
     for (U32 i = 0; i < part_count; i++) {
         STRCPY(p, parts[i]);
         p += STRLEN(parts[i]);
         if (i < part_count - 1) *p++ = '/';
     }
     *p = '\0';
+    STRCPY(path, tmp_path);
 }
 
 static VOID StripLeadingDotSlash(PU8 *path_ptr) {

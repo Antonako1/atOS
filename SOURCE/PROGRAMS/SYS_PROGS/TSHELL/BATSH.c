@@ -21,6 +21,7 @@
 /* ===================================================
  * Internal Shell State
  * =================================================== */
+// global variables for shell state; these are not process-specific since BATSH is single-threaded and runs in the shell process itself
 static ShellVar shell_vars[MAX_VARS] ATTRIB_DATA = {0};
 static U32 shell_var_count ATTRIB_DATA = 0;
 
@@ -88,6 +89,7 @@ typedef enum {
     TOK_END,
     TOK_BREAK,
     TOK_EXISTS,
+    TOK_TO,
     TOK_COMMENT,
     TOK_PIPE,
     TOK_PLUS,
@@ -150,6 +152,7 @@ static const KEYWORD KEYWORDS[] ATTRIB_RODATA = {
     { "end",    TOK_END },
     { "break",  TOK_BREAK },
     { "exists", TOK_EXISTS },
+    { "to",     TOK_TO },
 
     /* Misc */
     { "rem",    TOK_COMMENT },
@@ -598,6 +601,17 @@ BATSH_COMMAND *parse_var_assignment(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH
                 break;
             case TOK_SEMI: end_next = TRUE; break;
             case TOK_ASSIGN: assign_track = 2; continue;
+            case TOK_PLUS:
+            case TOK_MINUS:
+            case TOK_MUL:
+            case TOK_DIV:
+                /* Include arithmetic operators in value tokens */
+                if (has_assign || assign_track > 0) {
+                    if (assign_track == 1) has_assign = TRUE;
+                    var_tkn->argv = ReAlloc(var_tkn->argv, sizeof(char*) * (var_tkn->argc + 1));
+                    var_tkn->argv[var_tkn->argc++] = STRDUP(tkn->text);
+                }
+                break;
             case TOK_STRING:
             case TOK_WORD:
             case TOK_VAR:
@@ -746,7 +760,7 @@ BATSH_COMMAND *parse_loop(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_INSTANCE 
     /* Skip 'loop' token */
     (*i)++;
 
-    /* Parse condition: LHS OP RHS */
+    /* Parse condition: LHS OP RHS  (or LHS TO RHS for range loops) */
     if (*i < len) {
         cmd->cond_left = STRDUP(tokens[*i]->text);
         (*i)++;
@@ -755,7 +769,8 @@ BATSH_COMMAND *parse_loop(BATSH_TOKEN **tokens, U32 len, U32 *i, BATSH_INSTANCE 
         cmd->cond_op = tokens[*i]->type;
         (*i)++;
     }
-    if (*i < len) {
+    /* For TOK_TO range loop, cond_right is the inclusive end value */
+    if (*i < len && cmd->cond_op != TOK_EXISTS) {
         cmd->cond_right = STRDUP(tokens[*i]->text);
         (*i)++;
     }
@@ -935,6 +950,70 @@ static BOOL resolve_vars(PU8 *line, BATSH_INSTANCE *inst) {
 }
 
 /* ===================================================
+ * Arithmetic expression evaluator
+ * Handles: "5 + 3", "10-2", "@{VAR} * 4" (vars already resolved)
+ * Simple left-to-right evaluation (no precedence).
+ * =================================================== */
+
+static BOOL str_has_arith(PU8 s) {
+    if (!s) return FALSE;
+    for (; *s; s++) {
+        if (*s == '+' || *s == '-' || *s == '*') return TRUE;
+    }
+    return FALSE;
+}
+
+static I32 eval_arith(PU8 expr) {
+    if (!expr || !*expr) return 0;
+    PU8 dup = STRDUP(expr);
+    if (!dup) return ATOI_I32(expr);
+
+    I32 result = 0;
+    CHAR op = '+';
+    PU8 p = dup;
+
+    while (*p) {
+        /* skip whitespace */
+        while (*p == ' ' || *p == '\t') p++;
+        if (!*p) break;
+
+        /* read optional sign then digits */
+        PU8 num_start = p;
+        if ((*p == '-' || *p == '+') && p == dup) p++; /* leading sign only at start */
+        while (*p >= '0' && *p <= '9') p++;
+
+        if (p == num_start) { p++; continue; } /* skip non-numeric garbage */
+
+        U8 tmp[64];
+        U32 nl = (U32)(p - num_start);
+        if (nl >= sizeof(tmp)) nl = sizeof(tmp) - 1;
+        MEMCPY(tmp, num_start, nl);
+        tmp[nl] = '\0';
+        I32 num = ATOI_I32(tmp);
+
+        switch (op) {
+        case '+': result += num; break;
+        case '-': result -= num; break;
+        case '*': result *= num; break;
+        case '/': if (num != 0) result /= num; break;
+        default:  result += num; break;
+        }
+
+        /* skip whitespace */
+        while (*p == ' ' || *p == '\t') p++;
+        /* read next operator */
+        if (*p == '+' || *p == '-' || *p == '*' || *p == '/') {
+            op = *p++;
+        } else {
+            break;
+        }
+    }
+
+    MFree(dup);
+    return result;
+}
+
+/* ===================================================
  * Condition evaluation (for if/loop)
  * =================================================== */
 
@@ -1020,11 +1099,20 @@ static BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
             if (cmd->argc < 2) break;
             PU8 name = cmd->argv[0];
             PU8 value = NULL;
-            for (U32 i = 1; i < (U32)cmd->argc; i++)
+            for (U32 i = 1; i < (U32)cmd->argc; i++) {
+                if (i > 1) value = STRAPPEND(value, (PU8)" ");
                 value = STRAPPEND(value, cmd->argv[i]);
+            }
             resolve_vars(&value, inst);
-            S32 idx = FIND_VAR(name);
-            if (idx >= 0) SET_VAR(name, value);
+            if (str_has_arith(value)) {
+                I32 res = eval_arith(value);
+                U8 numbuf[32];
+                ITOA(res, numbuf, 10);
+                MFree(value);
+                value = STRDUP(numbuf);
+            }
+            /* Always write to global table (create if not present) */
+            SET_VAR(name, value);
             MFree(value);
         } break;
 
@@ -1032,16 +1120,24 @@ static BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
             if (cmd->argc < 2) break;
             PU8 name = cmd->argv[0];
             PU8 value = NULL;
-            for (U32 i = 1; i < (U32)cmd->argc; i++)
+            for (U32 i = 1; i < (U32)cmd->argc; i++) {
+                if (i > 1) value = STRAPPEND(value, (PU8)" ");
                 value = STRAPPEND(value, cmd->argv[i]);
+            }
             resolve_vars(&value, inst);
+            if (str_has_arith(value)) {
+                I32 res = eval_arith(value);
+                U8 numbuf[32];
+                ITOA(res, numbuf, 10);
+                MFree(value);
+                value = STRDUP(numbuf);
+            }
             if (inst) {
                 S32 idx = FIND_VAR(name);
                 if (idx >= 0) SET_VAR(name, value);
                 else SET_INST_VAR(name, value, inst);
             } else {
-                S32 idx = FIND_VAR(name);
-                if (idx >= 0) SET_VAR(name, value);
+                SET_VAR(name, value);
             }
             MFree(value);
         } break;
@@ -1057,30 +1153,59 @@ static BOOLEAN execute_master(BATSH_COMMAND *master, BATSH_INSTANCE *inst) {
         } break;
 
         case CMD_LOOP: {
-            /* Loop while condition is true */
-            U32 max_iters = 10000; /* safety limit */
-            U32 iters = 0;
-            while (iters++ < max_iters) {
-                BOOL cond = eval_condition(cmd->cond_left, cmd->cond_op,
-                                           cmd->cond_right, inst);
-                if (!cond) break;
+            if (cmd->cond_op == TOK_TO) {
+                /* --- Range loop: LOOP start TO end --- */
+                PU8 start_s = STRDUP(cmd->cond_left  ? cmd->cond_left  : (PU8)"0");
+                PU8 end_s   = STRDUP(cmd->cond_right ? cmd->cond_right : (PU8)"0");
+                resolve_vars(&start_s, inst);
+                resolve_vars(&end_s,   inst);
+                I32 start_v = ATOI_I32(start_s);
+                I32 end_v   = ATOI_I32(end_s);
+                MFree(start_s);
+                MFree(end_s);
 
-                /* Execute body — check for break sentinel */
-                BATSH_COMMAND *body = cmd->left;
-                BOOL did_break = FALSE;
-                while (body) {
-                    if (body->type == CMD_VAR && body->argc == -1) {
-                        did_break = TRUE;
-                        break;
+                U32 max_iters = 100000;
+                U32 iters = 0;
+                for (I32 counter = start_v; counter <= end_v && iters < max_iters; counter++, iters++) {
+                    /* Expose counter as @{I} */
+                    U8 counter_buf[32];
+                    ITOA(counter, counter_buf, 10);
+                    if (inst) SET_INST_VAR((PU8)"I", counter_buf, inst);
+                    else      SET_VAR((PU8)"I", counter_buf);
+
+                    BATSH_COMMAND *body = cmd->left;
+                    BOOL did_break = FALSE;
+                    while (body) {
+                        if (body->type == CMD_VAR && body->argc == -1) { did_break = TRUE; break; }
+                        BATSH_COMMAND saved_next = *body;
+                        body->next = NULL;
+                        execute_master(body, inst);
+                        body->next = saved_next.next;
+                        body = body->next;
                     }
-                    /* Execute single command */
-                    BATSH_COMMAND saved_next = *body;
-                    body->next = NULL;
-                    execute_master(body, inst);
-                    body->next = saved_next.next;
-                    body = body->next;
+                    if (did_break) break;
                 }
-                if (did_break) break;
+            } else {
+                /* --- Condition loop: LOOP LHS OP RHS --- */
+                U32 max_iters = 10000;
+                U32 iters = 0;
+                while (iters++ < max_iters) {
+                    BOOL cond = eval_condition(cmd->cond_left, cmd->cond_op,
+                                               cmd->cond_right, inst);
+                    if (!cond) break;
+
+                    BATSH_COMMAND *body = cmd->left;
+                    BOOL did_break = FALSE;
+                    while (body) {
+                        if (body->type == CMD_VAR && body->argc == -1) { did_break = TRUE; break; }
+                        BATSH_COMMAND saved_next = *body;
+                        body->next = NULL;
+                        execute_master(body, inst);
+                        body->next = saved_next.next;
+                        body = body->next;
+                    }
+                    if (did_break) break;
+                }
             }
         } break;
 
@@ -1416,6 +1541,14 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     STRNCPY(prog_copy, original_line, prog_len);
     prog_copy[prog_len] = 0;
 
+    /* --- Resolve prog_copy to absolute path upfront --- */
+    U8 resolved_prog[512] = {0};
+    if (ResolvePath(prog_copy, resolved_prog, sizeof(resolved_prog))) {
+        MFree(prog_copy);
+        prog_copy = STRDUP(resolved_prog);
+    }
+    /* -------------------------------------------------- */
+
     PU8 prog_name = STRDUP(prog_copy);
     PU8 last_slash = STRRCHR(prog_name, '/');
     if (last_slash) {
@@ -1430,31 +1563,29 @@ BOOLEAN RUN_PROCESS(PU8 line) {
     BOOLEAN is_found_as_bin = FALSE;
     BOOLEAN is_found_as_sh  = FALSE;
 
-    /* Try direct path */
-    if (ResolvePath(prog_copy, abs_path_buf, sizeof(abs_path_buf))) {
-        if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
-            found = TRUE;
+    /* Try direct (already-absolute) path */
+    STRNCPY(abs_path_buf, prog_copy, sizeof(abs_path_buf) - 1);
+    if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
+        found = TRUE;
+    } else {
+        U8 candidate[512];
+        STRCPY(candidate, abs_path_buf);
+        STRNCAT(candidate, ".BIN", sizeof(candidate) - STRLEN(candidate) - 1);
+        if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
+            STRCPY(abs_path_buf, candidate);
+            found = TRUE; is_found_as_bin = TRUE;
         } else {
-            U8 candidate[512];
             STRCPY(candidate, abs_path_buf);
-            STRNCAT(candidate, ".BIN", sizeof(candidate) - STRLEN(candidate) - 1);
+            STRNCAT(candidate, ".SH", sizeof(candidate) - STRLEN(candidate) - 1);
             if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
                 STRCPY(abs_path_buf, candidate);
-                found = TRUE;
-                is_found_as_bin = TRUE;
-            } else {
-                STRCPY(candidate, abs_path_buf);
-                STRNCAT(candidate, ".SH", sizeof(candidate) - STRLEN(candidate) - 1);
-                if (FAT32_PATH_RESOLVE_ENTRY(candidate, &ent)) {
-                    STRCPY(abs_path_buf, candidate);
-                    found = TRUE;
-                    is_found_as_sh = TRUE;
-                }
+                found = TRUE; is_found_as_sh = TRUE;
             }
         }
     }
 
-    /* Search PATH */
+    /* Search PATH if not found and no slash in original prog_copy token */
+    PU8 orig_prog_nopath = STRDUP(prog_name); /* basename only */
     if (!found) {
         PU8 path_val = GET_VAR((PU8)"PATH");
         if (path_val && *path_val) {
@@ -1464,29 +1595,33 @@ BOOLEAN RUN_PROCESS(PU8 line) {
             while (tok && !found) {
                 if (*tok) {
                     U8 candidate[512] = {0};
-                    STRNCPY(candidate, tok, sizeof(candidate) - 1);
-                    U32 clen = STRLEN(candidate);
-                    if (clen && candidate[clen - 1] != '/' && candidate[clen - 1] != '\\')
-                        STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
-                    STRNCAT(candidate, prog_name, sizeof(candidate) - STRLEN(candidate) - 1);
+                    /* Resolve each PATH entry to absolute */
+                    U8 abs_tok[512] = {0};
+                    if (!ResolvePath(tok, abs_tok, sizeof(abs_tok)))
+                        STRNCPY(abs_tok, tok, sizeof(abs_tok) - 1);
 
-                    if (ResolvePath(candidate, abs_path_buf, sizeof(abs_path_buf))) {
-                        if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
-                            found = TRUE; break;
-                        }
-                        U8 try_ext[512];
-                        STRCPY(try_ext, abs_path_buf);
-                        STRNCAT(try_ext, ".BIN", sizeof(try_ext) - STRLEN(try_ext) - 1);
-                        if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
-                            STRCPY(abs_path_buf, try_ext);
-                            found = TRUE; is_found_as_bin = TRUE; break;
-                        }
-                        STRCPY(try_ext, abs_path_buf);
-                        STRNCAT(try_ext, ".SH", sizeof(try_ext) - STRLEN(try_ext) - 1);
-                        if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
-                            STRCPY(abs_path_buf, try_ext);
-                            found = TRUE; is_found_as_sh = TRUE; break;
-                        }
+                    STRNCPY(candidate, abs_tok, sizeof(candidate) - 1);
+                    U32 clen = STRLEN(candidate);
+                    if (clen && candidate[clen - 1] != '/') 
+                        STRNCAT(candidate, "/", sizeof(candidate) - STRLEN(candidate) - 1);
+                    STRNCAT(candidate, orig_prog_nopath, sizeof(candidate) - STRLEN(candidate) - 1);
+
+                    STRNCPY(abs_path_buf, candidate, sizeof(abs_path_buf) - 1);
+                    if (FAT32_PATH_RESOLVE_ENTRY(abs_path_buf, &ent)) {
+                        found = TRUE; break;
+                    }
+                    U8 try_ext[512];
+                    STRCPY(try_ext, abs_path_buf);
+                    STRNCAT(try_ext, ".BIN", sizeof(try_ext) - STRLEN(try_ext) - 1);
+                    if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
+                        STRCPY(abs_path_buf, try_ext);
+                        found = TRUE; is_found_as_bin = TRUE; break;
+                    }
+                    STRCPY(try_ext, abs_path_buf);
+                    STRNCAT(try_ext, ".SH", sizeof(try_ext) - STRLEN(try_ext) - 1);
+                    if (FAT32_PATH_RESOLVE_ENTRY(try_ext, &ent)) {
+                        STRCPY(abs_path_buf, try_ext);
+                        found = TRUE; is_found_as_sh = TRUE; break;
                     }
                 }
                 tok = STRTOK_R(NULL, ";", &saveptr);
@@ -1494,6 +1629,7 @@ BOOLEAN RUN_PROCESS(PU8 line) {
             MFree(path_dup);
         }
     }
+    MFree(orig_prog_nopath);
 
     if (!found) {
         PUTS("\nError: Failed to resolve path.\n");
@@ -1533,6 +1669,20 @@ BOOLEAN RUN_PROCESS(PU8 line) {
             argv[argc++] = arg;
             if (in_quotes && *p == '"') p++;
             while (*p == ' ' || *p == '\t') p++;
+        }
+    }
+
+    for(U32 i = 0; i < argc; i++) {
+        if (argv[i]) {
+            PU8 tmp = rel_to_abs_path(argv[i]);
+            if(tmp) {
+                if(FILE_EXISTS(tmp) || DIR_EXISTS(tmp)) { 
+                    MFree(argv[i]);
+                    argv[i] = tmp;
+                } else {
+                    MFree(tmp);
+                }
+            }
         }
     }
 

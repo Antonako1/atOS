@@ -1,0 +1,9 @@
+#ifndef AUTOCOMPLETE_H
+#define AUTOCOMPLETE_H
+
+#include "TSHELL.h"
+
+VOID HANDLE_LE_TAB(VOID);
+VOID HANDLE_LE_SHIFT_TAB(VOID);
+
+#endif

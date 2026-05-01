@@ -615,9 +615,12 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
 }
 
 BOOL initialize_filestructure(VOID) {
-    if(!GET_BPB_LOADED()) {
-        return LOAD_BPB();
-    }
+    KDEBUG_PUTS("[atOS] Initializing filesystem structure on disk if not present...\n");
+    BOOL res = ENSURE_BPB_LOADED();
+    DEBUG_PRINTF("[atOS] ENSURE_BPB_LOADED returned %d\n", res);
+    if(res) return TRUE; // Already initialized on disk
+
+    KDEBUG_PUTS("[atOS] Initializing FAT32 filesystem on disk...\n");
     VOIDPTR bin = NULLPTR;
     U32 sz = 0;
     bin = ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY("HOME/SRC/BOOT/VBR.BIN", &sz);
@@ -633,8 +636,10 @@ BOOL initialize_filestructure(VOID) {
     CREATE_CHILD_DIR(GET_ROOT_CLUSTER(), "HOME", 0, &tmp);
     CREATE_CHILD_DIR(tmp, "DOCS", 0, &tmp);
     CREATE_CHILD_DIR(GET_ROOT_CLUSTER(), "TMP", 0, &tmp);
-    // HLT;
-    return TRUE;
+
+    // Reload BPB + FAT + root dir from disk so in-memory state is consistent
+    KDEBUG_PUTS("[atOS] FAT32 initialized, reloading BPB and FAT from disk...\n");
+    return ENSURE_BPB_LOADED();
 }
 
 

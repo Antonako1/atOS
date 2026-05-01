@@ -21,6 +21,7 @@
 
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 
+#include <CPU/PIT/PIT.h>
 #include <DEBUG/KDEBUG.h>
 
 #define SYSCALL_ENTRY(id, fn) [id] = fn,
@@ -34,6 +35,11 @@ U32 SYS_HDD_READ_SECTOR(U32 lba, U32 sector_count, U32 buf, U32 unused4, U32 unu
 }
 U32 SYS_HDD_WRITE_SECTOR(U32 lba, U32 sector_count, U32 buf, U32 unused4, U32 unused5) {
     return ATA_PIO_WRITE_SECTORS(lba, sector_count, buf);
+}
+
+U32 SYS_NULL(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    return 0;
 }
 
 U32 SYS_GET_TIME(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {

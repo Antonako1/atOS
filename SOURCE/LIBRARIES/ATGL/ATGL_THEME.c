@@ -57,6 +57,7 @@ ATGL_THEME ATGL_DEFAULT_THEME(VOID)
     t.progress_bg   = VBE_WHITE;
     t.progress_fill = VBE_BLUE;
     t.progress_text = VBE_BLACK;
+    t.progress_text_bg = VBE_SEE_THROUGH; // Let the fill color show through behind the text
 
     /* Listbox */
     t.list_bg     = VBE_WHITE;

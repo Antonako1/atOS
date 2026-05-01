@@ -8,6 +8,8 @@
 #include <VESA/VBE.h>
 #include <PAGING/PAGING.h>
 #include <DEBUG/KDEBUG.h>
+#include <CPU/SYSCALL/SYSCALL.h>
+#include <CPU/YIELD/YIELD.h>
 
 #define PIT_CHANNEL0 0x40
 #define PIT_COMMAND  0x43
@@ -87,6 +89,7 @@ U0 PIT_INIT(U0) {
     hz = PIT_TICKS_HZ;
     pit_set_frequency(hz);
     idt_set_gate(PIT_VECTOR, (U32)isr_pit, KCS, 0x8E);
+    idt_set_gate(YIELD_VECTOR, (U32)isr_yield, KCS, 0x8E);
     KDEBUG_PUTS("[PIT] Gate set\n");
     ISR_REGISTER_HANDLER(PIC_REMAP_OFFSET + 0, isr_pit);
     KDEBUG_PUTS("[PIT] Handler registered\n");
@@ -105,7 +108,8 @@ U32 *PIT_GET_HZ_PTR() {
 }
 
 void SCHEDULER_YIELD(void) {
-    isr_pit();  
+    KDEBUG_PUTS("[PIT] Yielding from PID \n");
+    isr_yield();
 }
 
 __attribute__((naked)) void isr_pit(void) {
@@ -230,6 +234,91 @@ __attribute__((naked)) void isr_pit(void) {
         // Return to the new task
         // "sti\n\t"
         "iret\n\t" // return to the new task, which pops eip, cs, eflags
+        : : : "memory"
+    );
+}
+
+__attribute__((naked)) void isr_yield(void) {
+    asm volatile(
+        "pushl %%gs\n\t"
+        "pushl %%fs\n\t"
+        "pushl %%es\n\t"
+        "pushl %%ds\n\t"
+        "pushl %%edi\n\t"
+        "pushl %%esi\n\t"
+        "pushl %%ebp\n\t"
+        "pushl %%esp\n\t"
+        "pushl %%ebx\n\t"
+        "pushl %%edx\n\t"
+        "pushl %%ecx\n\t"
+        "pushl %%eax\n\t"
+
+        "movw $" _STR(KDS) ", %%ax\n\t"
+        "movw %%ax, %%ds\n\t"
+        "movw %%ax, %%es\n\t"
+        "movw %%ax, %%fs\n\t"
+        "movw %%ax, %%gs\n\t"
+
+        "movl %%esp, current_task_esp\n\t"
+        "pushl %%esp\n\t"
+        "call pit_handler_task_control\n\t"
+        "addl $4, %%esp\n\t"
+        
+        "movl next_task_cr3_val, %%eax\n\t"
+        
+        // NO EOI FOR SOFTWARE YIELD!
+        
+        "movl %%eax, %%cr3\n\t"
+        "movl next_task_esp_val, %%esp\n\t"
+
+        "cmpl $0, next_task_pid\n\t"
+        "je yield_normal_task_switch\n\t"
+        
+        "cmpl $1, next_task_num_switches\n\t"
+        "jne yield_normal_task_switch\n\t"
+
+        // New task, first time switch
+            "xorl %%eax, %%eax\n\t"
+            "movl %%eax, %%ecx\n\t"
+            "movl %%eax, %%edx\n\t"
+            "movl %%eax, %%ebx\n\t"
+            "movl %%eax, %%ebp\n\t"
+            "movl %%eax, %%esi\n\t"
+            "movl %%eax, %%edi\n\t"
+            "movw $" _STR(KDS) ", %%ax\n\t"
+            "movw %%ax, %%ds\n\t"
+            "movw %%ax, %%es\n\t"
+            "movw %%ax, %%fs\n\t"
+            "movw %%ax, %%gs\n\t"   
+
+            "pushl $0x0\n\t"
+            "movl PROC_ARGV, %%eax\n\t"
+            "pushl %%eax\n\t"
+            "movl PROC_ARGC, %%eax\n\t"
+            "pushl %%eax\n\t"
+            "pushl $0x0\n\t"
+            
+            "pushl $0x200\n\t"
+            "pushl $" _STR(KCS) "\n\t"
+            "pushl $" _STR(USER_BINARY_VADDR) "\n\t"
+            "jmp yield_end_switch\n\t"        
+
+    // Normal task switch, just pop registers and iret
+    "yield_normal_task_switch:\n\t"
+        "popl %%eax\n\t"
+        "popl %%ecx\n\t"
+        "popl %%edx\n\t"
+        "popl %%ebx\n\t"
+        "popl %%esp\n\t"
+        "popl %%ebp\n\t"
+        "popl %%esi\n\t"
+        "popl %%edi\n\t"
+        "popl %%ds\n\t"
+        "popl %%es\n\t"
+        "popl %%fs\n\t"
+        "popl %%gs\n\t"
+    "yield_end_switch:\n\t"
+        "iret\n\t"
         : : : "memory"
     );
 }

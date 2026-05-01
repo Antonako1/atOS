@@ -569,6 +569,16 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
     return proc->pagedir_phys;
 }
 
+U32 *setup_dynamic_library(TCB *proc, U8 *binary_data, U32 bin_size, U32 initial_state) {
+    if (!proc || !binary_data || bin_size == 0) return NULL;
+    if (!proc->pagedir_phys) return NULL;
+
+    user_layout_t layout;
+    if (!compute_user_layout(binary_data, bin_size, 0, 0, &layout)) return NULL;
+
+    return proc->pagedir_phys;
+}
+
 TCB *get_tcb_by_pid(U32 pid) {
     if (pid == 0) return &master_tcb;
     TCB *master = &master_tcb;
@@ -721,6 +731,33 @@ BOOLEAN RUN_BINARY(
     return TRUE;
 }
 
+
+BOOLEAN LOAD_LIBRARY(LOAD_LIBRARY_STRUCT *load_info) {
+    if (!load_info || !load_info->file) return FALSE;
+    if (!initialized) return FALSE;
+    if (load_info->bin_size == 0 || load_info->bin_size > MAX_USER_BINARY_SIZE) return FALSE;
+
+    TCB *new_lib = KMALLOC(sizeof(TCB));
+    panic_if(!new_lib, "Unable to allocate memory for TCB!", PANIC_OUT_OF_MEMORY);
+    MEMZERO(new_lib, sizeof(TCB));
+
+    new_lib->info.pid = get_next_pid();
+    DEBUG_PRINTF("[proc] Assigned PID %u to new library\n", new_lib->info.pid);
+    KDEBUG_PUTS("[proc] setup_user_process for library...\n");
+    panic_if(!setup_user_process(new_lib, (U8 *)load_info->file, load_info->bin_size, 0, 0, load_info->initial_state),
+             PANIC_TEXT("Failed to set up user library"), PANIC_OUT_OF_MEMORY);
+    KDEBUG_PUTS("[proc] setup_user_process for library OK\n");
+
+    STRNCPY((char *)new_lib->info.name, load_info->lib_name, TASK_NAME_MAX_LEN);
+    new_lib->info.name[TASK_NAME_MAX_LEN - 1] = '\0';
+
+    add_tcb_to_scheduler(new_lib);
+    KDEBUG_PUTS("[proc] Library added to scheduler pid="); 
+    KDEBUG_HEX32(new_lib->info.pid); 
+    KDEBUG_PUTS("\n");
+    
+    return TRUE;
+}
 
 void remove_tcb_from_scheduler(TCB *tcb) {
     if (!tcb || tcb->info.state == TCB_STATE_IMMORTAL) return;

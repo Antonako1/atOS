@@ -5,6 +5,7 @@
 #include <STD/STRING.h>
 #include <STD/TIME.h>
 #include <STD/MATH.h>
+#include <STD/TASK.h>
 #include <LIBRARIES/ARGHAND/ARGHAND.h>
 
 /* Helper to convert polar coordinates to screen lines */

@@ -107,7 +107,7 @@ BOOLEAN ATA_PIIX3_INIT(VOID) {
     // Identify first available drive
     U32 identification = ATA_GET_IDENTIFIER();
     if (identification == ATA_FAILED) return FALSE;
-    panic_debug("A",0);
+    // panic_debug("A",0);
     PRDT = (PRDT_ENTRY*)KMALLOC_ALIGN(sizeof(PRDT_ENTRY), ATA_PIIX3_PRDT_ALIGN);
     panic_if(!PRDT, PANIC_TEXT("Failed to allocate PRDT"), PANIC_OUT_OF_MEMORY);
     MEMZERO(PRDT, sizeof(PRDT_ENTRY));
@@ -129,7 +129,8 @@ BOOLEAN ATA_PIIX3_INIT(VOID) {
     // Detect supported DMA modes on connected drives
     U16 ident[256];
     if (identification == ATA_PRIMARY_MASTER || identification == ATA_PRIMARY_SLAVE) {
-        if (ata_read_identify_to_buffer(ATA_PRIMARY_BASE, identification & 1, ident)) {
+        U8 drive_sel = (identification == ATA_PRIMARY_SLAVE) ? ATA_SLAVE : ATA_MASTER;
+        if (ata_read_identify_to_buffer(ATA_PRIMARY_BASE, drive_sel, ident)) {
             U16 w63 = ident[63];
             U16 w88 = ident[88];
             supported_dma_modes.MW_DMA_0 = (w63 & (1 << 0)) != 0;
@@ -140,7 +141,8 @@ BOOLEAN ATA_PIIX3_INIT(VOID) {
         }
     }
     if (identification == ATA_SECONDARY_MASTER || identification == ATA_SECONDARY_SLAVE) {
-        if (ata_read_identify_to_buffer(ATA_SECONDARY_BASE, identification & 1, ident)) {
+        U8 drive_sel = (identification == ATA_SECONDARY_SLAVE) ? ATA_SLAVE : ATA_MASTER;
+        if (ata_read_identify_to_buffer(ATA_SECONDARY_BASE, drive_sel, ident)) {
             U16 w63 = ident[63];
             U16 w88 = ident[88];
             supported_dma_modes.MW_DMA_0 |= (w63 & (1 << 0)) != 0;
@@ -166,14 +168,16 @@ BOOLEAN ATA_PIIX3_XFER(U8 device, U32 lba, U8 sectors, VOIDPTR buf, BOOLEAN writ
     U32 total_bytes = sectors * ATA_PIIX3_SECTOR_SIZE;
     if (total_bytes > 0x10000) return FALSE;
 
-    U16 base = (device & 2) ? ATA_SECONDARY_BASE : ATA_PRIMARY_BASE;
-    U32 bm_base = (device & 2) ? BM_BASE_SECONDARY : BM_BASE_PRIMARY;
-    BOOL is_io = (device & 2) ? BM_SECONDARY_IS_IO : BM_PRIMARY_IS_IO;
+    BOOL is_secondary = (device == ATA_SECONDARY_MASTER || device == ATA_SECONDARY_SLAVE);
+    BOOL is_slave     = (device == ATA_PRIMARY_SLAVE    || device == ATA_SECONDARY_SLAVE);
+    U16 base    = is_secondary ? ATA_SECONDARY_BASE    : ATA_PRIMARY_BASE;
+    U32 bm_base = is_secondary ? BM_BASE_SECONDARY     : BM_BASE_PRIMARY;
+    BOOL is_io  = is_secondary ? BM_SECONDARY_IS_IO    : BM_PRIMARY_IS_IO;
 
     // Setup PRDT + DMA buffer
     MEMZERO(DMA_BUFFER, total_bytes);
     PRDT[0].phys_addr = (U32)DMA_BUFFER;
-    PRDT[0].byte_count = total_bytes - 1;
+    PRDT[0].byte_count = (U16)(total_bytes >= 0x10000 ? 0 : total_bytes); // 0 == 64 KB per PIIX3 spec
     PRDT[0].flags = END_OF_TABLE_FLAG;
     bm_write32(bm_base, is_io, BM_PRDT_ADDR_OFFSET, (U32)PRDT);
 
@@ -188,8 +192,8 @@ BOOLEAN ATA_PIIX3_XFER(U8 device, U32 lba, U8 sectors, VOIDPTR buf, BOOLEAN writ
     bm_write8(bm_base, is_io, BM_STATUS_OFFSET, BM_STATUS_ERROR | BM_STATUS_IRQ);
     bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, (write ? BM_CMD_WRITE : BM_CMD_READ) | BM_CMD_START_STOP);
 
-    // Program ATA registers
-    _outb(base + ATA_DRIVE_HEAD, 0xE0 | ((device & 1) ? 0x10 : 0) | ((lba >> 24) & 0x0F));
+    // Program ATA registers (0xE0 = fixed bits; bit6=LBA mode; bit4=slave select)
+    _outb(base + ATA_DRIVE_HEAD, 0xE0 | (is_slave ? 0x10 : 0x00) | ((lba >> 24) & 0x0F));
     ata_io_wait(base);
     _outb(base + ATA_SECCOUNT, sectors);
     _outb(base + ATA_LBA_LO,   (U8)(lba & 0xFF));

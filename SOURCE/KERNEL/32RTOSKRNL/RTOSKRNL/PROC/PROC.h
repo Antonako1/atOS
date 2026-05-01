@@ -44,6 +44,7 @@ and message passing between processes and the kernel.
 #define TCB_STATE_KERNEL_WAIT   0x0040  // Waiting for kernel event (e.g. I/O)
 #define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0080 // Handles and informs kernel of child process. AKA Shell
 #define TCB_STATE_KILL                0x40000000 // Mark for kill on next cycle
+#define TCB_STATE_LIBRARY             0x80000000 // This is a library, not a process
 
 /*
 Trap frame is pushed automatically by the PIT interrupt handler and used for context switching.
@@ -291,6 +292,15 @@ typedef struct {
     PPU8 argv;
     U32 argc;
 } RUN_BINARY_STRUCT;
+
+typedef struct {
+    U8 lib_name[255];
+    VOIDPTR file;
+    U32 bin_size;
+    PPU8 argv;
+    U32 argc;
+    U32 initial_state;
+} LOAD_LIBRARY_STRUCT;
 
 
 #ifdef __RTOS__
