@@ -259,7 +259,8 @@ iso: bootloader kernel programs diskvbr
 run:
 	@echo "Running ISO in QEMU..."
 	# Make sure disk exists
-	[ -f hdd.img ] || qemu-img create -f raw hdd.img 256M
+	[ -f hdd.img ] && rm -f hdd.img
+	qemu-img create -f raw hdd.img 256M
 	mkdir -p OUTPUT/DEBUG
 	mkdir -p OUTPUT/SERIAL
 
