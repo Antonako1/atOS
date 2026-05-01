@@ -26,6 +26,53 @@ DESCRIPTION
 /*                       RENDER FUNCTIONS                           */
 /* ================================================================ */
 
+VOID ATGL_NODE_RESET_THEME_COLORS(PATGL_NODE node)
+{
+    if (!node || node->type == ATGL_NODE_ROOT) return;
+
+    switch (node->type) {
+        case ATGL_NODE_LABEL:
+        case ATGL_NODE_SEPARATOR:
+        case ATGL_NODE_IMAGE:
+            node->fg = atgl.theme.fg;
+            node->bg = VBE_SEE_THROUGH;
+            break;
+        case ATGL_NODE_BUTTON:
+            node->fg = atgl.theme.btn_fg;
+            node->bg = atgl.theme.btn_bg;
+            break;
+        case ATGL_NODE_CHECKBOX:
+        case ATGL_NODE_RADIO:
+            node->fg = atgl.theme.fg;
+            node->bg = atgl.theme.check_bg;
+            break;
+        case ATGL_NODE_TEXTINPUT:
+            node->fg = atgl.theme.input_fg;
+            node->bg = atgl.theme.input_bg;
+            break;
+        case ATGL_NODE_SLIDER:
+            node->fg = atgl.theme.slider_thumb;
+            node->bg = atgl.theme.slider_track;
+            break;
+        case ATGL_NODE_PROGRESSBAR:
+            node->fg = atgl.theme.progress_text;
+            node->bg = atgl.theme.progress_bg;
+            break;
+        case ATGL_NODE_PANEL:
+            node->fg = atgl.theme.widget_fg;
+            node->bg = atgl.theme.widget_bg;
+            break;
+        case ATGL_NODE_LISTBOX:
+            node->fg = atgl.theme.list_fg;
+            node->bg = atgl.theme.list_bg;
+            break;
+        default:
+            node->fg = atgl.theme.fg;
+            node->bg = atgl.theme.bg;
+            break;
+    }
+}
+
 /* Walk up the parent chain to find the nearest non-transparent bg.
    Used so that widgets with SEE_THROUGH bg can clear their area
    before re-drawing text (prevents old text ghosting). */
@@ -36,7 +83,7 @@ static VBE_COLOUR resolve_bg(PATGL_NODE node)
         if (n->bg != VBE_SEE_THROUGH) return n->bg;
         n = n->parent;
     }
-    return atgl.theme.bg;
+    return 0; // Fallback
 }
 
 /* ----------------------------- Label ----------------------------- */
@@ -44,7 +91,7 @@ static VBE_COLOUR resolve_bg(PATGL_NODE node)
 static VOID render_label(PATGL_NODE node)
 {
     ATGL_RECT  *r = &node->abs_rect;
-    VBE_COLOUR  fg = (node->fg != VBE_SEE_THROUGH) ? node->fg : atgl.theme.fg;
+    VBE_COLOUR  fg = node->fg;
 
     /* Always clear the label area so old text is erased.
        Use the node's own bg, or walk up parents to find one. */
@@ -72,9 +119,9 @@ static VOID render_button(PATGL_NODE node)
     if      (!node->enabled) face = t->btn_disabled_bg;
     else if (bd->pressed)    face = t->btn_pressed;
     else if (bd->hovered)    face = t->btn_hover;
-    else                     face = t->btn_bg;
+    else                     face = node->bg;
 
-    VBE_COLOUR text_fg = node->enabled ? t->btn_fg : t->btn_disabled_fg;
+    VBE_COLOUR text_fg = node->enabled ? node->fg : t->btn_disabled_fg;
 
     /* Face fill */
     atgl_fb_fill(r->x, r->y, r->w, r->h, face);
@@ -112,7 +159,7 @@ static VOID render_checkbox(PATGL_NODE node)
     I32 box_y  = r->y + (r->h - (I32)box_sz) / 2;
 
     /* Box */
-    atgl_fb_fill(r->x, box_y, box_sz, box_sz, t->check_bg);
+    atgl_fb_fill(r->x, box_y, box_sz, box_sz, node->bg);
     ATGL_DRAW_SUNKEN(r->x, box_y, box_sz, box_sz);
 
     /* Check mark (X shape) */
@@ -125,7 +172,7 @@ static VOID render_checkbox(PATGL_NODE node)
 
     /* Label */
     if (node->text[0]) {
-        VBE_COLOUR fg = node->enabled ? t->fg : t->btn_disabled_fg;
+        VBE_COLOUR fg = node->enabled ? node->fg : t->btn_disabled_fg;
         VBE_COLOUR cbg = resolve_bg(node);
         I32 text_x = r->x + (I32)box_sz + 4;
         I32 text_y = r->y + (r->h - (I32)t->char_h) / 2;
@@ -166,7 +213,7 @@ static VOID render_radio(PATGL_NODE node)
 
     // Draw body (slightly smaller filled ellipse)
     ATGL_DRAW_FILLED_ELLIPSE((U32)cx, (U32)cy,
-        (circle_sz - border_w) / 2, (circle_sz - border_w) / 2, t->check_bg);
+        (circle_sz - border_w) / 2, (circle_sz - border_w) / 2, node->bg);
 
     // Draw inner dot when selected (well inside the body)
     if (rd->selected) {
@@ -175,7 +222,7 @@ static VOID render_radio(PATGL_NODE node)
 
     /* Label */
     if (node->text[0]) {
-        VBE_COLOUR fg = node->enabled ? t->fg : t->btn_disabled_fg;
+        VBE_COLOUR fg = node->enabled ? node->fg : t->btn_disabled_fg;
         I32 text_x = r->x + (I32)circle_sz + 4;
         I32 text_y = r->y + (r->h - (I32)t->char_h) / 2;
         /* Clear label area so old text doesn't ghost */
@@ -201,7 +248,7 @@ static VOID render_textinput(PATGL_NODE node)
     ATGL_TEXTINPUT_DATA *td = &node->data.textinput;
 
     /* Background */
-    atgl_fb_fill(r->x, r->y, r->w, r->h, t->input_bg);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, node->bg);
 
     /* Border */
     ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
@@ -232,7 +279,7 @@ static VOID render_textinput(PATGL_NODE node)
                 MEMSET_OPT(pwd_buf, '*', draw_count);
                 pwd_buf[draw_count] = '\0';
                 DRAW_8x8_STRING(text_x, text_y, (PU8)pwd_buf,
-                                t->input_fg, t->input_bg);
+                                node->fg, node->bg);
             } else {
                 /* Selection present — batch into up to 3 runs */
                 CHAR pwd_buf[ATGL_TEXTINPUT_MAX];
@@ -246,7 +293,7 @@ static VOID render_textinput(PATGL_NODE node)
                 if (vis_sel_start > 0) {
                     pwd_buf[vis_sel_start] = '\0';
                     DRAW_8x8_STRING(text_x, text_y, (PU8)pwd_buf,
-                                    t->input_fg, t->input_bg);
+                                    node->fg, node->bg);
                     pwd_buf[vis_sel_start] = '*';
                 }
                 /* Selected region */
@@ -265,7 +312,7 @@ static VOID render_textinput(PATGL_NODE node)
                     pwd_buf[draw_count]  = '\0';
                     DRAW_8x8_STRING(text_x + (I32)(vis_sel_end * t->char_w),
                                     text_y, (PU8)&pwd_buf[vis_sel_end],
-                                    t->input_fg, t->input_bg);
+                                    node->fg, node->bg);
                 }
             }
         } else {
@@ -348,7 +395,7 @@ static VOID render_slider(PATGL_NODE node)
     atgl_fb_fill(r->x, r->y, r->w, r->h, bg);
 
     /* Track */
-    atgl_fb_fill(r->x, track_y, r->w, track_h, t->slider_track);
+    atgl_fb_fill(r->x, track_y, r->w, track_h, node->bg);
     ATGL_DRAW_SUNKEN(r->x, track_y, r->w, track_h);
 
     /* Filled portion */
@@ -365,7 +412,7 @@ static VOID render_slider(PATGL_NODE node)
     /* Thumb */
     I32 thumb_x = r->x + fill_w;
     I32 thumb_y = r->y + 2;
-    atgl_fb_fill(thumb_x, thumb_y, thumb_w, thumb_h, t->slider_thumb);
+    atgl_fb_fill(thumb_x, thumb_y, thumb_w, thumb_h, node->fg);
     ATGL_DRAW_RAISED(thumb_x, thumb_y, thumb_w, thumb_h);
 
     /* Focus ring */
@@ -384,7 +431,7 @@ static VOID render_progressbar(PATGL_NODE node)
     ATGL_PROGRESS_DATA *pd = &node->data.progress;
 
     /* Background */
-    atgl_fb_fill(r->x, r->y, r->w, r->h, t->progress_bg);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, node->bg);
     ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
 
     /* Fill bar */
@@ -393,7 +440,7 @@ static VOID render_progressbar(PATGL_NODE node)
     if (fill_w > r->w - 4) fill_w = r->w - 4;
     if (fill_w > 0) {
         atgl_fb_fill(r->x + 2, r->y + 2,
-                     fill_w, r->h - 4, t->progress_fill);
+                     fill_w, r->h - 4, node->fg);
     }
 
     /* Percentage text */
@@ -408,8 +455,8 @@ static VOID render_progressbar(PATGL_NODE node)
         // VBE_COLOUR text_bg = (fill_w > 0 && tx >= r->x + 2 &&
         //                       tx < r->x + 2 + fill_w)
         //                      ? t->progress_fill : t->progress_bg;
-        VBE_COLOUR text_bg = t->progress_text_bg;
-        ATGL_DRAW_TEXT(tx, ty, (PU8)buf, t->progress_text, text_bg);
+        VBE_COLOUR text_bg = node->bg;
+        ATGL_DRAW_TEXT(tx, ty, (PU8)buf, node->fg, text_bg);
     }
 }
 
@@ -437,7 +484,7 @@ static VOID render_panel(PATGL_NODE node)
                      (I32)title_w, (I32)atgl.theme.char_h,
                      pbg);
         ATGL_DRAW_TEXT(r->x + 10, r->y, (PU8)node->text,
-                       atgl.theme.fg, pbg);
+                       node->fg, pbg);
     }
 }
 
@@ -450,7 +497,7 @@ static VOID render_listbox(PATGL_NODE node)
     ATGL_LISTBOX_DATA *ld = &node->data.listbox;
 
     /* Background */
-    atgl_fb_fill(r->x, r->y, r->w, r->h, t->list_bg);
+    atgl_fb_fill(r->x, r->y, r->w, r->h, node->bg);
     ATGL_DRAW_SUNKEN(r->x, r->y, r->w, r->h);
 
     /* Items */
@@ -463,8 +510,8 @@ static VOID render_listbox(PATGL_NODE node)
         I32 iy  = r->y + 2 + (I32)(i * item_h);
 
         BOOL       sel = (idx == ld->selected);
-        VBE_COLOUR ibg = sel ? t->list_sel_bg : t->list_bg;
-        VBE_COLOUR ifg = sel ? t->list_sel_fg : t->list_fg;
+        VBE_COLOUR ibg = sel ? t->list_sel_bg : node->bg;
+        VBE_COLOUR ifg = sel ? t->list_sel_fg : node->fg;
 
         atgl_fb_fill(r->x + 2, iy, r->w - 4, (I32)item_h, ibg);
         ATGL_DRAW_TEXT_CLIPPED(r->x + 4, iy + 1, r->w - 8,
@@ -1121,6 +1168,9 @@ PATGL_NODE ATGL_CREATE_LABEL(PATGL_NODE parent, ATGL_RECT rect,
     node->bg        = bg;
     node->focusable = FALSE;
     node->fn_render = render_label;
+    ATGL_NODE_RESET_THEME_COLORS(node);
+    if (bg != VBE_SEE_THROUGH) node->bg = bg;
+    if (fg != VBE_SEE_THROUGH) node->fg = fg;
     return node;
 }
 
@@ -1132,14 +1182,13 @@ PATGL_NODE ATGL_CREATE_BUTTON(PATGL_NODE parent, ATGL_RECT rect,
     if (!node) return NULLPTR;
 
     ATGL_NODE_SET_TEXT(node, text);
-    node->fg        = atgl.theme.btn_fg;
-    node->bg        = atgl.theme.btn_bg;
     node->focusable = TRUE;
     node->on_click  = on_click;
     node->fn_render = render_button;
     node->fn_event  = event_button;
     node->data.button.pressed = FALSE;
     node->data.button.hovered = FALSE;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1156,6 +1205,7 @@ PATGL_NODE ATGL_CREATE_CHECKBOX(PATGL_NODE parent, ATGL_RECT rect,
     node->fn_render = render_checkbox;
     node->fn_event  = event_checkbox;
     node->data.checkbox.checked = initial;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1173,6 +1223,7 @@ PATGL_NODE ATGL_CREATE_RADIO(PATGL_NODE parent, ATGL_RECT rect,
     node->fn_event  = event_radio;
     node->data.radio.group_id = group_id;
     node->data.radio.selected = selected;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1197,6 +1248,7 @@ PATGL_NODE ATGL_CREATE_TEXTINPUT(PATGL_NODE parent, ATGL_RECT rect,
         if (plen >= ATGL_PLACEHOLDER_MAX) plen = ATGL_PLACEHOLDER_MAX - 1;
         MEMCPY_OPT(td->placeholder, placeholder, plen);
     }
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1216,6 +1268,7 @@ PATGL_NODE ATGL_CREATE_SLIDER(PATGL_NODE parent, ATGL_RECT rect,
     sd->value    = value;
     sd->step     = step > 0 ? step : 1;
     sd->dragging = FALSE;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1233,6 +1286,7 @@ PATGL_NODE ATGL_CREATE_PROGRESSBAR(PATGL_NODE parent, ATGL_RECT rect,
     pd->value     = 0;
     pd->max       = max ? max : 100;
     pd->show_text = TRUE;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1243,13 +1297,13 @@ PATGL_NODE ATGL_CREATE_PANEL(PATGL_NODE parent, ATGL_RECT rect,
     PATGL_NODE node = ATGL_NODE_CREATE(ATGL_NODE_PANEL, parent, rect);
     if (!node) return NULLPTR;
 
-    node->bg        = atgl.theme.widget_bg;
     node->fn_render = render_panel;
 
     ATGL_PANEL_DATA *pd = &node->data.panel;
     pd->layout  = layout;
     pd->padding = padding;
     pd->spacing = spacing;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1268,6 +1322,7 @@ PATGL_NODE ATGL_CREATE_LISTBOX(PATGL_NODE parent, ATGL_RECT rect,
     ld->selected     = 0;
     ld->scroll_offset = 0;
     ld->visible_rows = visible_rows ? visible_rows : 5;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1277,6 +1332,7 @@ PATGL_NODE ATGL_CREATE_SEPARATOR(PATGL_NODE parent, ATGL_RECT rect)
     if (!node) return NULLPTR;
 
     node->fn_render = render_separator;
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
@@ -1306,6 +1362,7 @@ PATGL_NODE ATGL_CREATE_IMAGE(PATGL_NODE parent, ATGL_RECT rect,
     node->data.image.owns_pixels = FALSE;
     node->data.image.show_grid   = FALSE;
     node->data.image.grid_colour = RGB(60, 60, 60);
+    ATGL_NODE_RESET_THEME_COLORS(node);
     return node;
 }
 
