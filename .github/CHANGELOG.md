@@ -71,3 +71,49 @@ Tab autocompletes now pathnames for commands, binaryes and scripts in the curren
 Fixed relative path handling in TSHELL, so that commands like `./myprogram` or `../otherdir/script` work correctly regardless of the current working directory. This improves usability and consistency when running programs from the shell.
 
 Small bug fixes for the BATSH language, most features are now working as intended. 
+
+## 2026.05.01 - 2026.05.xx
+
+### CPCD
+
+Added the CPCD utility for copying files from a CD-ROM (ISO9660) to the hard drive. It supports copying large files efficiently and is designed to work with the FAT32 file system. The utility takes a source path inside the CD-ROM ISO image and a destination path on the hard drive, and performs the copy operation while handling the necessary filesystem interactions.
+
+### ATWAV 
+
+Added the ATWAV audio library for atOS, which provides basic audio playback capabilities for WAV files. It supports loading and playing WAV files in specific formats (8-bit 22050 Hz Mono and 16-bit 44800 Hz Stereo) and includes a simple API for audio playback. The library is designed for ease of use in atOS applications, particularly games and multimedia applications. Instructions for converting audio files to the supported WAV format using tools like CloudConvert or FFmpeg are also provided.
+
+### FAT 
+
+Added deferred-flush mode to the FAT filesystem implementation, allowing multiple FAT updates to be accumulated in memory and written to disk in a single batch operation. This can significantly improve performance when making many changes to the filesystem, such as when copying a large number of files from an ISO image. Also changed from ATA PIO to DMA for FAT reads and writes, which should further improve performance by allowing the CPU to do other work while the disk transfer is in progress.
+
+### AC97 Audio
+
+Added support for playing PCM audio data through the AC97 audio interface, with two new system calls: `AC97_PLAY8` for 8-bit mono audio and `AC97_PLAY16` for 16-bit stereo audio. These functions take a pointer to the PCM audio data and the number of frames to play, and return a boolean indicating success or failure. This allows applications to generate and play custom audio in real time, opening up possibilities for music, sound effects, and more immersive multimedia experiences on atOS.
+
+### JAMMER
+
+Added JAMMER, a WAV PCM audio player program for atOS that uses the new ATWAV library and AC97 audio support. JAMMER allows users to load and play WAV files in the supported formats, providing a simple interface for audio playback. It can be used to play music or sound effects in games and other applications on atOS, demonstrating the new audio capabilities of the system.
+
+### SHIFT+ALT+<F1-F12>
+
+Added support for switching between multiple virtual consoles using Shift+Alt+F1 through Shift+Alt+F12. This allows users to have multiple independent shell sessions or applications running in separate virtual consoles, improving multitasking and usability. Each virtual console maintains its own state, including the focused process and display output, allowing for a more flexible and powerful user experience on atOS.
+
+### ATZP
+
+Added ATZP, a simple ZIP file extractor utility for atOS. It supports extracting files from ZIP archives in the current directory, allowing users to easily access compressed files without needing to transfer them to another system for extraction. ATZP provides a command-line interface for specifying the ZIP file and the destination directory for extracted files, making it a convenient tool for managing compressed data on atOS.
+
+### ZIP
+
+ZIP is an utility program for managing ZIP archives using ATZP.
+
+### ATHASH
+
+Added ATHASH, a crypt library for atOS that provides base64 and sha1 encoding and decoding functions.
+
+### HASH
+
+Added a HASH utility for ATHASH testing, which allows users to compute and verify SHA-1 hashes of files and strings, as well as perform base64 encoding and decoding. This utility can be used for verifying file integrity, securely storing passwords, or any other use case where hashing is needed on atOS. It provides a simple command-line interface for specifying the input data and the desired operation (hashing or base64 encoding/decoding).
+
+### TESTS
+
+@retroaalto added a suite of tests for the std libraries in [PR](https://github.com/Antonako1/atOS/pull/38/)
