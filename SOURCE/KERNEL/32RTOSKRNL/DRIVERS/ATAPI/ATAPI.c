@@ -103,6 +103,7 @@ int read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
 
     _outb(port + ATA_DRIVE_HEAD, 0xA0 | (slave << 4));
     ata_io_wait(port);
+    _outb(port + ATA_CONTROL_REG, ATA_CTRL_NO_IRQ); // Disable IRQs during PIO
     _outb(port + ATA_ERR, 0x00);
     _outb(port + ATA_LBA_MID, ATAPI_SECTOR_SIZE & 0xFF);
     _outb(port + ATA_LBA_HI, ATAPI_SECTOR_SIZE >> 8);
@@ -143,6 +144,7 @@ int read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
         U32 offset = i * ATAPI_SECTOR_SIZE;
         _insw(port + ATA_DATA, (U16 *)((U8 *)buffer + offset), size / 2);
     }
+    _outb(port + ATA_CONTROL_REG, 0x00); // Re-enable IRQs
 
     return ATA_SUCCESS;
 }

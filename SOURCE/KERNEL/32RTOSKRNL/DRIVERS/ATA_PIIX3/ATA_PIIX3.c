@@ -188,9 +188,9 @@ BOOLEAN ATA_PIIX3_XFER(U8 device, U32 lba, U8 sectors, VOIDPTR buf, BOOLEAN writ
     dma_write = write;
     dma_done = FALSE;
 
-    // Start DMA engine
+    // Clear DMA status and set direction (do not start yet)
     bm_write8(bm_base, is_io, BM_STATUS_OFFSET, BM_STATUS_ERROR | BM_STATUS_IRQ);
-    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, (write ? BM_CMD_WRITE : BM_CMD_READ) | BM_CMD_START_STOP);
+    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, write ? BM_CMD_WRITE : BM_CMD_READ);
 
     // Program ATA registers (0xE0 = fixed bits; bit6=LBA mode; bit4=slave select)
     _outb(base + ATA_DRIVE_HEAD, 0xE0 | (is_slave ? 0x10 : 0x00) | ((lba >> 24) & 0x0F));
@@ -201,8 +201,21 @@ BOOLEAN ATA_PIIX3_XFER(U8 device, U32 lba, U8 sectors, VOIDPTR buf, BOOLEAN writ
     _outb(base + ATA_LBA_HI,   (U8)((lba >> 16) & 0xFF));
     _outb(base + ATA_COMM_REG, write ? ATA_MDA_CMD_WRITE28 : ATA_MDA_CMD_READ28);
 
-    // Wait for IRQ
-    while (!dma_done) cpu_relax(); // could use proper thread sleep instead
+    // Start DMA engine
+    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, (write ? BM_CMD_WRITE : BM_CMD_READ) | BM_CMD_START_STOP);
+
+    // Wait for IRQ with a timeout to prevent absolute lockups
+    U32 timeout = POLLING_TIME * 10;
+    while (!dma_done && timeout > 0) {
+        cpu_relax();
+        timeout--;
+    }
+
+    if (timeout == 0) {
+        // Timeout occurred, stop the DMA engine and return
+        bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, BM_STATUS_STOP);
+        return FALSE;
+    }
 
     return TRUE;
 }
@@ -232,12 +245,19 @@ void ATA_IRQ_HANDLER(U32 vector, U32 errcode) {
     // Determine primary/secondary channel
     U32 bm_base = (vector == PIC_REMAP_OFFSET + 14) ? BM_BASE_PRIMARY : BM_BASE_SECONDARY;
     BOOL is_io = (vector == PIC_REMAP_OFFSET + 14) ? BM_PRIMARY_IS_IO : BM_SECONDARY_IS_IO;
+    U16 base_port = (vector == PIC_REMAP_OFFSET + 14) ? ATA_PRIMARY_BASE : ATA_SECONDARY_BASE;
 
     // Read BM status
     U8 status = bm_read8(bm_base, is_io, BM_STATUS_OFFSET);
 
     // Stop DMA engine
     bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, BM_STATUS_STOP);
+
+    // Clear the interrupt and error bits in BM status (Write 1 to clear)
+    bm_write8(bm_base, is_io, BM_STATUS_OFFSET, status | BM_STATUS_IRQ | BM_STATUS_ERROR);
+
+    // Read the regular ATA status to clear the IRQ safely at the drive level
+    _inb(base_port + ATA_COMM_REG);
 
     // Check for errors
     if (status & BM_STATUS_ERROR) {

@@ -559,7 +559,7 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         KDEBUG_HEX32(entry_point);
         KDEBUG_PUTS("\n");
     }
-
+    DEBUG_PRINTF("[proc] Initializing task context with entry point 0x%X, stack size 0x%X, initial state 0x%X\n", entry_point, stack_size, initial_state);
     init_task_context(proc, (void (*)(void))entry_point, stack_size, initial_state);
     KDEBUG_PUTS("[proc] Trapframe initialized\n");
 
@@ -719,14 +719,11 @@ BOOLEAN RUN_BINARY(
     // HLT;
 
     add_tcb_to_scheduler(new_proc);
-    KDEBUG_PUTS("[proc] added to scheduler pid="); 
-    KDEBUG_HEX32(new_proc->info.pid); 
-    KDEBUG_PUTS("\n[proc] Stack at "); 
-    KDEBUG_HEX32(new_proc->stack_phys_base); 
-    KDEBUG_PUTS("\n");
+    DEBUG_PRINTF("[proc] Process \"%s\" (PID %u) created with entry point at 0x%X\n", new_proc->info.name, new_proc->info.pid, new_proc->tf->cpu.eip);
 
     if(initial_state & TCB_STATE_INFO_CHILD_PROC_HANDLER) {
         current_shell = new_proc;
+        DEBUG_PRINTF("[proc] Set current_shell to PID %u\n", current_shell->info.pid);
     }
     return TRUE;
 }

@@ -54,7 +54,7 @@ BOOL FAT_WRITE_CLUSTER(U32 cluster, const U8 *buf) {
     // Optionally, check sector range against total disk sectors
     // if (sector + bpb.SECTORS_PER_CLUSTER > TOTAL_DISK_SECTORS) return FALSE;
 
-    return ATA_PIO_WRITE_SECTORS(sector, bpb.SECTORS_PER_CLUSTER, buf);
+    return ATA_PIIX3_WRITE_SECTORS(sector, bpb.SECTORS_PER_CLUSTER, buf);
 }
 
 
@@ -372,17 +372,40 @@ BOOLEAN INITIAL_WRITE_FAT() {
         fat32[i] = FAT32_FREE_CLUSTER;      // 0x00000000
     }
 
-    // Write FAT #1
-    if (!ATA_PIO_WRITE_SECTORS(bpb.RESERVED_SECTORS, fat_sectors, fatbuf)) {
-        Free(fatbuf);
-        return FALSE;
+    /* Write FAT #1 in chunks (ATA PIO sector_count is U8, max 255) */
+    #define FAT_INIT_CHUNK 127
+    U8 *src;
+    U32 lba, remaining, count;
+
+    src = fatbuf;
+    lba = bpb.RESERVED_SECTORS;
+    remaining = fat_sectors;
+    while (remaining > 0) {
+        count = remaining > FAT_INIT_CHUNK ? FAT_INIT_CHUNK : remaining;
+        if (!ATA_PIO_WRITE_SECTORS(lba, (U8)count, src)) {
+            Free(fatbuf);
+            return FALSE;
+        }
+        src       += count * bpb.BYTES_PER_SECTOR;
+        lba       += count;
+        remaining -= count;
     }
 
-    // Write FAT #2 (backup)
-    if (!ATA_PIO_WRITE_SECTORS(bpb.RESERVED_SECTORS + fat_sectors, fat_sectors, fatbuf)) {
-        Free(fatbuf);
-        return FALSE;
+    /* Write FAT #2 (backup) in chunks */
+    src = fatbuf;
+    lba = bpb.RESERVED_SECTORS + fat_sectors;
+    remaining = fat_sectors;
+    while (remaining > 0) {
+        count = remaining > FAT_INIT_CHUNK ? FAT_INIT_CHUNK : remaining;
+        if (!ATA_PIO_WRITE_SECTORS(lba, (U8)count, src)) {
+            Free(fatbuf);
+            return FALSE;
+        }
+        src       += count * bpb.BYTES_PER_SECTOR;
+        lba       += count;
+        remaining -= count;
     }
+    #undef FAT_INIT_CHUNK
 
     return TRUE;
 }
@@ -391,10 +414,37 @@ BOOLEAN INITIAL_WRITE_FAT() {
 BOOL FAT_FLUSH(void) {
     U32 fat_sectors = bpb.EXBR.SECTORS_PER_FAT;
     U32 first_fat_lba = bpb.RESERVED_SECTORS;
+
+    /* ATA PIO sector_count is U8 (max 255); write in chunks like READ_FAT */
+    #define FAT_WRITE_CHUNK 127
+    U8 *src;
+    U32 lba, remaining, count;
+
     // write FAT #1
-    if (!ATA_PIO_WRITE_SECTORS(first_fat_lba, fat_sectors, (U8 *)fat32)) return FALSE;
+    src = (U8 *)fat32;
+    lba = first_fat_lba;
+    remaining = fat_sectors;
+    while (remaining > 0) {
+        count = remaining > FAT_WRITE_CHUNK ? FAT_WRITE_CHUNK : remaining;
+        if (!ATA_PIIX3_WRITE_SECTORS(lba, (U8)count, src)) return FALSE;
+        src       += count * bpb.BYTES_PER_SECTOR;
+        lba       += count;
+        remaining -= count;
+    }
+
     // write FAT #2 (backup)
-    if (!ATA_PIO_WRITE_SECTORS(first_fat_lba + fat_sectors, fat_sectors, (U8 *)fat32)) return FALSE;
+    src = (U8 *)fat32;
+    lba = first_fat_lba + fat_sectors;
+    remaining = fat_sectors;
+    while (remaining > 0) {
+        count = remaining > FAT_WRITE_CHUNK ? FAT_WRITE_CHUNK : remaining;
+        if (!ATA_PIIX3_WRITE_SECTORS(lba, (U8)count, src)) return FALSE;
+        src       += count * bpb.BYTES_PER_SECTOR;
+        lba       += count;
+        remaining -= count;
+    }
+    #undef FAT_WRITE_CHUNK
+
     return TRUE;
 }
 
