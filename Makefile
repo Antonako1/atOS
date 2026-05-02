@@ -46,7 +46,7 @@ INPUT_ISO_DIR_SYSTEM ?= $(INPUT_ISO_DIR)/ATOS
 INPUT_ISO_DIR_HOME ?= $(INPUT_ISO_DIR)/HOME
 INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 
-.PHONY: all kernel reset_hdd bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap
+.PHONY: all kernel reset_hdd bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap test
 .PHONY: run_user
 .PHONY: run_user_gui
 
@@ -425,3 +425,7 @@ help:
 	@echo "  sudo make clean_tap      - Clean tap ethernet config"
 	@echo "  make reset_hdd   - Reset hdd.img to 256MB"
 	@echo "  make clean      - Clean build artifacts"
+	@echo "  make test       - Run host unit tests"
+
+test:
+	$(MAKE) -C TESTS all
