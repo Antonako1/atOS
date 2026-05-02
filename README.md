@@ -154,7 +154,8 @@ The project uses `make` with simple targets:
 * **Build and launch atOS:**
 
   ```bash
-  make iso run
+  # Add `reset_hdd` to the after make to reset the hard disk image before running
+  make <reset_hdd> iso run
   ```
 
 CMake is used for processes and libraries
