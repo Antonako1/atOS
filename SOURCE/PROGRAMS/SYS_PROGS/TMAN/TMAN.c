@@ -147,7 +147,7 @@ static VOID on_kill(PATGL_NODE node)
     if (sel_pid != 0xFFFFFFFF && sel_pid != KERNEL_PID) {
         if(sel_pid == PROC_GETPID()) {
             DEBUG_PRINTF("[TMAN] Attempting to kill self, exiting instead.\n");
-            EXIT(0);
+            ATGL_QUIT();
         } else {
             KILL_PROCESS_INSTANCE(sel_pid);
         }
