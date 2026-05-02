@@ -627,6 +627,8 @@ BOOL initialize_filestructure(VOID) {
     if(!bin) {
         return FALSE;
     }
+    DEBUG_PRINTF("[atOS] Read VBR.BIN from ISO9660, size %u bytes\n", sz);
+    
     if(!ZERO_INITIALIZE_FAT32(bin, sz)) {
         ISO9660_FREE_MEMORY(bin);
         return FALSE;
