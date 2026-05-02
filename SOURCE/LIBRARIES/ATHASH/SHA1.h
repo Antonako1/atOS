@@ -18,4 +18,11 @@ VOID SHA1_FINAL(U8 digest[SHA1_DIGEST_SIZE], SHA1_CTX *ctx);
 /* Convenience: hash a buffer in one call, writes 20-byte digest */
 VOID SHA1_HASH(CONST U8 *data, U32 len, U8 digest[SHA1_DIGEST_SIZE]);
 
+/*
+Usage example:
+U8 digest[SHA1_DIGEST_SIZE];
+SHA1_HASH((U8 *)"hello world", 11, digest);
+The resulting digest will be the SHA-1 hash of "hello world". You can convert it to hex or use it as needed.
+*/
+
 #endif // ATHASH_SHA1_H
