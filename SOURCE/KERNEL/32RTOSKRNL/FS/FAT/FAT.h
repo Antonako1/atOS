@@ -165,6 +165,19 @@ BOOLEAN ZERO_INITIALIZE_FAT32(VOIDPTR BOOTLOADER_BIN, U32 sz);
 // Initializes a new FAT32 filesystem on a blank disk. 
 // Writes BPB, FSInfo, empty FATs, and creates the root directory.
 
+BOOL FAT_FLUSH(VOID);
+// Write the entire in-memory FAT table to disk immediately.
+// Skipped automatically when deferred-flush mode is active.
+
+VOID FAT_SET_DEFERRED_FLUSH(BOOL deferred);
+// When TRUE, FAT_FLUSH() becomes a no-op (all FAT updates stay in RAM).
+// Call FAT_COMMIT() to write the accumulated changes to disk in one pass.
+
+BOOL FAT_COMMIT(VOID);
+// Disables deferred-flush mode and immediately writes the in-memory FAT to disk.
+// Use this after a bulk operation (e.g. copying ISO contents) to replace
+// hundreds of per-cluster flushes with a single sequential write.
+
 // ----- Directory and file lookup -----
 
 U32 GET_ROOT_CLUSTER();
@@ -226,6 +239,17 @@ BOOL FAT_FREE_CHAIN(U32 start_cluster);
 
 BOOL FAT_TRUNCATE_CHAIN(U32 start_cluster, U32 new_size_clusters);
 // Keeps the first 'new_size_clusters' in a chain, frees the rest.
+
+U32 FAT_CLUSTER_TO_LBA(U32 cluster);
+// Converts a FAT32 cluster number to the corresponding absolute disk LBA sector.
+
+U32 FAT_GET_NEXT_CLUSTER(U32 cluster);
+// Returns the next cluster in the FAT chain after 'cluster'.
+// Returns FAT32_END_OF_CHAIN (>=0x0FFFFFF8) when at the end.
+
+BOOLEAN FIND_DIR_ENTRY_BY_CLUSTER_NUMBER(U32 cluster, DIR_ENTRY *out);
+// Searches all directories for a directory entry whose first cluster matches 'cluster'.
+// Returns TRUE and fills 'out' on success.
 
 // ----- File data operations -----
 

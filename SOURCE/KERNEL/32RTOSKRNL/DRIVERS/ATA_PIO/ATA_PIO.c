@@ -83,7 +83,7 @@ static BOOLEAN ata_wait_ready_and_data_request(U16 base) {
     return FALSE; // Timeout
 }
 
-// Generic PIO sector read/write (LBA28 only)
+// Generic PIO sector read/write (LBA28) — true multi-sector transfer
 BOOLEAN ATA_PIO_XFER(U8 device, U32 lba, U8 sector_count, VOIDPTR buffer, BOOLEAN write) {
     U16 base;
     U8 drive;
@@ -109,46 +109,55 @@ BOOLEAN ATA_PIO_XFER(U8 device, U32 lba, U8 sector_count, VOIDPTR buffer, BOOLEA
         return FALSE;        
     }
 
+    if (sector_count == 0) return FALSE;
+
     U16* buf = (U16*)buffer;
 
-    for(U8 s = 0; s < sector_count; s++) {
-        // 1. Select Drive and LBA high bits (400ns delay required)
-        _outb(base + ATA_DRIVE_HEAD, drive | 0xE0 | ((lba >> 24) & 0x0F));
-        // Provide 400ns delay by reading the status register 4 times
-        ata_io_wait(base); ata_io_wait(base); ata_io_wait(base); ata_io_wait(base); 
-        
-        // 2. Set Sector Count and LBA for single sector transfer
-        _outb(base + ATA_SECCOUNT, 1);
-        _outb(base + ATA_LBA_LO,   lba & 0xFF);
-        _outb(base + ATA_LBA_MID,  (lba >> 8) & 0xFF);
-        _outb(base + ATA_LBA_HI,   (lba >> 16) & 0xFF);
+    // 1. Select Drive and upper LBA bits; 400 ns delay
+    _outb(base + ATA_DRIVE_HEAD, drive | 0xE0 | ((lba >> 24) & 0x0F));
+    ata_io_wait(base); ata_io_wait(base); ata_io_wait(base); ata_io_wait(base);
 
-        // 3. Send Command (using standard ATA PIO commands)
-        _outb(base + ATA_COMM_REG, write ? ATA_PIO_CMD_WRITE28 : ATA_PIO_CMD_READ28);
-        ata_io_wait(base);
+    // 2. Program sector count and 24-bit LBA address
+    _outb(base + ATA_SECCOUNT, sector_count);
+    _outb(base + ATA_LBA_LO,   (U8)(lba & 0xFF));
+    _outb(base + ATA_LBA_MID,  (U8)((lba >> 8) & 0xFF));
+    _outb(base + ATA_LBA_HI,   (U8)((lba >> 16) & 0xFF));
 
-        // 4. Poll for DRQ (Ready for Data)
-        if(!ata_wait_ready_and_data_request(base)) return ATA_FAILED; // Base argument added
+    // 3. Issue single READ or WRITE command for all sectors
+    _outb(base + ATA_COMM_REG, write ? ATA_PIO_CMD_WRITE28 : ATA_PIO_CMD_READ28);
+    ata_io_wait(base);
 
-        // Calculate offset into the 16-bit buffer
-        U16* sector_buffer = buf + (s * ATA_PIO_SECTOR_WORDS);
+    // 4. Transfer one sector at a time, waiting for DRQ before each
+    for (U8 s = 0; s < sector_count; s++) {
+        // Poll for DRQ (drive ready to transfer next sector)
+        if (!ata_wait_ready_and_data_request(base)) return FALSE;
 
-        // 5. Transfer Data (512 bytes = 256 words)
-        if(write) {
-            for(int i=0;i<256;i++) _outw(base + ATA_DATA, sector_buffer[i]);
-            // After PIO write, we must wait for BSY to clear before next command
+        U16 *sector_buf = buf + (s * ATA_PIO_SECTOR_WORDS);
+
+        if (write) {
+            for (int i = 0; i < 256; i++) _outw(base + ATA_DATA, sector_buf[i]);
+            /* Wait for BSY to clear before writing the next sector (or finishing).
+             * Do NOT issue any ATA command here — the multi-sector transfer is
+             * still in progress; the drive will assert DRQ again for the next sector. */
             U32 poll_timeout = POLLING_TIME;
             while ((_inb(base + ATA_COMM_REG) & STAT_BSY) && poll_timeout--) {
                 ata_io_wait(base);
             }
-            if (poll_timeout == 0) return FALSE; // Write completion timeout
-            // Add 400ns delay before next command loop iteration
-            ata_io_wait(base); ata_io_wait(base); ata_io_wait(base); ata_io_wait(base); 
+            if (poll_timeout == 0) return FALSE;
         } else {
-            for(int i=0;i<256;i++) sector_buffer[i] = _inw(base + ATA_DATA);
+            for (int i = 0; i < 256; i++) sector_buf[i] = _inw(base + ATA_DATA);
         }
+    }
 
-        lba++;
+    /* After all write sectors are done, issue a single CACHE FLUSH so the data
+     * is committed to persistent storage before we return. */
+    if (write) {
+        _outb(base + ATA_COMM_REG, 0xE7); /* WRITE_CACHE_FLUSH */
+        U32 flush_timeout = POLLING_TIME;
+        while ((_inb(base + ATA_COMM_REG) & STAT_BSY) && flush_timeout--) {
+            ata_io_wait(base);
+        }
+        if (flush_timeout == 0) return FALSE;
     }
 
     return ATA_SUCCESS;

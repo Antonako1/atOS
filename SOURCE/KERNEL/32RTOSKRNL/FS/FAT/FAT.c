@@ -1,4 +1,5 @@
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
+#include <DRIVERS/ATA_PIIX3/ATA_PIIX3.h>
 #include <DRIVERS/CMOS/CMOS.h>
 #include <RTOSKRNL/RTOSKRNL_INTERNAL.h>
 #include <FS/FAT/FAT.h>
@@ -19,6 +20,8 @@ static DIR_ENTRY *root_dir = NULLPTR;
 static U32 root_dir_end ATTRIB_DATA = 0;
 static BOOL bpb_loaded ATTRIB_DATA = 0;
 static FSINFO fsinfo ATTRIB_DATA = { 0 };
+/* When TRUE, FAT_FLUSH() is a no-op; call FAT_COMMIT() to force a real flush. */
+static BOOL g_fat_deferred_flush ATTRIB_DATA = FALSE;
 
 #define SET_BPB(x, val, sz) MEMCPY(&x, val, sz)
 
@@ -30,14 +33,13 @@ static FSINFO fsinfo ATTRIB_DATA = { 0 };
 // Writes a single sector to disk at absolute sector number
 BOOL FAT_WRITE_SECTOR_ON_DISK(U32 lba, const U8 *buf) {
     if (!buf) return FALSE;
-    // ATA_PIO_WRITE_SECTORS expects LBA, count, buffer
-    return ATA_PIO_WRITE_SECTORS(lba, 1, buf);
+    return ATA_PIIX3_WRITE_SECTORS(lba, 1, buf);
 }
 
 // Reads a single sector from disk at absolute sector number
 BOOL FAT_READ_SECTOR_FROM_DISK(U32 lba, U8 *buf) {
     if (!buf) return FALSE;
-    return ATA_PIO_READ_SECTORS(lba, 1, buf);
+    return ATA_PIIX3_READ_SECTORS(lba, 1, buf);
 }
 
 // Write cluster buffer (cluster -> disk sector mapping)
@@ -66,7 +68,7 @@ BOOL FAT_READ_CLUSTER(U32 cluster, U8 *buf) {
     U32 data_start_sector = bpb.RESERVED_SECTORS + (bpb.NUM_OF_FAT * bpb.EXBR.SECTORS_PER_FAT);
     U32 sector = data_start_sector + (cluster - FIRST_ALLOWED_CLUSTER_NUMBER) * bpb.SECTORS_PER_CLUSTER;
     
-    return ATA_PIO_READ_SECTORS(sector, bpb.SECTORS_PER_CLUSTER, buf);
+    return ATA_PIIX3_READ_SECTORS(sector, bpb.SECTORS_PER_CLUSTER, buf);
 }
 
 
@@ -84,14 +86,14 @@ BOOLEAN READ_FAT() {
     fat32 = (U32 *)KMALLOC(fat_size);
     if (!fat32) return FALSE;
 
-    /* ATA PIO is limited to 255 sectors per request — read in chunks */
+    /* DMA is limited to 127 sectors (~64 KB) per transfer — read in chunks */
     #define FAT_READ_CHUNK 127
     U8 *dst = (U8 *)fat32;
     U32 lba = fat_lba;
     U32 remaining = fat_sectors;
     while (remaining > 0) {
         U32 count = remaining > FAT_READ_CHUNK ? FAT_READ_CHUNK : remaining;
-        if (!ATA_PIO_READ_SECTORS(lba, count, dst)) {
+        if (!ATA_PIIX3_READ_SECTORS(lba, count, dst)) {
             KFREE(fat32);
             fat32 = NULLPTR;
             KDEBUG_PUTS("[FAT] Failed to read FAT from disk.\n");
@@ -259,7 +261,11 @@ BOOLEAN WRITE_DISK_BPB() {
     bpb.BYTES_PER_SECTOR = BYTES_PER_SECT;
     bpb.SECTORS_PER_CLUSTER = SECT_PER_CLUST;     // 4 KB clusters
     bpb.RESERVED_SECTORS = 32;
+    #ifdef FAT2_BACKUP
     bpb.NUM_OF_FAT = 2;
+    #else
+    bpb.NUM_OF_FAT = 1;
+    #endif
     bpb.NUM_OF_ROOT_DIR_ENTRIES = 0; // FAT32 stores root dir in cluster chain
     bpb.TOTAL_SECTORS = 0;           // set 0 if >65535 sectors (use LARGE_SECTOR_COUNT)
     bpb.MEDIA_DESCR_TYPE = 0xF8;
@@ -304,7 +310,7 @@ BOOLEAN POPULATE_BOOTLOADER(VOIDPTR BOOTLOADER_BIN, U32 sz) {
     if (sz > ATA_PIO_SECTOR_SIZE)
         return FALSE;
     if (sz <= sizeof(BPB))
-        return FALSE; // nothing to copy after the header
+        return FALSE;
 
     U8 *loader = (U8 *)BOOTLOADER_BIN;
 
@@ -372,7 +378,7 @@ BOOLEAN INITIAL_WRITE_FAT() {
         fat32[i] = FAT32_FREE_CLUSTER;      // 0x00000000
     }
 
-    /* Write FAT #1 in chunks (ATA PIO sector_count is U8, max 255) */
+    /* Write FAT #1 in chunks (DMA PRDT limit: 127 sectors = 65024 bytes per transfer) */
     #define FAT_INIT_CHUNK 127
     U8 *src;
     U32 lba, remaining, count;
@@ -382,7 +388,7 @@ BOOLEAN INITIAL_WRITE_FAT() {
     remaining = fat_sectors;
     while (remaining > 0) {
         count = remaining > FAT_INIT_CHUNK ? FAT_INIT_CHUNK : remaining;
-        if (!ATA_PIO_WRITE_SECTORS(lba, (U8)count, src)) {
+        if (!ATA_PIIX3_WRITE_SECTORS(lba, (U8)count, src)) {
             Free(fatbuf);
             return FALSE;
         }
@@ -392,12 +398,13 @@ BOOLEAN INITIAL_WRITE_FAT() {
     }
 
     /* Write FAT #2 (backup) in chunks */
+    #ifdef FAT2_BACKUP
     src = fatbuf;
     lba = bpb.RESERVED_SECTORS + fat_sectors;
     remaining = fat_sectors;
     while (remaining > 0) {
         count = remaining > FAT_INIT_CHUNK ? FAT_INIT_CHUNK : remaining;
-        if (!ATA_PIO_WRITE_SECTORS(lba, (U8)count, src)) {
+        if (!ATA_PIIX3_WRITE_SECTORS(lba, (U8)count, src)) {
             Free(fatbuf);
             return FALSE;
         }
@@ -405,17 +412,31 @@ BOOLEAN INITIAL_WRITE_FAT() {
         lba       += count;
         remaining -= count;
     }
+    #endif // FAT2_BACKUP
     #undef FAT_INIT_CHUNK
 
     return TRUE;
 }
 
 
+VOID FAT_SET_DEFERRED_FLUSH(BOOL deferred) {
+    g_fat_deferred_flush = deferred;
+}
+
+/* Commit a previously deferred flush: disable deferred mode then do the real write. */
+BOOL FAT_COMMIT(VOID) {
+    g_fat_deferred_flush = FALSE;
+    return FAT_FLUSH();
+}
+
 BOOL FAT_FLUSH(void) {
+    /* Skip write if deferred mode is active; caller must call FAT_COMMIT() later. */
+    if (g_fat_deferred_flush) return TRUE;
+
     U32 fat_sectors = bpb.EXBR.SECTORS_PER_FAT;
     U32 first_fat_lba = bpb.RESERVED_SECTORS;
 
-    /* ATA PIO sector_count is U8 (max 255); write in chunks like READ_FAT */
+    /* DMA sector_count is U8 (max 127 per transfer to stay within 64 KB PRDT limit) */
     #define FAT_WRITE_CHUNK 127
     U8 *src;
     U32 lba, remaining, count;
@@ -431,7 +452,7 @@ BOOL FAT_FLUSH(void) {
         lba       += count;
         remaining -= count;
     }
-
+    #ifdef FAT2_BACKUP
     // write FAT #2 (backup)
     src = (U8 *)fat32;
     lba = first_fat_lba + fat_sectors;
@@ -443,6 +464,7 @@ BOOL FAT_FLUSH(void) {
         lba       += count;
         remaining -= count;
     }
+    #endif
     #undef FAT_WRITE_CHUNK
 
     return TRUE;
@@ -971,7 +993,7 @@ VOID FAT_83_TO_STR(const U8 filename_11[11], U8 *out_str, U32 max_len) {
 // Recursive function to copy ISO directories and files
 BOOLEAN copy_iso_to_fat32(IsoDirectoryRecord *iso_dir, U32 parent_cluster) {
     if (!iso_dir) return FALSE;
-
+    DEBUG_PRINTF("[FAT] Copying ISO directory to FAT32. Parent cluster: %u\n", parent_cluster);
     U32 count = 0;
     U8 success;
     IsoDirectoryRecord **dir_contents = ISO9660_GET_DIR_CONTENTS(iso_dir, FALSE, &count, &success);
@@ -985,6 +1007,7 @@ BOOLEAN copy_iso_to_fat32(IsoDirectoryRecord *iso_dir, U32 parent_cluster) {
         U32 copy_len = rec->fileNameLength < ISO9660_MAX_PATH - 1 ? rec->fileNameLength : ISO9660_MAX_PATH - 1;
         MEMCPY(name, rec->fileIdentifier, copy_len);
         name[copy_len] = '\0';
+        DEBUG_PRINTF("[FAT] Processing ISO entry: %s (isDir: %d, size: %u bytes)\n", name, (rec->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) != 0, rec->extentLengthLE);
         for (U32 j = 0; j < copy_len; j++) {    
             if (name[j] == ';') {
                 name[j] = '\0';
@@ -1037,6 +1060,8 @@ BOOLEAN COPY_ISO9660_CONTENTS_TO_FAT32() {
     if (!ISO9660_READ_PVD(&pvd, sizeof(PrimaryVolumeDescriptor))) return FALSE;
     IsoDirectoryRecord root_iso;
     ISO9660_EXTRACT_ROOT_FROM_PVD(&pvd, &root_iso);
+    DEBUG_PRINTF("[FAT] Root directory extracted from ISO9660 PVD.\n");
+    DEBUG_PRINTF("[FAT] Root directory starts at LBA: %u, size: %u bytes.\n", root_iso.extentLocationLE_LBA, root_iso.extentLengthLE);
     return copy_iso_to_fat32(&root_iso, bpb.EXBR.ROOT_CLUSTER);
 }
 
@@ -1051,8 +1076,18 @@ BOOLEAN ZERO_INITIALIZE_FAT32(VOIDPTR BOOTLOADER_BIN, U32 sz) {
     DEBUG_PRINTF("[FAT] FAT tables initialized.\n");
     if (!CREATE_ROOT_DIR(bpb.EXBR.ROOT_CLUSTER)) return FALSE;
     DEBUG_PRINTF("[FAT] Root directory created.\n");
-    if(!COPY_ISO9660_CONTENTS_TO_FAT32()) return FALSE;
-    DEBUG_PRINTF("ISO9660 contents copied to FAT32.\n");
+    /* Defer FAT flushes during the ISO copy: instead of rewriting the entire
+     * FAT table (8192 sectors, ~4 MB) on every cluster allocation, we batch
+     * all in-memory FAT updates and write the table just once at the end. */
+    FAT_SET_DEFERRED_FLUSH(TRUE);
+    if(!COPY_ISO9660_CONTENTS_TO_FAT32()) {
+        FAT_SET_DEFERRED_FLUSH(FALSE); /* make sure flag is cleared on failure */
+        return FALSE;
+    }
+    DEBUG_PRINTF("[FAT] ISO9660 contents copied to FAT32 (in-memory). Committing FAT to disk...\n");
+    /* Single flush of the entire FAT after all files are placed. */
+    if (!FAT_COMMIT()) return FALSE;
+    DEBUG_PRINTF("[FAT] FAT committed to disk.\n");
     return TRUE;
 }
 
