@@ -14,10 +14,6 @@ VOID CMD_SLEEP(U8 *line) {
         DELETE_ARG_ARRAY(&args);
         return;
     }
-    for(U32 i = 0; i < seconds; i++) {
-        for(U32 j = 0; j < U32_MAX << 1; j++) {
-            cpu_relax(); // busy-wait loop to approximate sleep (not accurate, but works for now)
-        }
-    }
+    CPU_SLEEP(seconds * 1000);
     DELETE_ARG_ARRAY(&args);
 }

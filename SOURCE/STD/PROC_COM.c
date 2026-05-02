@@ -5,6 +5,7 @@
 #include <PROC/PROC.h>
 #include <STD/DEBUG.h>
 #include <STD/TASK.h>
+#include <CPU/PIT/PIT.h>
 
 static TCB process ATTRIB_DATA = {0};
 static BOOLEAN process_fetched ATTRIB_DATA = FALSE;
@@ -167,7 +168,13 @@ U32 GET_SYS_SECONDS() {
 }
 
 U32 CPU_SLEEP(U32 ms) {
-    return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
+    U32 ticks = GET_PIT_TICKS();
+    U32 target_ticks = ticks + (ms * TICKS_PER_SECOND) / 1000;
+    while (GET_PIT_TICKS() < target_ticks) {
+        YIELD();
+    }
+    
+    // return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
 }
 
 
