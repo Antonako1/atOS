@@ -992,11 +992,17 @@ BOOLEAN COPY_ISO9660_CONTENTS_TO_FAT32() {
 
 BOOLEAN ZERO_INITIALIZE_FAT32(VOIDPTR BOOTLOADER_BIN, U32 sz) {
     if (!WRITE_DISK_BPB()) return FALSE;
+    DEBUG_PRINTF("[FAT] BPB written to disk.\n");
     if (!POPULATE_BOOTLOADER(BOOTLOADER_BIN, sz)) return FALSE;
+    DEBUG_PRINTF("[FAT] Bootloader populated.\n");
     if (!CREATE_FSINFO()) return FALSE;
+    DEBUG_PRINTF("[FAT] FSInfo sector created.\n");
     if (!INITIAL_WRITE_FAT()) return FALSE;
+    DEBUG_PRINTF("[FAT] FAT tables initialized.\n");
     if (!CREATE_ROOT_DIR(bpb.EXBR.ROOT_CLUSTER)) return FALSE;
+    DEBUG_PRINTF("[FAT] Root directory created.\n");
     if(!COPY_ISO9660_CONTENTS_TO_FAT32()) return FALSE;
+    DEBUG_PRINTF("ISO9660 contents copied to FAT32.\n");
     return TRUE;
 }
 
