@@ -114,13 +114,7 @@ TCB *GET_MASTER_TCB(void) {
     }
     TCB *t = (TCB *)SYSCALL(SYSCALL_GET_MASTER_TCB, 0, 0, 0, 0, 0);
     if(t) {
-        master = (TCB *)MAlloc(sizeof(TCB));
-        if(!master) {
-            MFree(t);
-            return NULL;
-        }
-        MEMCPY(master, t, sizeof(TCB));
-        MFree(t);
+        master = t;
         master_fetched = TRUE;
         return master;
     }
