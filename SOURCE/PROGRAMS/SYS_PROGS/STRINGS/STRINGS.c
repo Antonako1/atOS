@@ -13,7 +13,7 @@
 
 static U0 HELP_MESSAGE(VOID) {
     printf(
-        #include <STRINGS.HELP>
+        #include "STRINGS.HELP"
     );
 }
 
