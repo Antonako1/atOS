@@ -23,7 +23,7 @@ VOID CMD_HELP(U8 *line) {
 
     /* -- Header -- */
     TPUT_SET_FG(VBE_LIGHT_CYAN);
-    PUTS("  BATSH v1.0 — atOS Shell" LEND);
+    PUTS("  BATSH v1.0 - atOS Shell" LEND);
     TPUT_SET_FG(VBE_DARK_GRAY);
     PUTS("  Better AT Shell  |  help [cmds|keys|batsh]" LEND LEND);
 
