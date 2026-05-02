@@ -46,7 +46,7 @@ INPUT_ISO_DIR_SYSTEM ?= $(INPUT_ISO_DIR)/ATOS
 INPUT_ISO_DIR_HOME ?= $(INPUT_ISO_DIR)/HOME
 INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 
-.PHONY: all kernel bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap
+.PHONY: all kernel reset_hdd bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap
 .PHONY: run_user
 .PHONY: run_user_gui
 
@@ -254,13 +254,22 @@ iso: bootloader kernel programs diskvbr
 	genisoimage -o $(OUTPUT_ISO_DIR)/$(ISO_NAME) -r -J -b BOOTLOADER.BIN -no-emul-boot $(INPUT_ISO_DIR)
 	@echo "ISO created at $(OUTPUT_ISO_DIR)/$(ISO_NAME)"
 
-
+reset_hdd:
+	@echo "Resetting hdd.img to 256MB size..."
+	if [ -f hdd.img ]; then \
+		rm -f hdd.img; \
+	fi
+	qemu-img create -f raw hdd.img 256M
+	@echo "hdd.img reset successfully."
 
 run:
 	@echo "Running ISO in QEMU..."
 	# Make sure disk exists
-	[ -f hdd.img ] && rm -f hdd.img
-	qemu-img create -f raw hdd.img 256M
+	if [ ! -f hdd.img ]; then \
+		echo "Creating hdd.img with 256MB size..."; \
+		qemu-img create -f raw hdd.img 256M; \
+	fi
+
 	mkdir -p OUTPUT/DEBUG
 	mkdir -p OUTPUT/SERIAL
 
@@ -414,4 +423,5 @@ help:
 	@echo "  Logs: OUTPUT/DEBUG/debug.log (from I/O port 0xE9)"
 	@echo "  sudo make setup_tap      - Setup tap ethernet config"
 	@echo "  sudo make clean_tap      - Clean tap ethernet config"
+	@echo "  make reset_hdd   - Reset hdd.img to 256MB"
 	@echo "  make clean      - Clean build artifacts"
