@@ -15,6 +15,7 @@
 #include <DRIVERS/VESA/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 #include <DRIVERS/ATA_PIO/ATA_PIO.h>
+#include <DRIVERS/ATA_PIIX3/ATA_PIIX3.h>
 #include <DRIVERS/AC97/AC97.h>
 #include <DRIVERS/CMOS/CMOS.h>
 #include <DRIVERS/SERIAL/SERIAL.h>
@@ -31,10 +32,10 @@ static SYSCALL_HANDLER syscall_table[SYSCALL_MAX] = {
 #undef SYSCALL_ENTRY
 
 U32 SYS_HDD_READ_SECTOR(U32 lba, U32 sector_count, U32 buf, U32 unused4, U32 unused5) {
-    return ATA_PIO_READ_SECTORS(lba, sector_count, buf);
+    return ATA_PIIX3_READ_SECTORS(lba, (U8)sector_count, (VOIDPTR)buf);
 }
 U32 SYS_HDD_WRITE_SECTOR(U32 lba, U32 sector_count, U32 buf, U32 unused4, U32 unused5) {
-    return ATA_PIO_WRITE_SECTORS(lba, sector_count, buf);
+    return ATA_PIIX3_WRITE_SECTORS(lba, (U8)sector_count, (VOIDPTR)buf);
 }
 
 U32 SYS_NULL(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
@@ -331,6 +332,21 @@ U32 SYS_AC97_STOP(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused
     return 0;
 }
 
+U32 SYS_AC97_PLAY8(U32 pcm_ptr, U32 frames, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3; (void)unused4; (void)unused5;
+    if (!pcm_ptr || frames == 0) return 0;
+    const U8* pcm = (const U8*)pcm_ptr;
+    BOOLEAN ok = AC97_PLAY8(pcm, frames);
+    return ok ? 1 : 0;
+}
+U32 SYS_AC97_PLAY16(U32 pcm_ptr, U32 frames, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3; (void)unused4; (void)unused5;
+    if (!pcm_ptr || frames == 0) return 0;
+    const U16* pcm = (const U16*)pcm_ptr;
+    BOOLEAN ok = AC97_PLAY16(pcm, frames);
+    return ok ? 1 : 0;
+}
+
 
 U32 SYS_GET_ROOT_CLUSTER(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
@@ -360,16 +376,22 @@ U32 SYS_CREATE_CHILD_DIR(U32 parent_cluster, U32 name_ptr, U32 attrib, U32 clust
 U32 SYS_GET_ROOT_DIR_ENTRY(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
     DIR_ENTRY e = GET_ROOT_DIR_ENTRY();
-    DIR_ENTRY *ep = KMALLOC((sizeof(DIR_ENTRY)));
-    if(!ep) return NULLPTR;
+    DIR_ENTRY *ep = KMALLOC(sizeof(DIR_ENTRY));
+    if(!ep) return 0;
+    MEMCPY(ep, &e, sizeof(DIR_ENTRY));
     return (U32)ep;
 }
-U32 SYS_CREATE_CHILD_FILE(U32 parent_cluster, U32 name_ptr, U32 attrib, U32 filedata_ptr, U32 filedata_size) {
+/* CREATE_CHILD_FILE uses a single struct ptr to work around the 5-arg syscall limit.
+ * The kernel takes ownership of args->name and args->filedata and frees them.
+ * Result cluster is written back to args->cluster_out before the struct is freed. */
+U32 SYS_CREATE_CHILD_FILE(U32 args_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    if (!args_ptr) return FALSE;
+    CREATE_CHILD_FILE_ARGS *args = (CREATE_CHILD_FILE_ARGS *)args_ptr;
     U32 cluster_out = 0;
-    BOOL res = CREATE_CHILD_FILE(parent_cluster, (PU8)name_ptr, (U8)attrib, (PU8)filedata_ptr, filedata_size, &cluster_out);
-    if (res) {
-        MEMCPY((PU32)attrib, &cluster_out, sizeof(U32)); // Write cluster_out back to user space
-    }
+    BOOL res = CREATE_CHILD_FILE(args->parent_cluster, args->name, args->attrib,
+                                  args->filedata, args->filedata_size, &cluster_out);
+    if (args->cluster_out) *args->cluster_out = cluster_out;
     return res;
 }
 
@@ -407,6 +429,54 @@ U32 SYS_FILE_APPEND(U32 entry_ptr, U32 data_ptr, U32 size, U32 unused4, U32 unus
 U32 SYS_PATH_RESOLVE_ENTRY(U32 path_ptr, U32 out_entry_ptr, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused3; (void)unused4; (void)unused5;
     return PATH_RESOLVE_ENTRY((U8*)path_ptr, (FAT_LFN_ENTRY*)out_entry_ptr);
+}
+
+/* --- New FAT table management handlers --- */
+U32 SYS_FAT_FLUSH(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    return FAT_FLUSH();
+}
+U32 SYS_FAT_COMMIT(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1;(void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    return FAT_COMMIT();
+}
+U32 SYS_FAT_FREE_CHAIN(U32 start_cluster, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    return FAT_FREE_CHAIN(start_cluster);
+}
+U32 SYS_FAT_TRUNCATE_CHAIN(U32 start_cluster, U32 new_size_clusters, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    return FAT_TRUNCATE_CHAIN(start_cluster, new_size_clusters);
+}
+U32 SYS_FAT_CLUSTER_TO_LBA(U32 cluster, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    return FAT_CLUSTER_TO_LBA(cluster);
+}
+U32 SYS_FAT_GET_NEXT_CLUSTER(U32 cluster, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    return FAT_GET_NEXT_CLUSTER(cluster);
+}
+
+/* --- Directory entry utility handlers --- */
+U32 SYS_FILE_GET_SIZE(U32 entry_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    if (!entry_ptr) return 0;
+    return FILE_GET_SIZE((DIR_ENTRY *)entry_ptr);
+}
+U32 SYS_DIR_ENTRY_IS_FREE(U32 entry_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    if (!entry_ptr) return TRUE;
+    return DIR_ENTRY_IS_FREE((DIR_ENTRY *)entry_ptr);
+}
+U32 SYS_DIR_ENTRY_IS_DIR(U32 entry_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2;(void)unused3;(void)unused4;(void)unused5;
+    if (!entry_ptr) return FALSE;
+    return DIR_ENTRY_IS_DIR((DIR_ENTRY *)entry_ptr);
+}
+U32 SYS_FIND_DIR_ENTRY_BY_CLUSTER(U32 cluster, U32 out_ptr, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused3;(void)unused4;(void)unused5;
+    if (!out_ptr) return FALSE;
+    return FIND_DIR_ENTRY_BY_CLUSTER_NUMBER(cluster, (DIR_ENTRY *)out_ptr);
 }
 
 U32 SYS_RESTART_MACHINE(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
