@@ -25,6 +25,8 @@ REMARKS
 #include <STD/TYPEDEF.h>
 #include <MEMORY/MEMORY.h>
 
+#ifdef __RTOS__
+
 /// @brief Allocates memory from the kernel heap.
 /// @param size Size in bytes to allocate.
 /// @return Pointer to the allocated memory, or NULL if allocation failed.
@@ -70,6 +72,7 @@ VOID KFREE_ALIGN(VOIDPTR ptr);
 /// @param pageNum Number of pages to allocate for the heap.
 /// @return TRUE if initialization succeeded, FALSE otherwise.
 BOOLEAN KHEAP_INIT(U32 pageNum);
+#endif // __RTOS__
 
 /// @brief Header for a memory block in the kernel heap.
 /// Placed directly before the user-accessible memory region.
@@ -97,6 +100,8 @@ typedef struct {
     VOIDPTR currentPtr;   // Pointer for the next-fit search start
 } KHeap;
 
+#ifdef __RTOS__
+
 /// @brief Retrieves statistics and information about the kernel heap.
 /// @return Pointer to the kernel's KHeap structure.
 KHeap* KHEAP_GET_INFO(VOID);
@@ -110,5 +115,7 @@ KHeapBlock* KHEAP_GET_X_BLOCK(U32 index);
 /// @param additionalPages The number of pages to add to the heap.
 /// @return TRUE if expansion succeeded, FALSE otherwise.
 BOOLEAN KHEAP_EXPAND(U32 additionalPages);
+
+#endif // __RTOS__
 
 #endif // KHEAP_H

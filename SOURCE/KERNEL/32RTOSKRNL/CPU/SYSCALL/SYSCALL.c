@@ -283,6 +283,15 @@ U32 SYS_KCALLOC(U32 num, U32 size, U32 unused3, U32 unused4, U32 unused5) {
     return (U32)KCALLOC(num, size);
 }
 
+U32 SYS_KHEAP_GET_INFO(U32 unused1, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused1; (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    return (U32)KHEAP_GET_INFO();
+}
+U32 SYS_KHEAP_GET_X_BLOCK(U32 index, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
+    (void)unused2; (void)unused3; (void)unused4; (void)unused5;
+    return (U32)KHEAP_GET_X_BLOCK(index);
+}
+
 U32 SYS_CDROM_READ(U32 lba, U32 sectors, U32 buf_ptr, U32 unused4, U32 unused5) {
     (void)unused4; (void)unused5;
     if (!buf_ptr || sectors == 0) return 0;
