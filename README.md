@@ -17,7 +17,7 @@ As of now, atOS includes shell, TUI and GUI libraries, assembler/dissasembler, a
 
 ![atOS Preview](.github/PREVIEW.png)
 ![atOS Graphics Preview](.github/GRAPHICS.png)
-![atOS Kernel Panic](DOCS/IMAGES/PANIC.png)
+![atOS ATUI Preview](.github/ATUI.png)
 
 ---
 
