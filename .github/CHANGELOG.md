@@ -72,7 +72,7 @@ Fixed relative path handling in TSHELL, so that commands like `./myprogram` or `
 
 Small bug fixes for the BATSH language, most features are now working as intended. 
 
-## 2026.05.01 - 2026.05.xx
+## 2026.05.01 - 2026.05.03
 
 ### CPCD
 
