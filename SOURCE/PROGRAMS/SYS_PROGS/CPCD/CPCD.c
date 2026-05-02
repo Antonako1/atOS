@@ -37,29 +37,36 @@ static U32 resolve_dir_cluster(PU8 dir_path) {
     if (!FAT32_PATH_RESOLVE_ENTRY(dir_path, &ent)) return 0;
     return ((U32)ent.entry.HIGH_CLUSTER_BITS << 16) | ent.entry.LOW_CLUSTER_BITS;
 }
-
+void print_help(){
+    printf(
+        "CPCD - Copy files from the CD-ROM ISO image to the hard drive.\n\n"
+        "CPCD.BIN <SOURCE> <DESTINATION>\n\n"
+        "SOURCE: The path inside the CD-ROM ISO image (e.g., ATOS/CPCD.BIN) (Must NOT be ISO normalized path)\n"
+        "DESTINATION: The path on the hard drive where the file should be copied (e.g., /CPCD-COPY.BIN)\n"
+    );
+}
 CMAIN() {
     if(argc < 3) {
+        if(argc == 2 && (STRCMP(argv[1], "-h") == 0 || STRCMP(argv[1], "--help") == 0)) {
+            print_help();
+            return 0;
+        }
         printf("Usage: %s <source> <destination>. --help for more information.\n", argv[0]);
         return 1;
     }
     for(U32 i = 1; i < argc; i++) {
         if (STRCMP(argv[i], "-h") == 0 || STRCMP(argv[i], "--help") == 0) {
-            printf(
-                "CPCD - Copy files from the CD-ROM ISO image to the hard drive.\n\n"
-                "CPCD.BIN <SOURCE> <DESTINATION>\n\n"
-                "SOURCE: The path inside the CD-ROM ISO image (e.g., /ATOS/CPCD.BIN)\n"
-                "DESTINATION: The path on the hard drive where the file should be copied (e.g., /CPCD-COPY.BIN)\n"
-            );
+            print_help();
             return 0;
         }
     }
 
     PU8 source_path = argv[1];
     PU8 dest_path   = argv[2];
-
+    if(source_path[0] == '/') {
+        STRSHIFTLEFTAT(source_path, 0);
+    }
     FILE *source_file = FOPEN(source_path, MODE_ISO9660 | MODE_R);
-
     if(!source_file) {
         printf("Failed to open source file: %s\n", source_path);
         return 1;
