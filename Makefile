@@ -255,19 +255,19 @@ iso: bootloader kernel programs diskvbr
 	@echo "ISO created at $(OUTPUT_ISO_DIR)/$(ISO_NAME)"
 
 reset_hdd:
-	@echo "Resetting hdd.img to 256MB size..."
+	@echo "Resetting hdd.img to minimum size..."
 	if [ -f hdd.img ]; then \
 		rm -f hdd.img; \
 	fi
-	qemu-img create -f raw hdd.img 256M
+	qemu-img create -f raw hdd.img 64M
 	@echo "hdd.img reset successfully."
 
 run:
 	@echo "Running ISO in QEMU..."
 	# Make sure disk exists
 	if [ ! -f hdd.img ]; then \
-		echo "Creating hdd.img with 256MB size..."; \
-		qemu-img create -f raw hdd.img 256M; \
+		echo "Creating hdd.img with 64MB size..."; \
+		qemu-img create -f raw hdd.img 64M; \
 	fi
 
 	mkdir -p OUTPUT/DEBUG
