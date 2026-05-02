@@ -27,11 +27,11 @@ typedef struct _CHAR_CELL {
 /// @brief Configurations for ATUI
 typedef enum _ATUI_CONF {
     ATUIC_NONE              = 0x00000000,
-    ATUIC_ECHO              = 0x00000001, 
-    ATUIC_RAW               = 0x00000002, 
-    ATUIC_CURSOR_VISIBLE    = 0x00000004, 
-    ATUIC_INSERT_MODE       = 0x00000008, 
-    ATUIC_MOUSE_ENABLED     = 0x00000010, 
+    ATUIC_ECHO              = 0x00000001, // Echo input characters to output (for text input widgets)
+    ATUIC_RAW               = 0x00000002, // Disable line buffering and special key handling (e.g. Ctrl-C) — getch returns raw key codes immediately
+    ATUIC_CURSOR_VISIBLE    = 0x00000004, // Show the text cursor (e.g. in text input widgets)
+    ATUIC_INSERT_MODE       = 0x00000008, // Insert mode (new characters push existing ones to the right) vs overwrite mode (new characters replace existing ones)
+    ATUIC_MOUSE_ENABLED     = 0x00000010, // Enable mouse event reporting (e.g. clicks, scrolls) to the application
     ATUIC_DEFAULT = ATUIC_CURSOR_VISIBLE | ATUIC_ECHO | ATUIC_INSERT_MODE,
     ATUIC_DEFAULT_MOUSE = ATUIC_DEFAULT | ATUIC_MOUSE_ENABLED,
 } ATUI_CONF;
