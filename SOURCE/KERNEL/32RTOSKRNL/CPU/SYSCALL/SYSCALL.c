@@ -310,8 +310,7 @@ U32 SYS_ISO9660_READ_ENTRY(U32 path_ptr, U32 unused2, U32 unused3, U32 unused4, 
 U32 SYS_ISO9660_FILECONTENTS(U32 record_ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused2; (void)unused3; (void)unused4; (void)unused5;
     if (!record_ptr) return 0;
-    IsoDirectoryRecord *fileptr = ISO9660_FILERECORD_TO_MEMORY((IsoDirectoryRecord *)record_ptr);
-    VOIDPTR data = ISO9660_READ_FILEDATA_TO_MEMORY(fileptr);
+    VOIDPTR data = ISO9660_READ_FILEDATA_TO_MEMORY(record_ptr);
     return (U32)data;
 }
 U32 SYS_ISO9660_FREE_MEMORY(U32 ptr, U32 unused2, U32 unused3, U32 unused4, U32 unused5) {

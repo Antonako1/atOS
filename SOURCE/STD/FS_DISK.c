@@ -13,16 +13,16 @@ U32 CDROM_READ(U32 lba, U32 sectors, U8 *buf) {
 }
 
 IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path) {
-    PU8 p = MAlloc(ISO9660_MAX_PATH);
-    if (!p) return NULLPTR;
-    MEMSET(p, 0, ISO9660_MAX_PATH);
-    U32 path_len = STRLEN(path);
-    if (path_len >= ISO9660_MAX_PATH) {
-        MFree(p);
-        return NULLPTR;
-    }
-    STRCPY(p, path);
-    return (IsoDirectoryRecord *)SYSCALL1(SYSCALL_ISO9660_READ_ENTRY, (U32)p);
+    // PU8 p = MAlloc(ISO9660_MAX_PATH);
+    // if (!p) return NULLPTR;
+    // MEMSET(p, 0, ISO9660_MAX_PATH);
+    // U32 path_len = STRLEN(path);
+    // if (path_len >= ISO9660_MAX_PATH) {
+    //     MFree(p);
+    //     return NULLPTR;
+    // }
+    // STRCPY(p, path);
+    return (IsoDirectoryRecord *)SYSCALL1(SYSCALL_ISO9660_READ_ENTRY, (U32)path);
 }
 VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr) {
     if (!dir_ptr) return NULLPTR;
@@ -313,9 +313,8 @@ FILE * FOPEN(PU8 path, FILEMODES mode) {
         MEMCPY(&file->ent.iso_ent, ent, sizeof(IsoDirectoryRecord));
         file->sz = ent->extentLengthLE;
         file->data = READ_ISO9660_FILECONTENTS(ent);
-
         MFree(ent);
-        if (!file->data) goto failure;
+        if (!file->data && file->sz > 0) goto failure;
         return file;
     }
 
