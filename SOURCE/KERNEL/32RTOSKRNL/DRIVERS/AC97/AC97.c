@@ -66,18 +66,30 @@ static AC97_VOICE voices[MAX_VOICES];
 static U32 sample_rate = 48000; // DAC output rate (hardware fixed)
 
 // 8-bit unsigned mono @ 22050 Hz stream
-// Resampled to 48000 Hz via 16.16 fixed-point stepping (step = 22050*65536/48000 = 30109)
+// Resampled to 48000 Hz via 16.16 fixed-point stepping (step = 22050*65536/48000 = 30109).
+// Split into U32 integer index + U16 fraction to avoid needing a U64.
 #define PCM8_STEP  30109U
 static const U8*  pcm8_data   = NULLPTR;
 static U32        pcm8_frames = 0;
-static U32        pcm8_pos    = 0; // 16.16 fixed-point position into pcm8_data
+static U32        pcm8_idx    = 0; // integer sample index into pcm8_data
+static U16        pcm8_frac   = 0; // fractional accumulator (0..65535)
 
-// 16-bit signed stereo @ 44800 Hz stream
-// Resampled to 48000 Hz via 16.16 fixed-point stepping (step = 44800*65536/48000 = 61156)
-#define PCM16_STEP 61156U
+// 16-bit signed stereo @ 48000 Hz stream.
+// PCM16_STEP = 65536 (1:1 with 48 kHz AC97 output) means the fractional part
+// is always 0, so we track a plain U32 frame counter — no fixed-point needed.
 static const U16* pcm16_data   = NULLPTR;
-static U32        pcm16_frames = 0; // frame count (each frame = 2 U16 samples: L,R)
-static U32        pcm16_pos    = 0; // 16.16 fixed-point position into pcm16_data (in frames)
+static U32        pcm16_frames = 0; // total frame count  (1 frame = L + R samples)
+static U32        pcm16_frame  = 0; // current frame index
+
+static BOOL       g_ac97_paused = FALSE;
+
+// --------------------------------------------------
+// VISUALIZER
+// --------------------------------------------------
+// 8 time-slice energy bands updated each DMA buffer fill.
+// Each band holds a smoothed peak amplitude (0..32767).
+#define VIZ_BANDS 8
+static U32 g_viz_bands[VIZ_BANDS];
 
 static AC97_BDL_ENTRY *Ac97Bdl;
 static U8 *Ac97Bufs[AC97_BDL_ENTRIES];
@@ -107,40 +119,42 @@ static VOID AC97_MIX_SAMPLES(U16* buffer, U32 samples)
         I32 L = 0, R = 0;
 
         // --- 8-bit mono 22050 Hz stream (resampled to 48000 Hz) ---
-        if(pcm8_data && pcm8_frames > 0)
+        if(!g_ac97_paused && pcm8_data && pcm8_frames > 0)
         {
-            U32 idx = pcm8_pos >> 16;
-            if(idx >= pcm8_frames)
+            if(pcm8_idx >= pcm8_frames)
             {
                 pcm8_data   = NULLPTR;
                 pcm8_frames = 0;
-                pcm8_pos    = 0;
+                pcm8_idx    = 0;
+                pcm8_frac   = 0;
             }
             else
             {
                 // U8 unsigned -> I16 signed: centre at 0, expand to 16-bit range
-                I32 val = ((I32)pcm8_data[idx] - 128) << 8;
+                I32 val = ((I32)pcm8_data[pcm8_idx] - 128) << 8;
                 L += val;
                 R += val; // mono: duplicate to both channels
-                pcm8_pos += PCM8_STEP;
+                // Advance fixed-point accumulator; carry integer part into idx
+                U32 next_frac = (U32)pcm8_frac + PCM8_STEP;
+                pcm8_idx  += next_frac >> 16;
+                pcm8_frac  = (U16)(next_frac & 0xFFFF);
             }
         }
 
-        // --- 16-bit stereo 44800 Hz stream (resampled to 48000 Hz) ---
-        if(pcm16_data && pcm16_frames > 0)
+        // --- 16-bit stereo 48000 Hz stream (1:1 with AC97 output rate) ---
+        if(!g_ac97_paused && pcm16_data && pcm16_frames > 0)
         {
-            U32 frame = pcm16_pos >> 16;
-            if(frame >= pcm16_frames)
+            if(pcm16_frame >= pcm16_frames)
             {
                 pcm16_data   = NULLPTR;
                 pcm16_frames = 0;
-                pcm16_pos    = 0;
+                pcm16_frame  = 0;
             }
             else
             {
-                L += (I16)pcm16_data[frame * 2];
-                R += (I16)pcm16_data[frame * 2 + 1];
-                pcm16_pos += PCM16_STEP;
+                L += (I16)pcm16_data[pcm16_frame * 2];
+                R += (I16)pcm16_data[pcm16_frame * 2 + 1];
+                pcm16_frame++;
             }
         }
 
@@ -166,6 +180,20 @@ static VOID AC97_MIX_SAMPLES(U16* buffer, U32 samples)
 
         buffer[i]     = (U16)(I16)L;
         buffer[i + 1] = (U16)(I16)R;
+
+        // --- Visualizer: accumulate peak per band (time-slice) ---
+        {
+            U32 slice_frames = (samples / 2) / VIZ_BANDS; // stereo frames per band slice
+            if (slice_frames == 0) slice_frames = 1;
+            U32 frame_idx = i / 2;                         // current stereo frame index
+            U32 band = frame_idx / slice_frames;
+            if (band >= VIZ_BANDS) band = VIZ_BANDS - 1;
+            U32 peak = (U32)(L < 0 ? -L : L);
+            U32 rabs = (U32)(R < 0 ? -R : R);
+            if (rabs > peak) peak = rabs;
+            // Exponential smoothing: blend toward new peak
+            g_viz_bands[band] = (g_viz_bands[band] * 7 + peak) >> 3;
+        }
     }
 
     // Update voice durations
@@ -322,6 +350,15 @@ BOOLEAN AC97_TONE(U32 freq,U32 duration,U32 rate,U16 amp)
 
 BOOLEAN AC97_STATUS(void){return ac97_dev!=NULLPTR;}
 
+/* Returns TRUE while PCM data is still being mixed by the IRQ handler */
+BOOLEAN AC97_IS_PLAYING(void){return pcm16_frames > 0 || pcm8_frames > 0;}
+
+VOID AC97_PAUSE(BOOL pause){g_ac97_paused = pause;}
+BOOL AC97_IS_PAUSED(void){return g_ac97_paused;}
+
+U32 AC97_GET_FRAME_POS(void){return pcm16_frame;}
+U32 AC97_GET_8BIT_FRAME_POS(void){return pcm8_idx;}
+
 // Play 8-bit unsigned mono PCM at 22050 Hz.
 // Buffer must remain valid for the duration of playback (streamed, not copied).
 BOOLEAN AC97_PLAY8(const U8* pcm, U32 frames)
@@ -329,27 +366,36 @@ BOOLEAN AC97_PLAY8(const U8* pcm, U32 frames)
     if(!pcm || !frames) return FALSE;
     pcm8_data   = pcm;
     pcm8_frames = frames;
-    pcm8_pos    = 0;
+    pcm8_idx    = 0;
+    pcm8_frac   = 0;
     AC97_REFRESH_PIPELINE();
     return TRUE;
 }
 
-// Play 16-bit signed stereo PCM at 44800 Hz.
-// Buffer must remain valid for the duration of playback (streamed, not copied).
 BOOLEAN AC97_PLAY16(const U16* pcm, U32 frames)
 {
     if(!pcm || !frames) return FALSE;
     pcm16_data   = pcm;
     pcm16_frames = frames;
-    pcm16_pos    = 0;
+    pcm16_frame  = 0;
     AC97_REFRESH_PIPELINE();
+    return TRUE;
+}
+
+BOOLEAN AC97_GET_VIZ(U32 *bands, U32 n)
+{
+    if (!bands || n == 0) return FALSE;
+    if (n > VIZ_BANDS) n = VIZ_BANDS;
+    for (U32 i = 0; i < n; i++)
+        bands[i] = g_viz_bands[i];
     return TRUE;
 }
 
 VOID AC97_STOP(void)
 {
-    pcm8_data    = NULLPTR; pcm8_frames  = 0; pcm8_pos  = 0;
-    pcm16_data   = NULLPTR; pcm16_frames = 0; pcm16_pos = 0;
+    pcm8_data    = NULLPTR; pcm8_frames  = 0; pcm8_idx  = 0; pcm8_frac = 0;
+    pcm16_data   = NULLPTR; pcm16_frames = 0; pcm16_frame = 0;
+    g_ac97_paused = FALSE;
     for(U32 i=0;i<MAX_VOICES;i++)
         voices[i].active=FALSE;
 }

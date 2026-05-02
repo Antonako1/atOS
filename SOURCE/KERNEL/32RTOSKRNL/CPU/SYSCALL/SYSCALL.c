@@ -339,6 +339,37 @@ U32 SYS_AC97_PLAY8(U32 pcm_ptr, U32 frames, U32 unused3, U32 unused4, U32 unused
     BOOLEAN ok = AC97_PLAY8(pcm, frames);
     return ok ? 1 : 0;
 }
+U32 SYS_AC97_PAUSE(U32 pause, U32 u2, U32 u3, U32 u4, U32 u5) {
+    (void)u2; (void)u3; (void)u4; (void)u5;
+    AC97_PAUSE((BOOL)pause);
+    return 0;
+}
+
+U32 SYS_AC97_IS_PAUSED(U32 u1, U32 u2, U32 u3, U32 u4, U32 u5) {
+    (void)u1; (void)u2; (void)u3; (void)u4; (void)u5;
+    return (U32)AC97_IS_PAUSED();
+}
+
+U32 SYS_AC97_GET_FRAME_POS(U32 u1, U32 u2, U32 u3, U32 u4, U32 u5) {
+    (void)u1; (void)u2; (void)u3; (void)u4; (void)u5;
+    return AC97_GET_FRAME_POS();
+}
+
+U32 SYS_AC97_GET_8BIT_FRAME_POS(U32 u1, U32 u2, U32 u3, U32 u4, U32 u5) {
+    (void)u1; (void)u2; (void)u3; (void)u4; (void)u5;
+    return AC97_GET_8BIT_FRAME_POS();
+}
+
+U32 SYS_AC97_GET_VIZ(U32 bands_ptr, U32 n, U32 u3, U32 u4, U32 u5) {
+    (void)u3; (void)u4; (void)u5;
+    return (U32)AC97_GET_VIZ((U32*)bands_ptr, n);
+}
+
+U32 SYS_AC97_IS_PLAYING(U32 u1, U32 u2, U32 u3, U32 u4, U32 u5) {
+    (void)u1; (void)u2; (void)u3; (void)u4; (void)u5;
+    return (U32)AC97_IS_PLAYING();
+}
+
 U32 SYS_AC97_PLAY16(U32 pcm_ptr, U32 frames, U32 unused3, U32 unused4, U32 unused5) {
     (void)unused3; (void)unused4; (void)unused5;
     if (!pcm_ptr || frames == 0) return 0;
