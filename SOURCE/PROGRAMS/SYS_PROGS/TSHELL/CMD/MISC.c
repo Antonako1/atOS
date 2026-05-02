@@ -23,7 +23,7 @@ VOID CMD_HELP(U8 *line) {
 
     /* -- Header -- */
     TPUT_SET_FG(VBE_LIGHT_CYAN);
-    PUTS("  BATSH v1.0 — atOS Shell" LEND);
+    PUTS("  BATSH v1.0 - atOS Shell" LEND);
     TPUT_SET_FG(VBE_DARK_GRAY);
     PUTS("  Better AT Shell  |  help [cmds|keys|batsh]" LEND LEND);
 
@@ -86,6 +86,7 @@ VOID CMD_HELP(U8 *line) {
             { "Ctrl+Delete",    "Delete word after cursor" },
             { "PgUp / PgDn",    "Scroll terminal output" },
             { "Shift+Tab",      "Cycle autocomplete backwards" },
+            { "Shift+Alt+<F1-F12>",      "Switch between virtual consoles" },
         };
         U32 key_count = sizeof(keys) / sizeof(keys[0]);
         U32 half_k = (key_count + 1) / 2;

@@ -283,6 +283,7 @@ have_fit:
         }
 
         /* Return pointer to payload area */
+        get_current_tcb()->info.heap_allocated += block->real_size;
         return (VOIDPTR)((U8*)block + sizeof(KHeapBlock));
     }
 
@@ -325,6 +326,7 @@ VOID KFREE(VOIDPTR ptr) {
     current_block->free = 1;
     kernelHeap.usedSize -= current_block->real_size;
     kernelHeap.freeSize += current_block->real_size;
+    get_current_tcb()->info.heap_allocated -= current_block->real_size;
     current_block->size = 0;
 
     block_to_merge_from = current_block;

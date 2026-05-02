@@ -50,6 +50,17 @@ enum {
 
 
 
+/* Argument struct for SYSCALL_CREATE_CHILD_FILE (6 params > 5-arg limit).
+ * Build on the heap with MAlloc, pass pointer as sole syscall argument. */
+typedef struct {
+    U32  parent_cluster;
+    U8  *name;           /* heap-allocated; kernel frees after use */
+    U8   attrib;
+    U8  *filedata;       /* heap-allocated or NULL; kernel frees after use */
+    U32  filedata_size;
+    U32 *cluster_out;    /* caller-allocated; kernel writes result here */
+} ATTRIB_PACKED CREATE_CHILD_FILE_ARGS;
+
 #ifdef __RTOS__
 U32 syscall_dispatcher(U32 num, U32 a1, U32 a2, U32 a3, U32 a4, U32 a5);
 __attribute__((naked)) void isr_syscall(void);  

@@ -149,7 +149,15 @@ U32 ATOI(CONST U8* str) {
     }
     return res;
 }
-
+U32 ATOIN(CONST PU8 str, U32 len){
+    if (!str) return 0;
+    U32 res = 0;
+    for (U32 i = 0; i < len; i++) {
+        if (str[i] < '0' || str[i] > '9') break;
+        res = res * 10 + (str[i] - '0');
+    }
+    return res;
+}
 BOOL ATOI_E(CONST U8* str, U32 *out_val) {
     if (!str || !out_val) return FALSE;
     if (!*str) return FALSE;  /* empty string */

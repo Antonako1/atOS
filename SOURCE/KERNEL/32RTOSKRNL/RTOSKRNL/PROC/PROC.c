@@ -6,6 +6,8 @@
 #include <DRIVERS/VESA/VBE.h>
 #include <DRIVERS/PS2/KEYBOARD_MOUSE.h>
 
+#include <FS/FAT/FAT.h>
+
 #include <MEMORY/PAGEFRAME/PAGEFRAME.h>
 #include <MEMORY/PAGING/PAGING.h>
 #include <MEMORY/HEAP/KHEAP.h>
@@ -42,6 +44,8 @@ static volatile BOOL8 immediate_reschedule_val ATTRIB_DATA = 0;
 
 // Shell informs kernel what task is focused
 static volatile TCB *focused_task __attribute__((section(".data"))) = NULL;
+
+void set_focused_task(TCB *t);
 
 static inline U32 PROC_READ_ESP(void) {
     U32 esp;
@@ -559,7 +563,7 @@ U32 *setup_user_process(TCB *proc, U8 *binary_data, U32 bin_size, U32 heap_size,
         KDEBUG_HEX32(entry_point);
         KDEBUG_PUTS("\n");
     }
-
+    DEBUG_PRINTF("[proc] Initializing task context with entry point 0x%X, stack size 0x%X, initial state 0x%X\n", entry_point, stack_size, initial_state);
     init_task_context(proc, (void (*)(void))entry_point, stack_size, initial_state);
     KDEBUG_PUTS("[proc] Trapframe initialized\n");
 
@@ -719,14 +723,11 @@ BOOLEAN RUN_BINARY(
     // HLT;
 
     add_tcb_to_scheduler(new_proc);
-    KDEBUG_PUTS("[proc] added to scheduler pid="); 
-    KDEBUG_HEX32(new_proc->info.pid); 
-    KDEBUG_PUTS("\n[proc] Stack at "); 
-    KDEBUG_HEX32(new_proc->stack_phys_base); 
-    KDEBUG_PUTS("\n");
+    DEBUG_PRINTF("[proc] Process \"%s\" (PID %u) created with entry point at 0x%X\n", new_proc->info.name, new_proc->info.pid, new_proc->tf->cpu.eip);
 
     if(initial_state & TCB_STATE_INFO_CHILD_PROC_HANDLER) {
         current_shell = new_proc;
+        DEBUG_PRINTF("[proc] Set current_shell to PID %u\n", current_shell->info.pid);
     }
     return TRUE;
 }
@@ -759,6 +760,7 @@ BOOLEAN LOAD_LIBRARY(LOAD_LIBRARY_STRUCT *load_info) {
     return TRUE;
 }
 
+// Removes a TCB from the scheduler's circular linked list. Adjusts proc_amount if needed. Does not free any memory or resources - caller must handle that.
 void remove_tcb_from_scheduler(TCB *tcb) {
     if (!tcb || tcb->info.state == TCB_STATE_IMMORTAL) return;
 
@@ -804,7 +806,7 @@ void KILL_PROCESS(U32 pid) {
 
     // If this was the focused task, reset focus to master
     if (target == focused_task) {
-        focused_task = current_shell;
+        set_focused_task(current_shell);
     }
 
     // If target was the last fpu user, reset fpu
@@ -859,14 +861,16 @@ void KILL_PROCESS(U32 pid) {
         if(current_shell == target) {
             focused_task = &master_tcb;
         } else {
-            focused_task = current_shell;
+            set_focused_task(current_shell);
         }
     }
     // Finally free the TCB itself
     KFREE(target);
 
-    KDEBUG_PUTS("[proc] Process killed successfully\n");
+    KDEBUG_PUTS("[proc] Process killed successfully ");
     KDEBUG_HEX32(pid);
+    KDEBUG_PUTS(" active processes remaining: ");
+    KDEBUG_HEX32(proc_amount);
     KDEBUG_PUTC('\n');
 }
 
@@ -1220,8 +1224,28 @@ static U32 last_kb_seq = 0;
 static U32 last_mouse_seq = 0;
 static PS2_KB_MOUSE_DATA *data = NULLPTR;
 
+static TCB *shells[MAX_SHELLS] ATTRIB_DATA = {0};
+
 void kernel_loop_init() {
     data = GET_KB_MOUSE_DATA();
+    for(U32 i = 0; i < MAX_SHELLS; i++) {
+        shells[i] = NULL;
+    }
+}
+
+void set_focused_task(TCB *t) {
+    if (!t) return;
+    focused_task = t;
+    send_msg(&(PROC_MESSAGE){
+        .sender_pid = 0, // from kernel
+        .receiver_pid = t->info.pid,
+        .type = PROC_MSG_FOCUS_SET,
+        .signal = 0,
+        .data_provided = FALSE,
+        .timestamp = get_uptime_sec(),
+        .read = FALSE,
+        .data = NULL
+    });
 }
 
 void handle_kernel_messages(void) {
@@ -1230,11 +1254,18 @@ void handle_kernel_messages(void) {
     while(master->msg_queue_head != master->msg_queue_tail) {
         PROC_MESSAGE *msg = &master->msg_queue[master->msg_queue_head];
         switch(msg->type) {
+            case PROC_SHELL_FIRST_OF_LIST:
+                if(shells[0]) {
+                    KDEBUG_PUTS("[proc_msg] Warning: overwriting existing shell in shells[0]\n");
+                }
+                if(!shells[0])
+                    shells[0] = get_tcb_by_pid(msg->sender_pid);
+                break;
             case PROC_MSG_SET_FOCUS:
                 KDEBUG_PUTS("[proc_msg] Switching focus to ");
                 KDEBUG_HEX32(msg->signal);
                 KDEBUG_PUTS("\n");
-                focused_task = get_tcb_by_pid(msg->signal);
+                set_focused_task(get_tcb_by_pid(msg->signal));
                 if(!focused_task) {
                     KDEBUG_PUTS("[proc_msg] Invalid PID for focus switch\n");
                     focused_task = &master_tcb;
@@ -1442,6 +1473,76 @@ void handle_kernel_messages(void) {
             data->kb.cur.keycode == KEY_INSERT
         ) {
             LOAD_AND_RUN_KERNEL_SHELL();
+        }
+        else if(
+            data->kb.cur.pressed &&
+            data->kb.mods.alt &&
+            data->kb.mods.shift
+        ) {
+            if(data->kb.cur.keycode >= KEY_F1 && data->kb.cur.keycode <= KEY_F12) {
+                // Switch focus to corresponding shell if exists
+                U32 shell_index = data->kb.cur.keycode - KEY_F1;
+                if(shell_index < MAX_SHELLS && shells[shell_index]) {
+                    set_focused_task(shells[shell_index]);
+                    KDEBUG_PUTS("[proc_msg] Focus switched to shell in slot ");
+                    KDEBUG_HEX32(shell_index);
+                    KDEBUG_PUTS("\n");
+                    current_shell = shells[shell_index];
+                } else {
+                    KDEBUG_PUTS("[proc_msg] No shell assigned to slot ");
+                    KDEBUG_HEX32(shell_index);
+                    KDEBUG_PUTS("\n");
+                    
+                    // create a new shell process in that slot
+                    PU8 path = "/ATOS/TSHELL.BIN";
+                    U8 *shell_argv[] = { "/ATOS/TSHELL.BIN" , "--legitemate-run", NULLPTR };
+                    FAT_LFN_ENTRY ent = {0};
+                    U32 sz = 0;
+                    if(!PATH_RESOLVE_ENTRY(path, &ent)) {
+                        KDEBUG_PUTS("[proc_msg] Failed to resolve shell path for new shell process\n");
+                    } else {
+                        VOIDPTR file = READ_FILE_CONTENTS(&sz, &ent.entry);
+                        if(!file) {
+                            KDEBUG_PUTS("[proc_msg] Failed to read shell binary contents for new shell process\n");
+                        } else {
+                            RUN_BINARY(
+                                path,
+                                file,
+                                sz,
+                                USER_HEAP_SIZE, 
+                                USER_STACK_SIZE, 
+                                TCB_STATE_ACTIVE | TCB_STATE_INFO_CHILD_PROC_HANDLER , 
+                                0,
+                                shell_argv,
+                                2
+                            );
+                            U32 pid = get_last_pid();
+                            shells[shell_index] = get_tcb_by_pid(pid);
+                            KDEBUG_PUTS("[proc_msg] New shell process created in slot ");
+                            KDEBUG_HEX32(shell_index);
+                            KDEBUG_PUTS(" with PID ");
+                            KDEBUG_HEX32(pid);
+                            KDEBUG_PUTS("\n");
+                        } 
+                    }
+                }
+
+                for(U32 i = 0; i < MAX_SHELLS; i++) {
+                    if(shells[i]) {
+                        send_msg(&(PROC_MESSAGE){
+                            .sender_pid = 0, // from kernel
+                            .receiver_pid = shells[i]->info.pid,
+                            .type = shells[i] == focused_task ? PROC_MSG_ENABLE_KEYBOARD : PROC_MSG_DISABLE_KEYBOARD,
+                            .signal = shells[i]->info.pid, // signal contains PID to set focus to
+                            .data_provided = FALSE,
+                            .timestamp = get_uptime_sec(),
+                            .read = FALSE,
+                            .data = NULL
+                        });
+                    } 
+                }
+
+            }
         }
     }
 

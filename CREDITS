@@ -16,8 +16,11 @@
    - Fixed the PS/2 keyboard driver, which lost input when the system was under load.
       - Subsequently fixed STD/IO's kb_poll() and kb_peek() functions to work correctly with the updated keyboard driver.
    - Optimized TSHELL terminal rendering.
+   - Added /TESTS directory with various test programs for atOS components, along with a Makefile for building them on the host system. This allows for easier testing and debugging of individual components in a controlled environment. 
       Thanks to retroaalto for his atOS contributions!
+   
       
   - Jooapa (https://github.com/jooapa)
      - PIANO program (SOURCE/PROGRAMS/SYS_PROGS/PIANO)
         Thanks to jooapa for his piano program!
+     - JAMMER trademark

@@ -78,7 +78,7 @@ VOID INIT_TOUTPUT(TSHELL_INSTANCE *sh, ATUI_WINDOW *win) {
 
     /* Set window colors and enable scrolling */
     ATUI_WSET_COLOR(win, tout->default_fg, tout->default_bg);
-    win->scroll = TRUE;
+    win->scroll = FALSE;
     win->boxed  = FALSE;
 
     /* Fill scrollback with spaces */

@@ -13,16 +13,16 @@ U32 CDROM_READ(U32 lba, U32 sectors, U8 *buf) {
 }
 
 IsoDirectoryRecord *READ_ISO9660_FILERECORD(CHAR *path) {
-    PU8 p = MAlloc(ISO9660_MAX_PATH);
-    if (!p) return NULLPTR;
-    MEMSET(p, 0, ISO9660_MAX_PATH);
-    U32 path_len = STRLEN(path);
-    if (path_len >= ISO9660_MAX_PATH) {
-        MFree(p);
-        return NULLPTR;
-    }
-    STRCPY(p, path);
-    return (IsoDirectoryRecord *)SYSCALL1(SYSCALL_ISO9660_READ_ENTRY, (U32)p);
+    // PU8 p = MAlloc(ISO9660_MAX_PATH);
+    // if (!p) return NULLPTR;
+    // MEMSET(p, 0, ISO9660_MAX_PATH);
+    // U32 path_len = STRLEN(path);
+    // if (path_len >= ISO9660_MAX_PATH) {
+    //     MFree(p);
+    //     return NULLPTR;
+    // }
+    // STRCPY(p, path);
+    return (IsoDirectoryRecord *)SYSCALL1(SYSCALL_ISO9660_READ_ENTRY, (U32)path);
 }
 VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr) {
     if (!dir_ptr) return NULLPTR;
@@ -137,20 +137,32 @@ BOOLEAN FAT32_CREATE_CHILD_DIR(U32 parent_cluster, U8 *name, U8 attrib, U32 *clu
 
 BOOLEAN FAT32_CREATE_CHILD_FILE(U32 parent_cluster, U8 *name, U8 attrib, PU8 filedata, U32 filedata_size, U32 *cluster_out) {
     U32 len = STRLEN(name) + 1;
-    U8 *ent_tmp = MAlloc(len);
-    if (!ent_tmp) return FALSE;
+    U8 *name_tmp = MAlloc(len);
+    if (!name_tmp) return FALSE;
+    MEMZERO(name_tmp, len);
+    STRCPY(name_tmp, name);
 
-    MEMZERO(ent_tmp, len);
-    STRCPY(ent_tmp, name);
-
-
-    U32 res = SYSCALL5(SYSCALL_CREATE_CHILD_FILE, parent_cluster, ent_tmp, (U32)attrib, filedata, filedata_size);
-    // cluster_out comes back in the attrib parameter due to syscall arg limit, so we need to copy it back to the output parameter
-    if (res) {
-        *cluster_out = (U32)attrib;
+    PU8 data_tmp = NULLPTR;
+    if (filedata && filedata_size > 0) {
+        data_tmp = MAlloc(filedata_size);
+        if (!data_tmp) { MFree(name_tmp); return FALSE; }
+        MEMCPY(data_tmp, filedata, filedata_size);
     }
 
-    MFree(ent_tmp);
+    U32 cluster_result = 0;
+    CREATE_CHILD_FILE_ARGS *args = MAlloc(sizeof(CREATE_CHILD_FILE_ARGS));
+    if (!args) { MFree(name_tmp); if (data_tmp) MFree(data_tmp); return FALSE; }
+    args->parent_cluster = parent_cluster;
+    args->name           = name_tmp;
+    args->attrib         = attrib;
+    args->filedata       = data_tmp;
+    args->filedata_size  = filedata_size;
+    args->cluster_out    = &cluster_result;
+
+    U32 res = SYSCALL1(SYSCALL_CREATE_CHILD_FILE, args);
+    if (res && cluster_out) *cluster_out = cluster_result;
+
+    MFree(args);
     return res;
 }
 
@@ -238,6 +250,41 @@ DIR_ENTRY FAT32_GET_ROOT_DIR_ENTRY() {
     return res1;
 }
 
+BOOLEAN FAT32_FIND_DIR_ENTRY_BY_CLUSTER(U32 cluster, DIR_ENTRY *out) {
+    if (!out) return FALSE;
+    DIR_ENTRY *tmp = MAlloc(sizeof(DIR_ENTRY));
+    if (!tmp) return FALSE;
+    MEMZERO(tmp, sizeof(DIR_ENTRY));
+    BOOL res = SYSCALL2(SYSCALL_FIND_DIR_ENTRY_BY_CLUSTER, cluster, tmp);
+    if (res) MEMCPY(out, tmp, sizeof(DIR_ENTRY));
+    MFree(tmp);
+    return res;
+}
+
+BOOL FAT32_FAT_FLUSH(void) {
+    return SYSCALL0(SYSCALL_FAT_FLUSH);
+}
+
+BOOL FAT32_FAT_COMMIT(void) {
+    return SYSCALL0(SYSCALL_FAT_COMMIT);
+}
+
+BOOL FAT32_FAT_FREE_CHAIN(U32 start_cluster) {
+    return SYSCALL1(SYSCALL_FAT_FREE_CHAIN, start_cluster);
+}
+
+BOOL FAT32_FAT_TRUNCATE_CHAIN(U32 start_cluster, U32 new_size_clusters) {
+    return SYSCALL2(SYSCALL_FAT_TRUNCATE_CHAIN, start_cluster, new_size_clusters);
+}
+
+U32 FAT32_CLUSTER_TO_LBA(U32 cluster) {
+    return SYSCALL1(SYSCALL_FAT_CLUSTER_TO_LBA, cluster);
+}
+
+U32 FAT32_GET_NEXT_CLUSTER(U32 cluster) {
+    return SYSCALL1(SYSCALL_FAT_GET_NEXT_CLUSTER, cluster);
+}
+
 
 
 
@@ -266,9 +313,8 @@ FILE * FOPEN(PU8 path, FILEMODES mode) {
         MEMCPY(&file->ent.iso_ent, ent, sizeof(IsoDirectoryRecord));
         file->sz = ent->extentLengthLE;
         file->data = READ_ISO9660_FILECONTENTS(ent);
-
         MFree(ent);
-        if (!file->data) goto failure;
+        if (!file->data && file->sz > 0) goto failure;
         return file;
     }
 
@@ -654,6 +700,33 @@ BOOLEAN FILE_CREATE(PU8 path) {
     return res;
 }
 
+U32 FAT32_GET_PARENT_CLUSTER(PU8 path) {
+    const U8 *name = GET_BASENAME(path);
+    U8 *parent = GET_PARENT_PATH(path);
+    if (!parent) {
+        DEBUG_PUTS_LN("FILE_CREATE: failed to get parent path");
+        return FALSE;
+    }
+
+    // resolve parent - if parent path is root ("/") we use root cluster; otherwise try to resolve
+    U32 parent_cluster = FAT32_GET_ROOT_CLUSTER();
+    if (!(parent[0] == '/' && parent[1] == '\0')) {
+        FAT_LFN_ENTRY parent_ent = {0};
+        if (!FAT32_PATH_RESOLVE_ENTRY(parent, &parent_ent)) {
+            MFree(parent);
+            return FALSE;
+        }
+        parent_cluster = GET_FULL_CLUSTER(parent_ent.entry.HIGH_CLUSTER_BITS, parent_ent.entry.LOW_CLUSTER_BITS);
+    }
+
+    // create empty file (attrib = archive)
+    U32 out_cluster = 0;
+    BOOLEAN res = FAT32_CREATE_CHILD_FILE(parent_cluster, (U8*)name, FAT_ATTRIB_ARCHIVE, NULL, 0, &out_cluster);
+
+
+    MFree(parent);
+    return res ? out_cluster : 0;
+}
 
 BOOLEAN DIR_CREATE(PU8 path) {
     if (!path) return FALSE;

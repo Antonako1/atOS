@@ -16,6 +16,7 @@ and some not-so-important functions are here.
 
 #include <STD/STRING.h>
 #include <STD/ASM.h>
+#include <STD/DEBUG.h>
 
 #include <MEMORY/HEAP/KHEAP.h>
 
@@ -588,6 +589,7 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
     if(!PATH_RESOLVE_ENTRY(SHELL_PATH, &ent)) {
         panic("Unable to load SHELL from FAT", PANIC_INITIALIZATION_FAILED);
     }
+    DEBUG_PRINTF("[atOS] Resolved SHELL path, size %u bytes\n", ent.entry.FILE_SIZE);
     VOIDPTR file = READ_FILE_CONTENTS(&sz, &ent.entry);
     if(!file) {
         panic("Unable to read SHELL from FAT", PANIC_INITIALIZATION_FAILED);
@@ -616,10 +618,18 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
 
 BOOL initialize_filestructure(VOID) {
     KDEBUG_PUTS("[atOS] Initializing filesystem structure on disk if not present...\n");
+    
     BOOL res = ENSURE_BPB_LOADED();
     DEBUG_PRINTF("[atOS] ENSURE_BPB_LOADED returned %d\n", res);
-    if(res) return TRUE; // Already initialized on disk
-
+    if(res) {
+        VBE_DRAW_STRING(0, rki_row, "FAT32 filesystem structure found on disk, skipping initialization.", VBE_WHITE, VBE_SEE_THROUGH);
+        INC_rki_row(rki_row);
+        VBE_DRAW_STRING(0, rki_row, "If you want to reinitialize the filesystem, please delete the FAT32 partition and reboot.", VBE_WHITE, VBE_SEE_THROUGH);
+        INC_rki_row(rki_row);
+        VBE_DRAW_STRING(0, rki_row, "If you are seeing this message for more than a few seconds, please check your disk or re-partition it.", VBE_WHITE, VBE_SEE_THROUGH);
+        return TRUE;
+    } // Already initialized on disk
+    VBE_DRAW_STRING(0, rki_row, "Initializing filesystem structure on disk since it was not found. This may take a few seconds...", VBE_WHITE, VBE_SEE_THROUGH);
     KDEBUG_PUTS("[atOS] Initializing FAT32 filesystem on disk...\n");
     VOIDPTR bin = NULLPTR;
     U32 sz = 0;
@@ -627,6 +637,8 @@ BOOL initialize_filestructure(VOID) {
     if(!bin) {
         return FALSE;
     }
+    DEBUG_PRINTF("[atOS] Read VBR.BIN from ISO9660, size %u bytes\n", sz);
+    
     if(!ZERO_INITIALIZE_FAT32(bin, sz)) {
         ISO9660_FREE_MEMORY(bin);
         return FALSE;
@@ -639,14 +651,16 @@ BOOL initialize_filestructure(VOID) {
 
     // Reload BPB + FAT + root dir from disk so in-memory state is consistent
     KDEBUG_PUTS("[atOS] FAT32 initialized, reloading BPB and FAT from disk...\n");
+    VBE_DRAW_STRING(0, rki_row, "FAT32 initialized, reloading BPB and FAT from disk...", VBE_WHITE, VBE_BLUE);
+    VBE_FLUSH_SCREEN();
     return ENSURE_BPB_LOADED();
 }
 
 
 void RTOSKRNL_LOOP(VOID) {
+    DEBUG_PRINTF("[atOS] Entering RTOSKRNL_LOOP\n");
     kernel_loop_init();
     while(1) {
-        // early_debug_tcb(get_active_task_pid());
         handle_kernel_messages();
     }
 }

@@ -5,6 +5,7 @@
 #include <PROC/PROC.h>
 #include <STD/DEBUG.h>
 #include <STD/TASK.h>
+#include <CPU/PIT/PIT.h>
 
 static TCB process ATTRIB_DATA = {0};
 static BOOLEAN process_fetched ATTRIB_DATA = FALSE;
@@ -114,13 +115,7 @@ TCB *GET_MASTER_TCB(void) {
     }
     TCB *t = (TCB *)SYSCALL(SYSCALL_GET_MASTER_TCB, 0, 0, 0, 0, 0);
     if(t) {
-        master = (TCB *)MAlloc(sizeof(TCB));
-        if(!master) {
-            MFree(t);
-            return NULL;
-        }
-        MEMCPY(master, t, sizeof(TCB));
-        MFree(t);
+        master = t;
         master_fetched = TRUE;
         return master;
     }
@@ -173,7 +168,13 @@ U32 GET_SYS_SECONDS() {
 }
 
 U32 CPU_SLEEP(U32 ms) {
-    return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
+    U32 ticks = GET_PIT_TICKS();
+    U32 target_ticks = ticks + (ms * TICKS_PER_SECOND) / 1000;
+    while (GET_PIT_TICKS() < target_ticks) {
+        YIELD();
+    }
+    
+    // return SYSCALL1(SYSCALL_PIT_SLEEP, ms);
 }
 
 
@@ -296,8 +297,8 @@ void PROC_INIT_CONSOLE() {
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_CREATE_STDOUT, NULL, 0, 0);
     SEND_MESSAGE(&msg);
 
-    msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_SHELL_FOCUS, NULL, 0, 0);
-    SEND_MESSAGE(&msg);
+    // msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_SHELL_FOCUS, NULL, 0, 0);
+    // SEND_MESSAGE(&msg);
 
     msg = CREATE_PROC_MSG(PROC_GETPPID(), SHELL_CMD_INFO_ARRAYS, NULL, 0, 0);
     SEND_MESSAGE(&msg);
@@ -414,4 +415,11 @@ VOID KILL_PROCESS_INSTANCE(U32 pid) {
     SEND_MESSAGE(&msg);
     msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_KILL_PROCESS, NULL, 0, pid);
     SEND_MESSAGE(&msg); 
+}
+
+KHeap*  GET_KERNEL_HEAP_INFO() {
+    return (KHeap *)SYSCALL0(SYSCALL_KHEAP_GET_INFO);
+}
+KHeapBlock* GET_KERNEL_HEAP_BLOCK(U32 index) {
+    return (KHeapBlock *)SYSCALL1(SYSCALL_KHEAP_GET_X_BLOCK, index);
 }

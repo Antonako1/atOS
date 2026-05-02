@@ -185,6 +185,9 @@ VOIDPTR READ_ISO9660_FILECONTENTS(IsoDirectoryRecord *dir_ptr);
 /// @note Not really necessary, just legacy code... MFree does the same job.
 VOID FREE_ISO9660_MEMORY(VOIDPTR ptr);
 
+/// @brief Returns TRUE if the given ISO9660 directory record represents a directory, FALSE if it's a regular file.
+#define ISO9660_IS_DIR(ent) (((ent)->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) != 0)
+
 /**
  * FAT32
  */
@@ -262,7 +265,47 @@ BOOL FAT32_DIR_ENTRY_IS_DIR(DIR_ENTRY *entry);
 // On error, empty struct is returned
 DIR_ENTRY FAT32_GET_ROOT_DIR_ENTRY(void);
 
+// Fills 'out' with the directory entry whose first cluster matches 'cluster'.
+// Returns TRUE on success, FALSE if not found.
+BOOLEAN FAT32_FIND_DIR_ENTRY_BY_CLUSTER(U32 cluster, DIR_ENTRY *out);
+
+// Flush the in-memory FAT table to disk immediately. Returns TRUE on success.
+BOOL FAT32_FAT_FLUSH(void);
+
+// Disable deferred-flush mode and write the in-memory FAT to disk in one pass.
+// Use after a bulk operation (e.g. batch file creation). Returns TRUE on success.
+BOOL FAT32_FAT_COMMIT(void);
+
+// Walk the FAT cluster chain from start_cluster and mark all clusters as free.
+// Frees all data clusters occupied by a file or directory. Returns TRUE on success.
+BOOL FAT32_FAT_FREE_CHAIN(U32 start_cluster);
+
+// Keep the first new_size_clusters clusters in the chain, free the remainder.
+// Used by FILE_TRUNCATE to shrink a file's cluster allocation. Returns TRUE on success.
+BOOL FAT32_FAT_TRUNCATE_CHAIN(U32 start_cluster, U32 new_size_clusters);
+
+// Convert a FAT32 cluster number to the corresponding absolute disk LBA.
+U32 FAT32_CLUSTER_TO_LBA(U32 cluster);
+
+// Return the next cluster in the FAT chain after 'cluster' (0 if end-of-chain).
+U32 FAT32_GET_NEXT_CLUSTER(U32 cluster);
+
+/// @brief Decodes FAT date and time fields into human-readable components.
+/// @param time FAT time field (2 bytes)
+/// @param date FAT date field (2 bytes)
+/// @param year Output pointer for year (e.g. 2024)
+/// @param month Output pointer for month (1-12)
+/// @param day Output pointer for day (1-31)
+/// @param hour Output pointer for hour (0-23)
+/// @param minute Output pointer for minute (0-59)
+/// @param second Output pointer for second (0-59)
 VOID FAT_DECODE_TIME(U16 time, U16 date, U32 *year, U32 *month, U32 *day, U32 *hour, U32 *minute, U32 *second);
+
+/// @brief Gets the parent cluster number from a given path. Returns 0 if path is invalid or parent not found.
+/// @param path Full path to the file or directory (e.g. "/DIR1/DIR2/FILE.TXT")
+/// @note This function is used internally by FILE_CREATE and DIR_CREATE to find the parent directory's cluster.
+/// @return Cluster number of the parent directory, or 0 on failure
+U32 FAT32_GET_PARENT_CLUSTER(PU8 path);
 
 /**
  * Raw Disk IO functions

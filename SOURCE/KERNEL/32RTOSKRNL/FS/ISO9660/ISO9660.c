@@ -517,7 +517,6 @@ VOIDPTR ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY(U8 *filename, U32 *filesize_out)
     if(!rec) return NULLPTR;
     *filesize_out = rec->extentLengthLE;
     bin = ISO9660_READ_FILEDATA_TO_MEMORY(rec);
-
     if(!bin) {
         ISO9660_FREE_MEMORY_INTERNAL(&rec);
         return NULLPTR;
@@ -529,5 +528,6 @@ VOIDPTR ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY(U8 *filename, U32 *filesize_out)
 }
 
 BOOLEAN ISO9660_IS_DIR(IsoDirectoryRecord *rec) {
-
+    if (!rec) return FALSE;
+    return (rec->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) != 0;
 }

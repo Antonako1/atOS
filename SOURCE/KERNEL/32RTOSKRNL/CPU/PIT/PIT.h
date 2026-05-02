@@ -16,14 +16,10 @@
 #define EVERY_MS(tcks, ms)                 EVERY_TICKS(tcks, MS_TO_TICKS(ms))
 #define EVERY_HZ(tcks, hz)                 EVERY_TICKS(tcks, PIT_TICKS_HZ / (hz))
 #define REFRESH_HZ 75 // Screen refresh
+
 #ifdef __RTOS__
 #include <PROC/PROC.h> // for TrapFrame struct
 
-
-// Time conversion helpers
-#define TICKS_PER_SECOND    PIT_TICKS_HZ
-#define MS_TO_TICKS(ms)     ((ms) / PIT_TICK_MS)
-#define SECONDS_TO_TICKS(s) ((s) * PIT_TICKS_HZ)
 
 // Check if current tick aligns with an interval (e.g., 30 Hz screen updates)
 #define EVERY_TICKS(tcks, interval_ticks)  ((tcks % (interval_ticks)) == 0)

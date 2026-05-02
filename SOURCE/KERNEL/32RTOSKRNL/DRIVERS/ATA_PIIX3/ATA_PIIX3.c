@@ -161,7 +161,7 @@ BOOLEAN ATA_PIIX3_INIT(VOID) {
 }
 
 
-// Generic DMA sector read/write (polling mode)
+// Generic DMA sector read/write (BM-status polling — works with or without IRQs enabled)
 BOOLEAN ATA_PIIX3_XFER(U8 device, U32 lba, U8 sectors, VOIDPTR buf, BOOLEAN write) {
     if (!PRDT || !DMA_BUFFER) return FALSE;
 
@@ -176,33 +176,96 @@ BOOLEAN ATA_PIIX3_XFER(U8 device, U32 lba, U8 sectors, VOIDPTR buf, BOOLEAN writ
 
     // Setup PRDT + DMA buffer
     MEMZERO(DMA_BUFFER, total_bytes);
-    PRDT[0].phys_addr = (U32)DMA_BUFFER;
+    PRDT[0].phys_addr  = (U32)DMA_BUFFER;
     PRDT[0].byte_count = (U16)(total_bytes >= 0x10000 ? 0 : total_bytes); // 0 == 64 KB per PIIX3 spec
-    PRDT[0].flags = END_OF_TABLE_FLAG;
+    PRDT[0].flags      = END_OF_TABLE_FLAG;
     bm_write32(bm_base, is_io, BM_PRDT_ADDR_OFFSET, (U32)PRDT);
 
     if (write) MEMCPY(DMA_BUFFER, buf, total_bytes);
 
+    /* Keep globals in sync so the IRQ handler, if it fires, does the right thing */
     dma_target_buf = buf;
-    dma_bytes = total_bytes;
-    dma_write = write;
-    dma_done = FALSE;
+    dma_bytes      = total_bytes;
+    dma_write      = write;
+    dma_done       = FALSE;
 
-    // Start DMA engine
-    bm_write8(bm_base, is_io, BM_STATUS_OFFSET, BM_STATUS_ERROR | BM_STATUS_IRQ);
-    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, (write ? BM_CMD_WRITE : BM_CMD_READ) | BM_CMD_START_STOP);
+    /* Clear stale IRQ and error bits (write-1-to-clear), then set direction */
+    bm_write8(bm_base, is_io, BM_STATUS_OFFSET,  BM_STATUS_ERROR | BM_STATUS_IRQ);
+    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, write ? BM_CMD_WRITE : BM_CMD_READ);
 
-    // Program ATA registers (0xE0 = fixed bits; bit6=LBA mode; bit4=slave select)
+    /* Program ATA registers (0xE0: fixed bits, bit6=LBA, bit4=slave select) */
     _outb(base + ATA_DRIVE_HEAD, 0xE0 | (is_slave ? 0x10 : 0x00) | ((lba >> 24) & 0x0F));
     ata_io_wait(base);
     _outb(base + ATA_SECCOUNT, sectors);
-    _outb(base + ATA_LBA_LO,   (U8)(lba & 0xFF));
-    _outb(base + ATA_LBA_MID,  (U8)((lba >> 8) & 0xFF));
-    _outb(base + ATA_LBA_HI,   (U8)((lba >> 16) & 0xFF));
+    _outb(base + ATA_LBA_LO,  (U8)(lba & 0xFF));
+    _outb(base + ATA_LBA_MID, (U8)((lba >> 8)  & 0xFF));
+    _outb(base + ATA_LBA_HI,  (U8)((lba >> 16) & 0xFF));
     _outb(base + ATA_COMM_REG, write ? ATA_MDA_CMD_WRITE28 : ATA_MDA_CMD_READ28);
 
-    // Wait for IRQ
-    while (!dma_done) cpu_relax(); // could use proper thread sleep instead
+    /* Start DMA engine */
+    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET,
+              (write ? BM_CMD_WRITE : BM_CMD_READ) | BM_CMD_START_STOP);
+
+    /* -----------------------------------------------------------------------
+     * Wait for completion by polling the Bus-Master Status register directly.
+     *
+     * Why polling instead of waiting on dma_done (set by IRQ handler):
+     *   The BM_STATUS_IRQ flag (bit 2) is set by HARDWARE the moment the IDE
+     *   drive asserts its interrupt line.  This happens regardless of whether
+     *   the CPU's IF flag is set and regardless of whether the PIC actually
+     *   delivers the interrupt.  Polling this bit is therefore safe in every
+     *   calling context:
+     *     - early boot (interrupts enabled, works as before)
+     *     - inside a syscall handler entered via an interrupt gate (IF=0, old
+     *       IRQ-driven wait would spin forever; polling still works)
+     *     - inside any other ISR
+     *
+     * If the IRQ handler fires first (IF is set) it will set dma_done and we
+     * break out on the dma_done check before we even read BM_STATUS; either
+     * path reaches the same cleanup code below.
+     * --------------------------------------------------------------------- */
+    U32 timeout = POLLING_TIME * 10;
+    BOOL completed = FALSE;
+    while (timeout > 0) {
+        /* Fast path: IRQ handler already ran (interrupts were enabled) */
+        if (dma_done) { completed = TRUE; break; }
+
+        /* Slow path: poll BM_STATUS for the hardware-set IRQ flag           */
+        U8 bm_st = bm_read8(bm_base, is_io, BM_STATUS_OFFSET);
+        if (bm_st & BM_STATUS_IRQ) {
+            /* Transfer complete — mirror what the IRQ handler would do */
+            completed = TRUE;
+            break;
+        }
+        if (bm_st & BM_STATUS_ERROR) {
+            /* DMA error flagged by hardware */
+            break;
+        }
+        cpu_relax();
+        timeout--;
+    }
+
+    /* Stop the DMA engine unconditionally */
+    bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, BM_STATUS_STOP);
+
+    /* Re-read status, ack the IRQ flag and error bit (write-1-to-clear) */
+    U8 final_status = bm_read8(bm_base, is_io, BM_STATUS_OFFSET);
+    bm_write8(bm_base, is_io, BM_STATUS_OFFSET, final_status | BM_STATUS_IRQ | BM_STATUS_ERROR);
+
+    /* Clear the ATA interrupt at the drive level */
+    _inb(base + ATA_COMM_REG);
+
+    if (!completed || (final_status & BM_STATUS_ERROR))
+        return FALSE;
+
+    /* Copy result to caller's buffer if this was a read and the IRQ handler
+     * hasn't already done it (dma_done means the handler copied already). */
+    if (!write && !dma_done) {
+        MEMCPY(buf, DMA_BUFFER, total_bytes);
+    }
+
+    /* Signal to the IRQ handler (if it fires late) that we handled it */
+    dma_done = TRUE;
 
     return TRUE;
 }
@@ -232,12 +295,27 @@ void ATA_IRQ_HANDLER(U32 vector, U32 errcode) {
     // Determine primary/secondary channel
     U32 bm_base = (vector == PIC_REMAP_OFFSET + 14) ? BM_BASE_PRIMARY : BM_BASE_SECONDARY;
     BOOL is_io = (vector == PIC_REMAP_OFFSET + 14) ? BM_PRIMARY_IS_IO : BM_SECONDARY_IS_IO;
+    U16 base_port = (vector == PIC_REMAP_OFFSET + 14) ? ATA_PRIMARY_BASE : ATA_SECONDARY_BASE;
 
     // Read BM status
     U8 status = bm_read8(bm_base, is_io, BM_STATUS_OFFSET);
 
     // Stop DMA engine
     bm_write8(bm_base, is_io, BM_COMMAND_OFFSET, BM_STATUS_STOP);
+
+    // Clear the interrupt and error bits in BM status (Write 1 to clear)
+    bm_write8(bm_base, is_io, BM_STATUS_OFFSET, status | BM_STATUS_IRQ | BM_STATUS_ERROR);
+
+    // Read the regular ATA status to clear the IRQ safely at the drive level
+    _inb(base_port + ATA_COMM_REG);
+
+    // If the polling path in ATA_PIIX3_XFER already completed the transfer
+    // (dma_done == TRUE), we only needed to acknowledge the IRQ above — skip
+    // the buffer copy and the error check to avoid double-copying or a false panic.
+    if (dma_done) {
+        // Ack IRQ (fall-through to EOI below)
+        goto ata_irq_ack;
+    }
 
     // Check for errors
     if (status & BM_STATUS_ERROR) {
@@ -251,6 +329,8 @@ void ATA_IRQ_HANDLER(U32 vector, U32 errcode) {
 
     // Signal completion
     dma_done = TRUE;
+
+    ata_irq_ack:;
 
     // Ack IRQ
     pic_send_eoi(vector - PIC_REMAP_OFFSET);
