@@ -16,6 +16,9 @@ and message passing between processes and the kernel.
 
 #define USER_BINARY_VADDR MEM_USER_SPACE_BASE
 
+// F1-F12 shell switching shells.
+#define MAX_SHELLS 12
+
 /// @note temporary fix from 30->256. No more than 256 can be created...
 #define MAX_PROC_AMOUNT 256 // max amount of processes including master
 
@@ -162,6 +165,7 @@ typedef enum {
     message is ignored
     */
     PROC_MSG_SET_FOCUS = 0x00000020,
+    PROC_MSG_FOCUS_SET = 0x00000021, // sent by kernel to inform process that it is now focused
 
     /*
     Empties the message queue of the process
@@ -206,10 +210,17 @@ typedef enum {
     PROC_AUTO_FLUSH_FRAMEBUFFER = 0x00000401, // Process will do automatic flushing of framebuffer. Sent by process to kernel. Data, signal and message are ignored.
     
     // Send to shell process
-    PROC_KILL_SHELL_PROC, // Send by procs
-    PROC_KILL_SHELL_KRNL, // Send by kernel
+    PROC_KILL_SHELL_PROC, // Send by process to kernel to request killing a shell process. Data, signal and message are ignored.
+    PROC_KILL_SHELL_KRNL, // Send by kernel to shell process to request termination. Data, signal and message are ignored.
 
     PROC_RECHECK_STATE, // Sent by process to kernel to request recheck of its state (e.g. if it was marked for kill). Data, signal and message are ignored.
+
+     
+    // First in the shells array. Sent by TSHELL to kernel to inform it of its existence and PID.
+    // signal contains 0-based index of shell (e.g. 0 for F1, 1 for F2, etc.)
+    PROC_SHELL_FIRST_OF_LIST, 
+    PROC_MSG_DISABLE_KEYBOARD, // sent by process to kernel to disable keyboard events. Data, signal and message are ignored.
+    PROC_MSG_ENABLE_KEYBOARD, // sent by process to kernel to enable keyboard events. Data, signal and message are ignored.
 
     // 0x100000 is limit number. User defined types start from there!
 } PROC_MESSAGE_TYPE;

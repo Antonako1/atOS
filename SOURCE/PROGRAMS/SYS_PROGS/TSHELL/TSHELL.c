@@ -44,6 +44,9 @@ VOID INIT_TSHELL(VOID) {
         tcb->info.state |= TCB_STATE_INFO_CHILD_PROC_HANDLER;
         PROC_MESSAGE msg = CREATE_PROC_MSG(KERNEL_PID, PROC_RECHECK_STATE, NULL, 0, tcb->info.state);
         SEND_MESSAGE(&msg);
+        msg = CREATE_PROC_MSG(KERNEL_PID, PROC_SHELL_FIRST_OF_LIST, NULL, 0, 0);
+        SEND_MESSAGE(&msg);
+
     }
 }
 
@@ -124,6 +127,8 @@ VOID END_PROC_SHELL(U32 pid, U32 exit_code, BOOL end_proc) {
     if (shndl->focused_pid == pid) {
         msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, self_pid);
         SEND_MESSAGE(&msg);
+        shndl->previously_focused_pid = shndl->focused_pid;
+        shndl->focused_pid = self_pid;
     }
 
     if (!end_proc)
@@ -196,6 +201,24 @@ static U0 EDIT_LINE_MSG_LOOP(VOID) {
             EXIT_SHELL();
             for (;;) YIELD();
             break;
+        case PROC_MSG_DISABLE_KEYBOARD:
+            shndl->active_kb = FALSE;
+            break;
+        case PROC_MSG_ENABLE_KEYBOARD:
+            shndl->active_kb = TRUE;
+            break;
+        case PROC_MSG_FOCUS_SET:
+            {
+                DEBUG_PRINTF("[TSHELL %d] Focus set to self (focused_pid: %d)\n", shndl->self_pid, shndl->focused_pid);
+                if(shndl->focused_pid == shndl->self_pid) {
+                    DEBUG_PRINTF("[TSHELL %d] Focus is now on self\n", shndl->self_pid);
+                } else {
+                    DEBUG_PRINTF("[TSHELL %d] Focus is now on another process (PID %d)\n", shndl->self_pid, shndl->focused_pid);
+                    PROC_MESSAGE msg = CREATE_PROC_MSG(KERNEL_PID, PROC_MSG_SET_FOCUS, NULL, 0, shndl->focused_pid);
+                    SEND_MESSAGE(&msg);
+                }
+            }
+            break;
 
         case SHELL_CMD_CREATE_STDOUT: {
             PROC_MESSAGE res;
@@ -215,6 +238,7 @@ static U0 EDIT_LINE_MSG_LOOP(VOID) {
             break;
 
         case SHELL_CMD_SHELL_FOCUS:
+            DEBUG_PRINTF("[TSHELL %d] Requesting focus switch to self (focused_pid: %d, sender_pid: %d)\n", shndl->self_pid, shndl->focused_pid, msg->sender_pid);
             shndl->previously_focused_pid = shndl->focused_pid;
             shndl->focused_pid = msg->sender_pid;
             break;

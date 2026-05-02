@@ -86,6 +86,7 @@ VOID CMD_HELP(U8 *line) {
             { "Ctrl+Delete",    "Delete word after cursor" },
             { "PgUp / PgDn",    "Scroll terminal output" },
             { "Shift+Tab",      "Cycle autocomplete backwards" },
+            { "Shift+Alt+<F1-F12>",      "Switch between virtual consoles" },
         };
         U32 key_count = sizeof(keys) / sizeof(keys[0]);
         U32 half_k = (key_count + 1) / 2;
