@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -I./stubs -I../SOURCE -I../SOURCE/KERNEL/32RTOSKRNL -w -O0 -g -DTEST_HOST -fno-builtin
 
-TEST_BINS = test_string test_math test_mem test_bitmap test_arghand
+TEST_BINS = test_string.out test_math.out test_mem.out test_bitmap.out test_arghand.out
 
 all: $(TEST_BINS)
 	@failed=0; \
@@ -18,20 +18,20 @@ all: $(TEST_BINS)
 		exit 1; \
 	fi
 
-test_string: test_string.c ../SOURCE/STD/STRING.c stubs/os_stubs.c
-	$(CC) $(CFLAGS) $^ -o $@
+test_string.out: test_string.c ../SOURCE/STD/STRING.c stubs/os_stubs.c
+	$(CC) $(CFLAGS) $^ -o $@.out
 
-test_math: test_math.c ../SOURCE/STD/MATH.c stubs/os_stubs.c
-	$(CC) $(CFLAGS) $^ -o $@
+test_math.out: test_math.c ../SOURCE/STD/MATH.c stubs/os_stubs.c
+	$(CC) $(CFLAGS) $^ -o $@.out
 
-test_mem: test_mem.c ../SOURCE/STD/MEM.c stubs/mem_test_stubs.c
-	$(CC) $(CFLAGS) $^ -o $@
+test_mem.out: test_mem.c ../SOURCE/STD/MEM.c stubs/mem_test_stubs.c
+	$(CC) $(CFLAGS) $^ -o $@.out
 
-test_bitmap: test_bitmap.c ../SOURCE/STD/BITMAP.c stubs/os_stubs.c
-	$(CC) $(CFLAGS) $^ -o $@
+test_bitmap.out: test_bitmap.c ../SOURCE/STD/BITMAP.c stubs/os_stubs.c
+	$(CC) $(CFLAGS) $^ -o $@.out
 
-test_arghand: test_arghand.c ../SOURCE/LIBRARIES/ARGHAND/ARGHAND.c ../SOURCE/STD/STRING.c stubs/os_stubs.c
-	$(CC) $(CFLAGS) $^ -o $@
+test_arghand.out: test_arghand.c ../SOURCE/LIBRARIES/ARGHAND/ARGHAND.c ../SOURCE/STD/STRING.c stubs/os_stubs.c
+	$(CC) $(CFLAGS) $^ -o $@.out
 
 clean:
 	rm -f $(TEST_BINS)
