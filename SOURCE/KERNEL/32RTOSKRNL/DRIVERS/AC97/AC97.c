@@ -63,10 +63,21 @@ typedef struct {
 } AC97_VOICE;
 
 static AC97_VOICE voices[MAX_VOICES];
-static U32 sample_rate = 48000;
+static U32 sample_rate = 48000; // DAC output rate (hardware fixed)
 
-static const U16* pcm_data = NULLPTR;
-static U32 pcm_frames_left = 0;
+// 8-bit unsigned mono @ 22050 Hz stream
+// Resampled to 48000 Hz via 16.16 fixed-point stepping (step = 22050*65536/48000 = 30109)
+#define PCM8_STEP  30109U
+static const U8*  pcm8_data   = NULLPTR;
+static U32        pcm8_frames = 0;
+static U32        pcm8_pos    = 0; // 16.16 fixed-point position into pcm8_data
+
+// 16-bit signed stereo @ 44800 Hz stream
+// Resampled to 48000 Hz via 16.16 fixed-point stepping (step = 44800*65536/48000 = 61156)
+#define PCM16_STEP 61156U
+static const U16* pcm16_data   = NULLPTR;
+static U32        pcm16_frames = 0; // frame count (each frame = 2 U16 samples: L,R)
+static U32        pcm16_pos    = 0; // 16.16 fixed-point position into pcm16_data (in frames)
 
 static AC97_BDL_ENTRY *Ac97Bdl;
 static U8 *Ac97Bufs[AC97_BDL_ENTRIES];
@@ -88,28 +99,63 @@ static inline VOID NabmWrite32(U16 r,U32 v){_outl(AC97_NABM_BASE+r,v);}
 
 static VOID AC97_MIX_SAMPLES(U16* buffer, U32 samples)
 {
+    // samples = number of U16 values; stereo so samples/2 = output frames
     U32 buffer_ms = (samples * 500) / sample_rate;
 
     for(U32 i = 0; i < samples; i += 2)
     {
         I32 L = 0, R = 0;
 
-        // ... PCM mixing code remains same ...
+        // --- 8-bit mono 22050 Hz stream (resampled to 48000 Hz) ---
+        if(pcm8_data && pcm8_frames > 0)
+        {
+            U32 idx = pcm8_pos >> 16;
+            if(idx >= pcm8_frames)
+            {
+                pcm8_data   = NULLPTR;
+                pcm8_frames = 0;
+                pcm8_pos    = 0;
+            }
+            else
+            {
+                // U8 unsigned -> I16 signed: centre at 0, expand to 16-bit range
+                I32 val = ((I32)pcm8_data[idx] - 128) << 8;
+                L += val;
+                R += val; // mono: duplicate to both channels
+                pcm8_pos += PCM8_STEP;
+            }
+        }
 
+        // --- 16-bit stereo 44800 Hz stream (resampled to 48000 Hz) ---
+        if(pcm16_data && pcm16_frames > 0)
+        {
+            U32 frame = pcm16_pos >> 16;
+            if(frame >= pcm16_frames)
+            {
+                pcm16_data   = NULLPTR;
+                pcm16_frames = 0;
+                pcm16_pos    = 0;
+            }
+            else
+            {
+                L += (I16)pcm16_data[frame * 2];
+                R += (I16)pcm16_data[frame * 2 + 1];
+                pcm16_pos += PCM16_STEP;
+            }
+        }
+
+        // --- Synthesizer voices (square wave tones) ---
         for(U32 v = 0; v < MAX_VOICES; v++)
         {
             if(!voices[v].active) continue;
 
             voices[v].phase += voices[v].step;
 
-            // Basic square wave
             I16 val = (voices[v].phase & 0x8000) ? voices[v].amp : -voices[v].amp;
 
-            // FIX: Simple Linear Decay if duration is low
-            // If duration is less than 10ms, fade the amplitude
-            if (voices[v].duration_ms < 10 && voices[v].duration_ms > 0) {
+            // Simple linear decay in the last 10 ms
+            if (voices[v].duration_ms < 10 && voices[v].duration_ms > 0)
                 val = (val * (I32)voices[v].duration_ms) / 10;
-            }
 
             L += val;
             R += val;
@@ -118,11 +164,11 @@ static VOID AC97_MIX_SAMPLES(U16* buffer, U32 samples)
         if(L > 32767) L = 32767; if(L < -32768) L = -32768;
         if(R > 32767) R = 32767; if(R < -32768) R = -32768;
 
-        buffer[i] = L;
-        buffer[i + 1] = R;
+        buffer[i]     = (U16)(I16)L;
+        buffer[i + 1] = (U16)(I16)R;
     }
 
-    // Update durations
+    // Update voice durations
     for(U32 v = 0; v < MAX_VOICES; v++) {
         if(voices[v].active && voices[v].duration_ms != 0xFFFFFFFF) {
             if(voices[v].duration_ms <= buffer_ms) {
@@ -276,9 +322,35 @@ BOOLEAN AC97_TONE(U32 freq,U32 duration,U32 rate,U16 amp)
 
 BOOLEAN AC97_STATUS(void){return ac97_dev!=NULLPTR;}
 
+// Play 8-bit unsigned mono PCM at 22050 Hz.
+// Buffer must remain valid for the duration of playback (streamed, not copied).
+BOOLEAN AC97_PLAY8(const U8* pcm, U32 frames)
+{
+    if(!pcm || !frames) return FALSE;
+    pcm8_data   = pcm;
+    pcm8_frames = frames;
+    pcm8_pos    = 0;
+    AC97_REFRESH_PIPELINE();
+    return TRUE;
+}
+
+// Play 16-bit signed stereo PCM at 44800 Hz.
+// Buffer must remain valid for the duration of playback (streamed, not copied).
+BOOLEAN AC97_PLAY16(const U16* pcm, U32 frames)
+{
+    if(!pcm || !frames) return FALSE;
+    pcm16_data   = pcm;
+    pcm16_frames = frames;
+    pcm16_pos    = 0;
+    AC97_REFRESH_PIPELINE();
+    return TRUE;
+}
+
 VOID AC97_STOP(void)
 {
-    pcm_frames_left=0;
+    pcm8_data    = NULLPTR; pcm8_frames  = 0; pcm8_pos  = 0;
+    pcm16_data   = NULLPTR; pcm16_frames = 0; pcm16_pos = 0;
     for(U32 i=0;i<MAX_VOICES;i++)
         voices[i].active=FALSE;
 }
+
