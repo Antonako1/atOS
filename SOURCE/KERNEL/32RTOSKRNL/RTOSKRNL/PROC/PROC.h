@@ -104,6 +104,8 @@ typedef struct TaskInfo {
     PROC_EVENT_TYPE event_types; // Bitfield of event types this process is interested in
     BOOL8 request_yield;
     BOOL8 fpu_initialized;
+
+    U32 heap_allocated; // in bytes, total allocated heap memory
 } __attribute__((packed)) TaskInfo;
 
 #define PROC_MSG_QUEUE_SIZE 30
