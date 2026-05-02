@@ -15,7 +15,9 @@ and message passing between processes and the kernel.
 #include <STD/ASM.h>
 
 #define USER_BINARY_VADDR MEM_USER_SPACE_BASE
-#define MAX_PROC_AMOUNT 30 // max amount of processes including master
+
+/// @note temporary fix from 30->256. No more than 256 can be created...
+#define MAX_PROC_AMOUNT 256 // max amount of processes including master
 
 // Minus 1 shell and krnl
 #define MAX_CHILD_PROC_COUNT (MAX_PROC_AMOUNT - 2)

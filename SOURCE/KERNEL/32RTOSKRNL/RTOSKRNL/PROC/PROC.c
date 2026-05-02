@@ -759,6 +759,7 @@ BOOLEAN LOAD_LIBRARY(LOAD_LIBRARY_STRUCT *load_info) {
     return TRUE;
 }
 
+// Removes a TCB from the scheduler's circular linked list. Adjusts proc_amount if needed. Does not free any memory or resources - caller must handle that.
 void remove_tcb_from_scheduler(TCB *tcb) {
     if (!tcb || tcb->info.state == TCB_STATE_IMMORTAL) return;
 
@@ -865,8 +866,10 @@ void KILL_PROCESS(U32 pid) {
     // Finally free the TCB itself
     KFREE(target);
 
-    KDEBUG_PUTS("[proc] Process killed successfully\n");
+    KDEBUG_PUTS("[proc] Process killed successfully ");
     KDEBUG_HEX32(pid);
+    KDEBUG_PUTS(" active processes remaining: ");
+    KDEBUG_HEX32(proc_amount);
     KDEBUG_PUTC('\n');
 }
 
