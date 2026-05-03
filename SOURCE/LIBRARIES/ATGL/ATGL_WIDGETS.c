@@ -1010,6 +1010,7 @@ static VOID event_textinput(PATGL_NODE node, ATGL_EVENT *ev)
         break;
 
     default:
+        if(ev->type != ATGL_EVT_KEY_DOWN || !node->focused) break;
         /* Printable character insertion */
         if (ev->key.ch >= 0x20 && ev->key.ch < 0x7F) {
             if (sel_min < sel_max) {
