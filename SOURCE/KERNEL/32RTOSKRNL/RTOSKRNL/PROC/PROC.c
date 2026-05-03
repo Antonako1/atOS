@@ -865,7 +865,9 @@ void KILL_PROCESS(U32 pid) {
         }
     }
     // Finally free the TCB itself
+    target->info.state = TCB_STATE_ZOMBIE; // Mark as zombie before
     KFREE(target);
+    target=NULL;
 
     KDEBUG_PUTS("[proc] Process killed successfully ");
     KDEBUG_HEX32(pid);
@@ -1480,9 +1482,15 @@ void handle_kernel_messages(void) {
             data->kb.mods.shift
         ) {
             if(data->kb.cur.keycode >= KEY_F1 && data->kb.cur.keycode <= KEY_F12) {
+
                 // Switch focus to corresponding shell if exists
                 U32 shell_index = data->kb.cur.keycode - KEY_F1;
                 if(shell_index < MAX_SHELLS && shells[shell_index]) {
+                    if(shells[shell_index]->info.state & TCB_STATE_ZOMBIE) {
+                        shells[shell_index] = NULLPTR; // clear reference to zombie shell
+                        goto create_shell_in_slot;
+                    }
+                    
                     set_focused_task(shells[shell_index]);
                     KDEBUG_PUTS("[proc_msg] Focus switched to shell in slot ");
                     KDEBUG_HEX32(shell_index);
@@ -1492,7 +1500,7 @@ void handle_kernel_messages(void) {
                     KDEBUG_PUTS("[proc_msg] No shell assigned to slot ");
                     KDEBUG_HEX32(shell_index);
                     KDEBUG_PUTS("\n");
-                    
+                    create_shell_in_slot:
                     // create a new shell process in that slot
                     PU8 path = "/ATOS/TSHELL.BIN";
                     U8 *shell_argv[] = { "/ATOS/TSHELL.BIN" , "--legitemate-run", NULLPTR };
@@ -1526,10 +1534,14 @@ void handle_kernel_messages(void) {
                         } 
                     }
                 }
-
-                for(U32 i = 0; i < MAX_SHELLS; i++) {
-                    if(shells[i]) {
-                        send_msg(&(PROC_MESSAGE){
+                
+                // Switch keyboard event notifications to focused task
+                for(U32 i = 0; i < MAX_SHELLS; i++) 
+                {
+                    if(shells[i]) 
+                    {
+                        send_msg(&(PROC_MESSAGE)
+                        {
                             .sender_pid = 0, // from kernel
                             .receiver_pid = shells[i]->info.pid,
                             .type = shells[i] == focused_task ? PROC_MSG_ENABLE_KEYBOARD : PROC_MSG_DISABLE_KEYBOARD,
@@ -1539,8 +1551,27 @@ void handle_kernel_messages(void) {
                             .read = FALSE,
                             .data = NULL
                         });
+                        for(U32 j = 0; j < shells[i]->child_count; j++) 
+                        {
+                            TCB *child = shells[i]->children[j];
+                            if(child) 
+                            {
+                                DEBUG_PRINTF("[proc_msg] Also sending keyboard event notification to child process PID %u of shell PID %u\n", child->info.pid, shells[i]->info.pid);
+                                send_msg(&(PROC_MESSAGE)
+                                {
+                                    .sender_pid = 0, // from kernel
+                                    .receiver_pid = child->info.pid,
+                                    .type = shells[i] == focused_task ? PROC_MSG_ENABLE_KEYBOARD : PROC_MSG_DISABLE_KEYBOARD,
+                                    .signal = shells[i]->info.pid, // signal contains PID to set focus to
+                                    .data_provided = FALSE,
+                                    .timestamp = get_uptime_sec(),
+                                    .read = FALSE,
+                                    .data = NULL
+                                });
+                            }
+                        }
                     } 
-                }
+                } // end of keyboard event notification switch
 
             }
         }

@@ -196,7 +196,10 @@ CMAIN() {
     BOOL quit      = FALSE;
     U32  track_idx = 0;
 
+    BOOL is_keyboard_disabled = FALSE;
+    PROC_MESSAGE *msg = NULLPTR;
     while (!quit) {
+
         const CHAR *path = files[track_idx];
 
         WAV_AUDIO_STREAM *stream = WAV_OPEN((PU8)path);
@@ -218,16 +221,30 @@ CMAIN() {
         BOOL skip   = FALSE;
 
         while (WAV_IS_PLAYING(stream) && !quit && !skip) {
-            PS2_KB_DATA *kp = ATUI_GETCH_NB();
-            if (kp && kp->cur.pressed) {
-                U32 key = kp->cur.keycode;
-                if (key == KEY_Q || key == KEY_ESC) {
-                    quit = TRUE;
-                } else if (key == KEY_SPACE) {
-                    paused = !paused;
-                    AUDIO_PAUSE(paused);
-                } else if (key == KEY_N) {
-                    skip = TRUE;
+            msg = GET_MESSAGE();
+            while(msg != NULLPTR){
+                if(msg->type == PROC_MSG_ENABLE_KEYBOARD){
+                    is_keyboard_disabled = FALSE;
+                }
+                else if(msg->type == PROC_MSG_DISABLE_KEYBOARD){
+                    is_keyboard_disabled = TRUE;
+                }
+                DEBUG_PRINTF("[JAMMER] is_keyboard_disabled=%u\n", is_keyboard_disabled);
+                FREE_MESSAGE(msg);
+                msg = GET_MESSAGE();
+            }
+            if(!is_keyboard_disabled) {
+                PS2_KB_DATA *kp = ATUI_GETCH_NB();
+                if (kp && kp->cur.pressed) {
+                    U32 key = kp->cur.keycode;
+                    if (key == KEY_Q || key == KEY_ESC) {
+                        quit = TRUE;
+                    } else if (key == KEY_SPACE) {
+                        paused = !paused;
+                        AUDIO_PAUSE(paused);
+                    } else if (key == KEY_N) {
+                        skip = TRUE;
+                    }
                 }
             }
 

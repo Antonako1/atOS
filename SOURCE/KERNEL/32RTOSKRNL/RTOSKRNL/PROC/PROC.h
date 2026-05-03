@@ -44,7 +44,7 @@ and message passing between processes and the kernel.
 #define TCB_STATE_ACTIVE        0x0002
 #define TCB_STATE_WAITING       0x0004
 #define TCB_STATE_IMMORTAL      0x0008  // Cannot be killed
-#define TCB_STATE_ZOMBIE        0x0010  // Dead, waiting for parent to reap
+#define TCB_STATE_ZOMBIE        0x0010  // Dead, set after kill.
 #define TCB_STATE_SLEEPING      0x0020  // Sleeping, can be woken up
 #define TCB_STATE_KERNEL_WAIT   0x0040  // Waiting for kernel event (e.g. I/O)
 #define TCB_STATE_INFO_CHILD_PROC_HANDLER 0x0080 // Handles and informs kernel of child process. AKA Shell
@@ -219,10 +219,15 @@ typedef enum {
     // First in the shells array. Sent by TSHELL to kernel to inform it of its existence and PID.
     // signal contains 0-based index of shell (e.g. 0 for F1, 1 for F2, etc.)
     PROC_SHELL_FIRST_OF_LIST, 
+
+    // These two are sent by kernel to process on virtual terminal switch to inform it of keyboard event notifications. Data, signal and message are ignored.
     PROC_MSG_DISABLE_KEYBOARD, // sent by process to kernel to disable keyboard events. Data, signal and message are ignored.
     PROC_MSG_ENABLE_KEYBOARD, // sent by process to kernel to enable keyboard events. Data, signal and message are ignored.
 
+
+    
     // 0x100000 is limit number. User defined types start from there!
+    // See STD/PROC_COM.h for user-defined message types.
 } PROC_MESSAGE_TYPE;
 
 typedef struct proc_message {
