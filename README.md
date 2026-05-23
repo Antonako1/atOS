@@ -127,6 +127,10 @@ Install the essential build tools:
 ```bash
 # For Debian/Ubuntu
 sudo apt install qemu-system-x86 nasm make gcc genisoimage cmake ninja-build
+
+# Or scripted installation (Linux)
+sudo apt update && sudo apt install -y 
+SCRIPTS/INSTALL_DEPS.sh
 ```
 
 Tools used in development:
