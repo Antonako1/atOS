@@ -66,8 +66,6 @@ start:
     pop cx
     pop dx
 
-    mov ax, BUFFER_SEGMENT
-    mov ds, ax
     mov si, BUFFER_OFFSET
     mov al, [si]
     cmp al, 0x01
@@ -86,8 +84,6 @@ start:
     ; 156: Root directory record
     ; +2 LBA location
     ; +10 Data length
-    mov ax, BUFFER_SEGMENT
-    mov ds, ax
     mov si, BUFFER_OFFSET
     add si, 156 + 10       ; Point to extent length
     mov bx, si
@@ -96,8 +92,6 @@ start:
     mov ax, [bx]
     mov [extentLengthLE], ax
     ;
-    mov ax, BUFFER_SEGMENT
-    mov ds, ax
     mov si, BUFFER_OFFSET
     add si, 156 + 2        ; Point to extent location LBA
     mov bx, si             ; Save SI for use
@@ -165,8 +159,6 @@ start:
         jge .main_loop_end
         
         ;3.     if ((record)(buffer_var+offset_var).length == 0) jmp ISO_ERROR
-        mov ax, BUFFER_SEGMENT
-        mov ds, ax
         mov si, BUFFER_OFFSET
         add si, [offset_var]
         mov al, byte [si]
@@ -175,8 +167,6 @@ start:
 
         ; Skip directories
         ;5.     if(!((record)(buffer_var+offset_var).fileFlags & 0b00000010)) 
-        mov ax, BUFFER_SEGMENT
-        mov ds, ax
         mov si, BUFFER_OFFSET
         add si, [offset_var]
         add si, 25
@@ -186,8 +176,6 @@ start:
         
         ;4.     strncpy(name_buf, record->fileIdentifier, record->fileNameLength);
         ; 
-        mov ax, BUFFER_SEGMENT
-        mov ds, ax
         mov si, BUFFER_OFFSET
 
         add si, [offset_var]
@@ -217,8 +205,14 @@ start:
         ;               extentLocationLE_LBA
         ;               extentLengthLE
 
-        mov ax, BUFFER_SEGMENT
-        mov ds, ax
+        mov si, BUFFER_OFFSET
+        add si, [offset_var]
+        add si, 10
+        mov bx, [si]
+        mov cx, [si+2]
+        mov [extentLengthLE], bx
+        mov [extentLengthLE+2], cx
+
         mov si, BUFFER_OFFSET
         add si, [offset_var]
         add si, 2
@@ -231,8 +225,6 @@ start:
 
         ;11.    If nothing happens: offset_var += (record)(buffer_var+offset_var).length
 .to_loop_increment:
-        mov ax, BUFFER_SEGMENT
-        mov ds, ax
         mov si, BUFFER_OFFSET
         xor ax, ax
         add si, [offset_var]
@@ -250,25 +242,16 @@ bootend:
     ; extentLengthLE contains data length for root
     ; fseek(iso, record->extentLocationLE_LBA * extentLengthLE, SEEK_SET);
 
-    ; Compute number of sectors
+    ; Compute number of ISO9660 sectors (2048 bytes each)
     mov ax, [extentLengthLE]
-    add ax, 511
-    shr ax, 9
+    add ax, 2047
+    shr ax, 11
     mov cx, ax        ; sector count
 
     ; Load kernel
     mov ax, [extentLocationLE_LBA]  ; Load LBA into ax
     mov dx, KERNEL_LOAD_SEGMENT                  ; Set segment register
     call READ_DISK                  ; Read the kernel into memory
-
-    mov dl, [drive_number]
-    mov ax, KERNEL_LOAD_OFFSET
-    mov es, ax
-    mov bx, ax
-    mov dl, [drive_number]
-    mov ax, 0xb800
-    mov es, ax
-    mov word [es:0x0000], 0x1A<<8 | 'A'
 
     jmp KERNEL_LOAD_SEGMENT:KERNEL_LOAD_OFFSET    ; Jump to kernel
 
@@ -388,7 +371,9 @@ READ_DISK:
 
     ; DWORD LBA divided into 2 words. No LBA larger than 0xFFFF will ever be used in 16-bit mode
     mov word [si+8], ax                 ; 2-byte LBA
-    mov word [si+10], 0                 
+    mov word [si+10], 0
+    mov word [si+12], 0
+    mov word [si+14], 0
 
     mov ah, 0x42
     mov dl, [drive_number]              ; Drive number
@@ -403,14 +388,11 @@ READ_DISK:
 diskErrorMessage    db "diskERROR", 0
 ISOErrorMessage     db "isoERROR", 0
 KERNEL_FILENAME     db "KERNEL.BIN;1", KERNEL_LEN
-result0             dw 0
-result1             dw 0
 drive_number        db 0
 
 extentLocationLE_LBA    dd 0    ; lba. contains either root or kernel lba
 extentLengthLE          dd 0    ; size of lba, ROOT dir
 offset_var:    dd 0     ; read_dir var. Offset in PVD
-buffer_var:    dd 0     ; read_dir var. Directory buffer in PVD
 name_buf:      db 12 ; Name buffer for filenames. KERNEL.BIN length is set here
 
 ; Disk Address Packet (DAP)
