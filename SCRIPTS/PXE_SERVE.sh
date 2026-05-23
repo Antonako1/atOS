@@ -62,7 +62,9 @@ if [ -z "$IFACE" ]; then
     echo "Available network interfaces:"
     ip -o link show | awk -F': ' '{print "  "$2}' | grep -v lo
     echo ""
-    read -rp "Enter Ethernet interface to use (e.g. enp3s0): Default: enp4s0" IFACE
+
+    # wait 5s, if no input, default to enp4s0 (common on many laptops)
+    read -rt 5 -rp "Enter Ethernet interface to use (e.g. enp3s0): Default: enp4s0 " IFACE
     IFACE="${IFACE:-enp4s0}"
 fi
 
