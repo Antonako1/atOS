@@ -29,7 +29,7 @@
 ; REMARKS
 ;     None
 
-%define VBE_ACTIVATE 1
+; %define VBE_ACTIVATE 1
 [BITS 16]
 [ORG 0x2000]
 
@@ -417,39 +417,27 @@ KRNL_TO_MEMORY:
     jmp kernel_found
 
 
-; Not optimal, but otherwise corrupts stack...
-; reads via DAP, DS:SI must point to DAP in our data/code segment
-READ_DISK_SAFE:
-    mov byte  [DAP], DAP_SIZE
-    mov byte  [DAP+1], 0
-    mov word  [DAP+2], cx
-    mov word  [DAP+4], bx
-    mov word  [DAP+6], dx
-    mov dword [DAP+8], eax
-    mov dword [DAP+12], 0
-
-    push ds
-    mov ax, cs
-    mov ds, ax
-    lea si, [DAP]
-    mov ah, 42h
-    mov dl, [drive_number]
-    int 13h
-    pop ds
-    jc DISK_ERROR1
-    jmp read_done_for_kernel
-
-
 kernel_found:
-    ; sectors = ceil(length / 2048)
+    ; KRNL.BIN loads upward from 0x7000.  The 16-bit stack is at 0x7C00
+    ; (growing down).  The 2nd sector write (0x7800-0x8000) overwrites the
+    ; INT 13h return frame that the CPU pushed to ~0x7BF6, causing iret to
+    ; jump to garbage.  Move the stack below the KERNEL_ENTRY code (ORG
+    ; 0x2000) before the read so INT 13h pushes are safe.
+    xor ax, ax
+    mov ss, ax
+    mov sp, 0x1F00
+
+    ; sectors = ceil(extentLengthLE_KRNL / 2048)
     mov eax, [extentLengthLE_KRNL]
     add eax, SECTOR_SIZE-1
-    shr eax, 11                    ; /2048
-    mov ecx, eax                   ; sector count (2048B sectors)
+    shr eax, 11
+    mov ecx, eax
     mov eax, [extentLocationLE_LBA_KRNL]
     mov bx, KERNEL_LOAD_OFFSET
     mov dx, KERNEL_LOAD_SEGMENT
-    jmp READ_DISK_SAFE
+    call READ_DISK
+    cmp eax, 0
+    jne DISK_ERROR1
 
 read_done_for_kernel:
     mov si, msg_kernel_end
