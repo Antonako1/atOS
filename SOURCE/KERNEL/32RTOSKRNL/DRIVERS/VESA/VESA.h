@@ -87,7 +87,7 @@ typedef struct {
     U8 OEM_SCRATCHPAD[256]; // OEM scratchpad for additional data 
 } __attribute__((packed)) VESA_INFO;
 
-#define VESA_LOAD_ADDRESS_SEGMENT 0x6400 / 16
+#define VESA_LOAD_ADDRESS_SEGMENT 0x6400 / 16 
 #define VESA_LOAD_ADDRESS_OFFSET 0x0000u
 
 // #ifdef __PROCESS__

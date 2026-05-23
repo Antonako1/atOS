@@ -75,8 +75,9 @@ ISR_ERRORCODE(11) // Segment not present
 ISR_ERRORCODE(12) // Stack segment fault
 ISR_ERRORCODE(13) // General protection fault
 ISR_ERRORCODE(14) // Page fault
-ISR_NOERRORCODE(15) // Reserved
 ISR_NOERRORCODE(16) // x87 FPU Floating Point Error
+#ifdef __RTOS__
+ISR_NOERRORCODE(15) // Reserved
 ISR_ERRORCODE(17) // Alignment check
 ISR_NOERRORCODE(18) // Machine check
 ISR_NOERRORCODE(19) // SIMD Floating Point Exception
@@ -92,13 +93,35 @@ ISR_NOERRORCODE(28) // Reserved
 ISR_NOERRORCODE(29) // Reserved
 ISR_NOERRORCODE(30) // Reserved
 ISR_NOERRORCODE(31) // Reserved
+#else
+#define EMPTY_ISR(n) \
+__attribute__((naked)) void isr##n(void) { \
+}
+EMPTY_ISR(15) // Reserved
+EMPTY_ISR(17) // Alignment check
+EMPTY_ISR(18) // Machine check
+EMPTY_ISR(19) // SIMD Floating Point Exception
+EMPTY_ISR(20) // Virtualization Exception
+EMPTY_ISR(21) // Control Protection Exception
+EMPTY_ISR(22) // Reserved
+EMPTY_ISR(23) // Reserved
+EMPTY_ISR(24) // Reserved
+EMPTY_ISR(25) // Reserved
+EMPTY_ISR(26) // Reserved
+EMPTY_ISR(27) // Reserved
+EMPTY_ISR(28) // Reserved
+EMPTY_ISR(29) // Reserved
+EMPTY_ISR(30) // Reserved
+EMPTY_ISR(31) // Reserved
+#endif // __RTOS__
 
 // IRQs (32–47)
 IRQ_WRAPPER(32) // IRQ0 - Timer
-IRQ_WRAPPER(33) // IRQ1 - Keyboard 
-IRQ_WRAPPER(34) // IRQ2 - Cascade
 IRQ_WRAPPER(35) // IRQ3 - COM2
 IRQ_WRAPPER(36) // IRQ4 - COM1
+#ifdef __RTOS__
+IRQ_WRAPPER(33) // IRQ1 - Keyboard 
+IRQ_WRAPPER(34) // IRQ2 - Cascade
 IRQ_WRAPPER(37) // IRQ5 - LPT2
 IRQ_WRAPPER(38) // IRQ6 - Floppy
 IRQ_WRAPPER(39) // IRQ7 - LPT1
@@ -110,6 +133,24 @@ IRQ_WRAPPER(44) // IRQ12 - PS2 Mouse
 IRQ_WRAPPER(45) // IRQ13 - FPU / Coprocessor / Inter-processor
 IRQ_WRAPPER(46) // IRQ14 - Primary ATA
 IRQ_WRAPPER(47) // IRQ15 - Secondary ATA
+#else
+#define EMPTY_IRQ(vec) \
+__attribute__((naked)) void irq##vec(void) { \
+}
+EMPTY_IRQ(33) // IRQ1 - Keyboard 
+EMPTY_IRQ(34) // IRQ2 - Cascade
+EMPTY_IRQ(37) // IRQ5 - LPT2
+EMPTY_IRQ(38) // IRQ6 - Floppy
+EMPTY_IRQ(39) // IRQ7 - LPT1
+EMPTY_IRQ(40) // IRQ8 - RTC
+EMPTY_IRQ(41) // IRQ9 - ACPI
+EMPTY_IRQ(42) // IRQ10 - Reserved (RTL8139)
+EMPTY_IRQ(43) // IRQ11 - Reserved
+EMPTY_IRQ(44) // IRQ12 - PS2 Mouse
+EMPTY_IRQ(45) // IRQ13 - FPU / Coprocessor / Inter-processor
+EMPTY_IRQ(46) // IRQ14 - Primary ATA
+EMPTY_IRQ(47) // IRQ15 - Secondary ATA
+#endif // __RTOS__
 
 // All remaining vectors
 ISR_NOERRORCODE(48)
