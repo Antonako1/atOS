@@ -46,7 +46,17 @@ INPUT_ISO_DIR_SYSTEM ?= $(INPUT_ISO_DIR)/ATOS
 INPUT_ISO_DIR_HOME ?= $(INPUT_ISO_DIR)/HOME
 INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 
-.PHONY: all kernel reset_hdd bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap test
+CMAKE_EXTRA_ARGS =
+ifneq ($(filter p4power,$(MAKECMDGOALS)),)
+CMAKE_EXTRA_ARGS += -Dp4pwr=1
+P4PWR=1
+else
+P4PWR=0
+endif
+
+BOOTLOADER_IMAGE := $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN
+
+.PHONY: all kernel reset_hdd bootloader iso clean run hdd help programs diskvbr clean_tap runn setup_tap test p4power
 .PHONY: run_user
 .PHONY: run_user_gui
 
@@ -54,13 +64,18 @@ INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 all: iso
 
 # Bootloader build (16-bit raw binary)
-# Bootloader build (16-bit raw binary)
 $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN: $(SOURCE_BOOTLOADER_DIR)/BOOTLOADER.asm
 	@echo "Compiling bootloader (16-bit real mode)..."
 	mkdir -p $(OUTPUT_BOOTLOADER_DIR)
 	$(ASSEMBLER) -f bin -D__REAL_MODE__ -o $@ $<
 	@echo "Bootloader compiled successfully."
 
+$(OUTPUT_BOOTLOADER_DIR)/P4PWR_BL.BIN: $(SOURCE_BOOTLOADER_DIR)/P4PWR_BL.asm
+	@echo "Compiling P4PWR_BL (16-bit real mode for PXE)..."
+	mkdir -p $(OUTPUT_BOOTLOADER_DIR)
+	$(ASSEMBLER) -f bin -D__REAL_MODE__ -o $@ $<
+	@echo "P4PWR_BL compiled successfully."
+pxe_bl: $(OUTPUT_BOOTLOADER_DIR)/P4PWR_BL.BIN
 bootloader: $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN
 
 kernel: 
@@ -90,6 +105,7 @@ kernel:
 	$(CComp) $(KRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/INTERRUPTS/INTERRUPTS.c -o $(OUTPUT_KERNEL_DIR)/INTERRUPTS.o
 	$(CComp) $(KRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DRIVERS/ATAPI/ATAPI.c -o $(OUTPUT_KERNEL_DIR)/ATA_ATAPI.o
 	$(CComp) $(KRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/CPU/PIC/PIC.c -o $(OUTPUT_KERNEL_DIR)/PIC.o
+	$(CComp) $(RTOSKRNLCompArgs) -c $(SOURCE_KERNEL_DIR)/32RTOSKRNL/DEBUG/KDEBUG.c -o $(OUTPUT_KERNEL_DIR)/KDEBUG.o
 
 # Link all object files into KRNL.BIN
 	
@@ -105,7 +121,8 @@ kernel:
 		$(OUTPUT_KERNEL_DIR)/IRQ.o \
 		$(OUTPUT_KERNEL_DIR)/INTERRUPTS.o \
 		$(OUTPUT_KERNEL_DIR)/ATA_ATAPI.o \
-		$(OUTPUT_KERNEL_DIR)/PIC.o \
+		$(OUTPUT_KERNEL_DIR)/PIC.o 
+# 		$(OUTPUT_KERNEL_DIR)/KDEBUG.o \
 
 	@echo "KRNL.BIN compiled successfully."
 	@size=$$(stat -c%s "$(OUTPUT_KERNEL_DIR)/KRNL.BIN"); \
@@ -215,23 +232,24 @@ programs:
 	@( \
 		cat $(PROGRAM_LIST_FILE) | while read prog_dir prog_name; do \
 			echo "Building $$prog_name from $$prog_dir..."; \
-			cmake -S $$prog_dir -B $$prog_dir/build -G "Unix Makefiles" || exit 1; \
+			cmake -S $$prog_dir -B $$prog_dir/build -G "Unix Makefiles" $(CMAKE_EXTRA_ARGS) || exit 1; \
 			cmake --build $$prog_dir/build || exit 1; \
 		done \
 	)
-	cmake -S $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS -B $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS/build -G "Unix Makefiles"
+	cmake -S $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS -B $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS/build -G "Unix Makefiles" $(CMAKE_EXTRA_ARGS)
 	cmake --build $(SOURCE_ROOT_USER_PROGRAMS_DIR)/SYS_PROGS/build
 	@echo "All user programs built successfully."
 
 # ISO build
-iso: bootloader kernel programs diskvbr
+iso: bootloader pxe_bl kernel programs diskvbr
 	@echo "Creating ISO directory structure..."
 	mkdir -p $(INPUT_ISO_DIR_SYSTEM)/SYS_SRC
 	mkdir -p $(INPUT_ISO_DIR_SYSTEM)
 	mkdir -p $(INPUT_ISO_DIR_HOME)
 	mkdir -p $(INPUT_ISO_DIR_HOME)/DOCS/
 	mkdir -p $(INPUT_ISO_DIR_PROGRAMS)
-	cp -f $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN $(INPUT_ISO_DIR)/BOOTLOADER.BIN
+	@echo "Using boot image: $(notdir $(BOOTLOADER_IMAGE))"
+	cp -f $(BOOTLOADER_IMAGE) $(INPUT_ISO_DIR)/BOOTLOADER.BIN
 	if [ -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN ]; then \
 		echo "Copying DISK_VBR.BIN to ISO directory..."; \
 		 cp -f $(OUTPUT_BOOTLOADER_DIR)/DISK_VBR.BIN $(INPUT_ISO_DIR_SYSTEM)/DISK_VBR.BIN; \
@@ -251,6 +269,7 @@ iso: bootloader kernel programs diskvbr
 
 	@echo "Building ISO..."
 	mkdir -p $(OUTPUT_ISO_DIR)
+
 	genisoimage -o $(OUTPUT_ISO_DIR)/$(ISO_NAME) -r -J -b BOOTLOADER.BIN -no-emul-boot $(INPUT_ISO_DIR)
 	@echo "ISO created at $(OUTPUT_ISO_DIR)/$(ISO_NAME)"
 
@@ -426,6 +445,10 @@ help:
 	@echo "  make reset_hdd   - Reset hdd.img to 256MB"
 	@echo "  make clean      - Clean build artifacts"
 	@echo "  make test       - Run host unit tests"
+	@echo "  make p4power    - Build ISO then serve it over PXE (RJ45 network boot)"
 
 test:
 	$(MAKE) -C TESTS all
+
+p4power: iso
+	sudo ./SCRIPTS/PXE_SERVE.sh
