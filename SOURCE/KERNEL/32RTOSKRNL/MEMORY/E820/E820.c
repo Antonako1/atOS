@@ -68,16 +68,39 @@ BOOLEAN E820_INIT(void) {
 
     g_E820Info.RawEntryCount = 0;
     for (U32 i = 0; i < e820_entry_count; i++) {
-        if(e820_entries[i].Type == TYPE_E820_RAM) {
+        E820_ENTRY *entry = &e820_entries[i];
+        VBE_DRAW_STRING(10, 10 + i * 20, "E820 Entry: Base=0x", VBE_RED,    VBE_BLACK);
+        U8 buffer[17];
+        ITOA_U(entry->BaseAddressLow, buffer, 16);
+        buffer[16] = '\0';
+        VBE_DRAW_STRING(200, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
+        VBE_DRAW_STRING(300, 10 + i * 20, " Length=0x", VBE_RED,    VBE_BLACK);
+        ITOA_U(entry->LengthLow, buffer, 16);
+        buffer[16] = '\0';
+        VBE_DRAW_STRING(400, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
+        VBE_DRAW_STRING(500, 10 + i * 20, " Type=", VBE_RED,    VBE_BLACK);
+        ITOA_U(entry->Type, buffer, 10);
+        buffer[16] = '\0';
+        VBE_DRAW_STRING(550, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
+
+        VBE_UPDATE_VRAM();
+        if(e820_entries[i].Type == TYPE_E820_RAM ||
+           e820_entries[i].Type == 3 /* ACPI_RECLAIMABLE — safe to use without ACPI */) {
             if (!fits_in_32(e820_entries[i].BaseAddressHigh) ||
                 !fits_in_32(e820_entries[i].LengthHigh)) continue;
             if (g_E820Info.RawEntryCount < E820_MAX_ENTRIES) {
+                e820_entries[i].Type = TYPE_E820_RAM; // Treat reclaimable as RAM
                 g_E820Info.RawEntries[g_E820Info.RawEntryCount++] = e820_entries[i];
             }
         } else {
             continue; // Skip non-RAM entries
         }
     }
+    while ((0))
+    {
+        /* code */
+    }
+    
     if(g_E820Info.RawEntryCount == 0) {
         return FALSE; // No usable RAM entries found
     }
