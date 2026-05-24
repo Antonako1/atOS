@@ -10,7 +10,7 @@
 VOID SERIAL_PORT_INIT(U16 port) {
     _outb(port + 1, 0x00);    // Disable interrupts
     _outb(port + 3, 0x80);    // Enable DLAB
-    _outb(port + 0, 0x03);    // Divisor low byte (38400 baud)
+    _outb(port + 0, 0x01);    // Divisor low byte (115200 baud)
     _outb(port + 1, 0x00);    // Divisor high byte
     _outb(port + 3, 0x03);    // 8 bits, no parity, one stop bit
     _outb(port + 2, 0xC7);    // FIFO enabled
