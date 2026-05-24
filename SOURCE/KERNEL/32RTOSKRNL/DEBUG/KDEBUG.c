@@ -1,9 +1,18 @@
 #include <DEBUG/KDEBUG.h>
 #include <STD/ASM.h>
+#include <DRIVERS/SERIAL/SERIAL.h>
 
 #define COM1_BASE 0x3F8
 #define DBG_PORT  0xE9
 
+#ifdef p4pwr
+VOID KDEBUG_INIT(VOID){}
+VOID KDEBUG_PUTC(U8 c){}
+VOID KDEBUG_PUTSN(const U8 *s, U32 len){}
+VOID KDEBUG_HEX32(U32 v){}
+VOID KDEBUG_PUTS(const U8 *s){}
+
+#else
 #ifdef p4pwr
 #define DBG_OUT(c) ((void)(c))
 #else
@@ -28,6 +37,7 @@ VOID KDEBUG_PUTC(U8 c) {
     DBG_OUT(c);
     while ((com1_lsr() & 0x20) == 0) { }
     com1_out(c);
+    
 }
 
 VOID KDEBUG_PUTS(const U8 *s) {
@@ -59,3 +69,4 @@ VOID KDEBUG_HEX32(U32 v) {
         DBG_OUT(hex_nibble((v >> (i * 4)) & 0xF));
     }
 }
+#endif
