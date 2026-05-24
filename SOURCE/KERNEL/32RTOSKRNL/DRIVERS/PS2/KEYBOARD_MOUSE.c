@@ -135,8 +135,21 @@ BOOLEAN PS2_WAIT_FOR_INPUT_CLEAR(VOID) {
     return timeout != 0;
 }
 
+BOOLEAN PS2_WAIT_FOR_OUTPUT_FULL(VOID) {
+    int timeout = 10000;
+    while(!(_inb(PS2_STATUSPORT) & PS2_OUTPUT_BUFFER_FULL) && --timeout);
+    return timeout != 0;
+}
+
+// Use for keyboard self-test: real hardware takes up to ~750ms
+BOOLEAN PS2_WAIT_FOR_OUTPUT_FULL_SLOW(VOID) {
+    int timeout = 1000000;
+    while(!(_inb(PS2_STATUSPORT) & PS2_OUTPUT_BUFFER_FULL) && --timeout);
+    return timeout != 0;
+}
+
 BOOLEAN PS2_ACKNOWLEDGED() {
-    if(!PS2_WAIT_FOR_INPUT_CLEAR()) return FALSE;
+    if(!PS2_WAIT_FOR_OUTPUT_FULL()) return FALSE;
     U8 status = PS2_INB(PS2_DATAPORT);
     if(status == PS2_SPECIAL_RESEND) return FALSE;
     if(status != PS2_SPECIAL_ACK) return FALSE;
@@ -148,11 +161,13 @@ BOOLEAN PS2_OUTB(U8 port, U8 data) {
 
     _outb(port, data);
 
+    if(!PS2_WAIT_FOR_OUTPUT_FULL()) return FALSE;
     U8 status = PS2_INB(PS2_DATAPORT);
     if(status == PS2_SPECIAL_RESEND) {
         for(U8 i = 0; i < 3; i++) {
             if(!PS2_WAIT_FOR_INPUT_CLEAR()) return FALSE;
             _outb(port, data);
+            if(!PS2_WAIT_FOR_OUTPUT_FULL()) return FALSE;
             status = PS2_INB(PS2_DATAPORT);
             if(status == PS2_SPECIAL_ACK) break;
             if(status != PS2_SPECIAL_RESEND) return FALSE;
@@ -161,7 +176,7 @@ BOOLEAN PS2_OUTB(U8 port, U8 data) {
         return FALSE;
     }
 
-    return PS2_WAIT_FOR_INPUT_CLEAR();
+    return TRUE;
 }
 
 BOOLEAN PS2_SET_SCAN_CODE_SET(U8 scan_code_set) {
@@ -172,7 +187,16 @@ BOOLEAN PS2_SET_SCAN_CODE_SET(U8 scan_code_set) {
 
 BOOLEAN PS2_KEYBOARD_RETRY_TRY(VOID) {
     if(!PS2_OUTB(PS2_DATAPORT, PS2_RESET_AND_SELF_TEST)) return FALSE;
-    return PS2_INB(PS2_DATAPORT) == PS2_SPECIAL_SELF_TEST_PASSED;
+    // After ACK (consumed by PS2_OUTB), keyboard self-test takes up to 750ms
+    // on real hardware. May also send 0x00 before the 0xAA result byte.
+    for(int i = 0; i < 8; i++) {
+        if(!PS2_WAIT_FOR_OUTPUT_FULL_SLOW()) return FALSE;
+        U8 r = PS2_INB(PS2_DATAPORT);
+        if(r == PS2_SPECIAL_SELF_TEST_PASSED) return TRUE;
+        if(r == PS2_SPECIAL_SELF_TEST_FAILED1 || r == PS2_SPECIAL_SELF_TEST_FAILED2) return FALSE;
+        // 0x00 or other interim byte — keep reading
+    }
+    return FALSE;
 }
 
 BOOLEAN PS2_KEYBOARD_RESET(VOID) {
@@ -191,20 +215,20 @@ BOOLEAN PS2_EMPTY_KEYBOARD_BUFFER(VOID) {
 }
 
 BOOLEAN PS2_EnableScanning(VOID) {
-    if(!PS2_OUTB(PS2_DATAPORT, PS2_ENABLE_SCANNING)) return FALSE;
-    return PS2_ACKNOWLEDGED();
+    return PS2_OUTB(PS2_DATAPORT, PS2_ENABLE_SCANNING);
 }
 
 BOOLEAN PS2_DisableScanning(VOID) {
-    if(!PS2_OUTB(PS2_DATAPORT, PS2_DISABLE_SCANNING)) return FALSE;
-    return PS2_ACKNOWLEDGED();
+    return PS2_OUTB(PS2_DATAPORT, PS2_DISABLE_SCANNING);
 }
 
 U16 PS2_Identify(VOID) {
     if(!PS2_OUTB(PS2_DATAPORT, PS2_IDENTIFY_KEYBOARD)) return 0;
 
+    if(!PS2_WAIT_FOR_OUTPUT_FULL()) return 0;
     U8 first = PS2_INB(PS2_DATAPORT);
     if(first == 0xAB) {
+        if(!PS2_WAIT_FOR_OUTPUT_FULL()) return first;
         U8 second = PS2_INB(PS2_DATAPORT);
         return (first << 8) | second;
     }
@@ -212,7 +236,9 @@ U16 PS2_Identify(VOID) {
 }
 
 static void PS2_MOUSE_WRITE(U8 data) {
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, 0xD4); // Signal that next byte is for the mouse
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_DATAPORT, data);
     PS2_ACKNOWLEDGED();
 }
@@ -235,67 +261,70 @@ BOOLEAN PS2_SetTypematic(U8 delay, U8 rate) {
 }
 
 BOOLEAN PS2_KEYBOARD_INIT(VOID) {
-    // Disable scanning first
-    if(!PS2_DisableScanning()) return FALSE;
-
-    // Identify device
-    U16 type = PS2_Identify();
-    ps2_info.type = type;
     ps2_info.dual_channel = FALSE;
     ps2_info.exists = TRUE;
 
-    // Disable both ports during setup
+    // 1. Disable both ports so the controller ignores device traffic during init
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, DISABLE_FIRST_PS2_PORT);
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, DISABLE_SECOND_PS2_PORT);
 
-    // Configure controller
+    // 2. Flush any stale bytes left from device power-on self-test (e.g. 0xAA)
+    PS2_EMPTY_KEYBOARD_BUFFER();
+
+    // 3. Read and configure the CCB: clear IRQ1, IRQ2 and translation during init
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, GET_CONTROLLER_CONFIGURATION_BYTE);
+    PS2_WAIT_FOR_OUTPUT_FULL();
     U8 config1 = _inb(PS2_DATAPORT);
-    FLAG_UNSET(config1, 0b01010010);
+    FLAG_UNSET(config1, 0b01000011); // clear port-1 IRQ, port-2 IRQ, translation
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, SET_CONTROLLER_CONFIGURATION_BYTE);
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_WRITEPORT, config1);
 
-    // Check if second port exists
+    // 4. Detect dual-channel: enable second port, re-read CCB
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, ENABLE_SECOND_PS2_PORT);
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, GET_CONTROLLER_CONFIGURATION_BYTE);
+    PS2_WAIT_FOR_OUTPUT_FULL();
     U8 config2 = _inb(PS2_DATAPORT);
     if(IS_FLAG_UNSET(config2, 0b00100000)) {
         ps2_info.dual_channel = TRUE;
-        FLAG_UNSET(config2, 0b00100010);
-        _outb(PS2_CMDPORT, SET_CONTROLLER_CONFIGURATION_BYTE);
-        _outb(PS2_WRITEPORT, config2);
     }
+    // Disable second port again until mouse init
+    PS2_WAIT_FOR_INPUT_CLEAR();
+    _outb(PS2_CMDPORT, DISABLE_SECOND_PS2_PORT);
 
-    // Test ports
+    // 5. Test ports
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, TEST_FIRST_PS2_PORT);
+    PS2_WAIT_FOR_OUTPUT_FULL();
     ps2_info.port1_check = PS2_INB(PS2_DATAPORT);
     if(ps2_info.dual_channel) {
+        PS2_WAIT_FOR_INPUT_CLEAR();
         _outb(PS2_CMDPORT, TEST_SECOND_PS2_PORT);
+        PS2_WAIT_FOR_OUTPUT_FULL();
         ps2_info.port2_check = PS2_INB(PS2_DATAPORT);
     } else {
         ps2_info.port2_check = 0;
     }
 
-    // Enable keyboard port & interrupt
+    // 6. Enable first port so controller forwards device commands
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, ENABLE_FIRST_PS2_PORT);
-    FLAG_SET(config1, 0b00000001);
-    _outb(PS2_CMDPORT, SET_CONTROLLER_CONFIGURATION_BYTE);
-    _outb(PS2_WRITEPORT, config1);
 
-    // Enable mouse port interrupt if exists
-    if(ps2_info.dual_channel) {
-        FLAG_SET(config2, 0b00000010);
-        _outb(PS2_CMDPORT, SET_CONTROLLER_CONFIGURATION_BYTE);
-        _outb(PS2_WRITEPORT, config2);
-    }
-
-    // Reset keyboard
+    // 7. Reset keyboard — must come AFTER port is enabled
     if(!PS2_KEYBOARD_RESET()) return FALSE;
+    // Flush any extra bytes the keyboard sends after reset (e.g. 0xAA, 0x00)
+    PS2_EMPTY_KEYBOARD_BUFFER();
 
-    // Set Delay to 250ms (0) and Rate to 30Hz (0)
+    // 8. Set typematic rate/delay
     PS2_SetTypematic(0, 0);
 
-    // Set scan code set
+    // 9. Set scan code set
     if(!PS2_SET_SCAN_CODE_SET(DEFAULT_SCANCODESET)) {
         if(!PS2_SET_SCAN_CODE_SET(SECONDARY_SCANCODESET)) return FALSE;
         ps2_info.scancode_set = SECONDARY_SCANCODESET;
@@ -303,15 +332,22 @@ BOOLEAN PS2_KEYBOARD_INIT(VOID) {
         ps2_info.scancode_set = DEFAULT_SCANCODESET;
     }
 
-    // Clear keyboard buffer
-    if(!PS2_EMPTY_KEYBOARD_BUFFER()) return FALSE;
+    // 10. Identify device (informational)
+    ps2_info.type = PS2_Identify();
 
-    // Register ISR & enable IRQ1
+    // 11. Register ISR before enabling IRQ in CCB
     ISR_REGISTER_HANDLER(PIC_REMAP_OFFSET + 1, PS2_KEYBOARD_HANDLER);
     PIC_Unmask(1);
 
-    // Enable scanning
+    // 12. Enable scanning before turning on the IRQ
     if(!PS2_EnableScanning()) return FALSE;
+
+    // 13. Enable port-1 IRQ in CCB now that handler is registered and scanning is on
+    FLAG_SET(config1, 0b00000001);
+    PS2_WAIT_FOR_INPUT_CLEAR();
+    _outb(PS2_CMDPORT, SET_CONTROLLER_CONFIGURATION_BYTE);
+    PS2_WAIT_FOR_INPUT_CLEAR();
+    _outb(PS2_WRITEPORT, config1);
 
     MEMZERO(&dec, sizeof(PS2_DECODER_STATE));
     CLEAR_CMD_QUEUE();
@@ -322,7 +358,9 @@ BOOLEAN PS2_MOUSE_INIT(VOID) {
     if(!ps2_info.dual_channel) return FALSE;
 
     // 1. Enable second PS/2 port
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, ENABLE_SECOND_PS2_PORT);
+    PS2_EMPTY_KEYBOARD_BUFFER(); // flush any data the mouse sent on enable
 
     // 2. Set Default Settings
     PS2_MOUSE_WRITE(0xF6);
@@ -334,9 +372,12 @@ BOOLEAN PS2_MOUSE_INIT(VOID) {
     PS2_MOUSE_WRITE(0xF3); PS2_MOUSE_WRITE(80);
 
     // 4. Check if the mouse upgraded to ID 3 (IntelliMouse)
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_CMDPORT, 0xD4);
+    PS2_WAIT_FOR_INPUT_CLEAR();
     _outb(PS2_DATAPORT, 0xF2); // Get ID command
     PS2_ACKNOWLEDGED();
+    PS2_WAIT_FOR_OUTPUT_FULL();
     U8 mouse_id = PS2_INB(PS2_DATAPORT);
 
     if (mouse_id == 3) {
