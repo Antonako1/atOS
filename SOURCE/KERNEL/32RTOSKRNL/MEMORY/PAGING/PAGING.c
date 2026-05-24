@@ -105,9 +105,11 @@ BOOLEAN PAGING_INIT(void) {
     VBE_MODEINFO *vmi = GET_VBE_MODE();
     if(vmi && vmi->PhysBasePtr && vmi->XResolution && vmi->YResolution && vmi->BitsPerPixel) {
         U32 fb_start = vmi->PhysBasePtr;
-        U32 fb_size = vmi->YResolution * vmi->BytesPerScanLine;
+        U32 stride = vmi->BytesPerScanLineLinear ? vmi->BytesPerScanLineLinear : vmi->BytesPerScanLine;
+        U32 fb_size = vmi->YResolution * stride;
         U32 fb_end = fb_start + fb_size;
-        identity_map_range(page_directory, fb_start, fb_end, PAGE_PRW);
+        // GPU VRAM is MMIO — must be mapped cache-disabled; cached writes may never reach hardware
+        identity_map_range(page_directory, fb_start, fb_end, PAGE_PRW | PAGE_CACHEDIS);
     }
     identity_map_range(page_directory, MEM_RTOSKRNL_BASE,      MEM_RTOSKRNL_END,      PAGE_PRW);
     identity_map_range(page_directory, MEM_KERNEL_HEAP_BASE,   MEM_KERNEL_HEAP_END,   PAGE_PRW);

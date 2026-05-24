@@ -76,7 +76,8 @@ void flush_focused_framebuffer() {
     VBE_MODEINFO* mode = GET_VBE_MODE();
     if (!mode) return;
     
-    U32 copy_size = mode->BytesPerScanLineLinear * mode->YResolution;
+    U32 stride = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
+    U32 copy_size = stride * mode->YResolution;
     if (copy_size == 0) return;
     if (copy_size > FRAMEBUFFER_SIZE) copy_size = FRAMEBUFFER_SIZE;
 
@@ -135,7 +136,8 @@ void debug_vram_dump() {
     if (!mode) return;
     
     // Copy only the required framebuffer bytes
-    U32 copy_size = mode->BytesPerScanLineLinear * mode->YResolution;
+    U32 stride = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
+    U32 copy_size = stride * mode->YResolution;
     if (copy_size > FRAMEBUFFER_SIZE) copy_size = FRAMEBUFFER_SIZE;
     __memcpy_fast(mode->PhysBasePtr, FRAMEBUFFER_ADDRESS, copy_size);
     early_mode = FALSE;
@@ -226,7 +228,8 @@ U0 VBE_UPDATE_VRAM(U0) {
     #ifdef __RTOS__
     flush_focused_framebuffer();
     #else
-    U32 copy_size = mode->BytesPerScanLineLinear * mode->YResolution;
+    U32 stride = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
+    U32 copy_size = stride * mode->YResolution;
     if (copy_size > FRAMEBUFFER_SIZE) copy_size = FRAMEBUFFER_SIZE;
     __memcpy_safe_chunks((void*)mode->PhysBasePtr, (void*)FRAMEBUFFER_ADDRESS, copy_size);
     #endif
@@ -248,7 +251,8 @@ BOOLEAN VBE_DRAW_FRAMEBUFFER(U32 pos, VBE_PIXEL_COLOUR colour) {
 
     if (!framebuffer || !mode) return FALSE;
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
-    if (pos + bytes_per_pixel > mode->BytesPerScanLineLinear * mode->YResolution) return FALSE;
+    U32 stride = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
+    if (pos + bytes_per_pixel > stride * mode->YResolution) return FALSE;
     // if (pos + bytes_per_pixel > FRAMEBUFFER_SIZE) return FALSE; // RAM framebuffer bounds
     switch (bytes_per_pixel) {
         case 1:
@@ -290,7 +294,8 @@ BOOLEAN VBE_DRAW_PIXEL(VBE_PIXEL_INFO pixel_info) {
     if ((U32)pixel_info.X >= (U32)mode->XResolution || (U32)pixel_info.Y >= (U32)mode->YResolution) return FALSE;
     
     U32 bytes_per_pixel = (mode->BitsPerPixel + 7) / 8;
-    U32 pos = (pixel_info.Y * mode->BytesPerScanLineLinear) + (pixel_info.X * bytes_per_pixel);
+    U32 stride = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
+    U32 pos = (pixel_info.Y * stride) + (pixel_info.X * bytes_per_pixel);
     
     return VBE_DRAW_FRAMEBUFFER(pos, (VBE_PIXEL_COLOUR)pixel_info.Colour);
 }
@@ -348,7 +353,7 @@ BOOLEAN VBE_DRAW_LINE(U32 x0_in, U32 y0_in, U32 x1_in, U32 y1_in, VBE_PIXEL_COLO
     if (!framebuffer) return FALSE;
 
     U32 bpp = (mode->BitsPerPixel + 7) / 8;
-    U32 pitch = mode->BytesPerScanLineLinear;
+    U32 pitch = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
 
     /* ---- FAST PATH: horizontal line (most common in text rendering) ---- */
     if (y0_in == y1_in) {
@@ -457,7 +462,7 @@ BOOLEAN VBE_CLEAR_SCREEN(VBE_PIXEL_COLOUR colour) {
     U32 bpp = (mode->BitsPerPixel + 7) / 8;
     U32 width = mode->XResolution;
     U32 height = mode->YResolution;
-    U32 pitch = mode->BytesPerScanLineLinear;
+    U32 pitch = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
 
     if (bpp == 4) {
         for (U32 y = 0; y < height; y++) {
@@ -627,7 +632,7 @@ BOOLEAN VBE_DRAW_FILLED_RECTANGLE(U32 x0, U32 y0, U32 x1, U32 y1, VBE_PIXEL_COLO
     if (!framebuffer) return FALSE;
 
     U32 bpp = (mode->BitsPerPixel + 7) / 8;
-    U32 pitch = mode->BytesPerScanLineLinear;
+    U32 pitch = mode->BytesPerScanLineLinear ? mode->BytesPerScanLineLinear : mode->BytesPerScanLine;
     U32 width = x1 - x0;
 
     if (bpp == 4) {
