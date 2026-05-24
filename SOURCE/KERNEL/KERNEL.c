@@ -307,24 +307,28 @@ U0 kernel_after_gdt(U0) {
     RTOSKRNL rks;
     rks.ExtentLengthLE = 0;
     rks.ExtentLocationLE_LBA = 0;
-    U8 *bios_vram = (U8*)0xB8000;
+    // U8 *bios_vram = (U8*)0xB8000;
     
-    bios_vram[0] = to_hex(g_iso_base & 0xF);
-    bios_vram[1] = 0x1A;
-    bios_vram[2] = to_hex((g_iso_base >> 4) & 0xF);
-    bios_vram[3] = 0x1A;
-    bios_vram[4] = to_hex((g_iso_base >> 8) & 0xF);
-    bios_vram[5] = 0x1A;
-    bios_vram[6] = to_hex((g_iso_base >> 12) & 0xF);
-    bios_vram[7] = 0x1A;
-    bios_vram[8] = to_hex((g_iso_base >> 16) & 0xF);
-    bios_vram[9] = 0x1A;
-    bios_vram[10] = to_hex((g_iso_base >> 20) & 0xF);
-    bios_vram[11] = 0x1A;
-    bios_vram[12] = to_hex((g_iso_base >> 24) & 0xF);
-    bios_vram[13] = 0x1A;
-    bios_vram[14] = to_hex((g_iso_base >> 28) & 0xF);
-    bios_vram[15] = 0x1A;
+    // bios_vram[0] = to_hex(g_iso_base & 0xF);
+    // bios_vram[1] = 0x1A;
+    // bios_vram[2] = to_hex((g_iso_base >> 4) & 0xF);
+    // bios_vram[3] = 0x1A;
+    // bios_vram[4] = to_hex((g_iso_base >> 8) & 0xF);
+    // bios_vram[5] = 0x1A;
+    // bios_vram[6] = to_hex((g_iso_base >> 12) & 0xF);
+    // bios_vram[7] = 0x1A;
+    // bios_vram[8] = to_hex((g_iso_base >> 16) & 0xF);
+    // bios_vram[9] = 0x1A;
+    // bios_vram[10] = to_hex((g_iso_base >> 20) & 0xF);
+    // bios_vram[11] = 0x1A;
+    // bios_vram[12] = to_hex((g_iso_base >> 24) & 0xF);
+    // bios_vram[13] = 0x1A;
+    // bios_vram[14] = to_hex((g_iso_base >> 28) & 0xF);
+    // bios_vram[15] = 0x1A;
+    // F1A50400 for example displayed as 0004a5f1
+    // This is useful for debugging the memdisk path, which is very buggy and unreliable
+
+
     // Read PVD at lba 16
     if(read_cdrom_sector(atapi_status, 16, 1, (U8*)pvd) == ATA_FAILED) {
         VBE_DRAW_STRING(0, row, 
@@ -355,8 +359,8 @@ U0 kernel_after_gdt(U0) {
 
         HLT;
     }
-    bios_vram[32] = 'F';
-    bios_vram[33] = 0x1A;
+    // bios_vram[32] = 'F';
+    // bios_vram[33] = 0x1A;
     if(!SEARCH_FILE(
         pvd->rootDirectoryRecord.extentLocationLE_LBA,
         pvd->rootDirectoryRecord.extentLengthLE,
@@ -373,13 +377,13 @@ U0 kernel_after_gdt(U0) {
             ""
             , VBE_WHITE, VBE_BLACK);
         VBE_UPDATE_VRAM();
-        bios_vram[32] = 'Z';
-        bios_vram[33] = 0x1A;
+        // bios_vram[32] = 'Z';
+        // bios_vram[33] = 0x1A;
         rowinc;
         HLT;
     }
-        bios_vram[32] = 'G';
-        bios_vram[33] = 0x1A;
+        // bios_vram[32] = 'G';
+        // bios_vram[33] = 0x1A;
     U32 sectors = CALC_SECTOR(rks.ExtentLengthLE);
     if(
         read_cdrom_sector(
@@ -395,12 +399,23 @@ U0 kernel_after_gdt(U0) {
             , VBE_WHITE, VBE_BLACK);
         VBE_UPDATE_VRAM();
         rowinc;
-        bios_vram[32] = 'I';
-        bios_vram[33] = 0x1A;
+        // bios_vram[32] = 'I';
+        // bios_vram[33] = 0x1A;
         HLT;
     }
-    bios_vram[32] = 'p';
-    bios_vram[33] = 0x1A;
+    // print first 0xFF bytes as "12 34 56 ..."
+    // for(U32 i = 0; i < 0xFF; i++) {
+    //     U8 b  = ((U8*)RTOSKRNL_ADDRESS)[i];
+    //     U8 hi = b >> 4;
+    //     U8 lo = b & 0xF;
+    //     U32 vbase = 32 + i * 6;
+    //     bios_vram[vbase + 0] = (hi < 10) ? ('0' + hi) : ('a' + hi - 10);
+    //     bios_vram[vbase + 1] = 0x1A;
+    //     bios_vram[vbase + 2] = (lo < 10) ? ('0' + lo) : ('a' + lo - 10);
+    //     bios_vram[vbase + 3] = 0x1A;
+    //     bios_vram[vbase + 4] = ' ';
+    //     bios_vram[vbase + 5] = 0x1A;
+    // }
     void (*entry)(void) = (void(*)(void))MEM_RTOSKRNL_BASE;
     __asm__ volatile("jmp *%0" :: "r"(entry) : "memory");
 
