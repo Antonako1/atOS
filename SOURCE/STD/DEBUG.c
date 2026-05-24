@@ -2,6 +2,15 @@
 #include <STD/ASM.h>
 #include <STD/ARG.h>
 
+#ifdef p4pwr
+void DEBUG_INIT(void) {}
+void DEBUG_PUTC(U8 c) { (void)c; }
+void DEBUG_PUTS(U8 *s) { (void)s; }
+void DEBUG_PUTS_LN(PU8 s) { (void)s; }
+void DEBUG_HEX32(U32 value) { (void)value; }
+void DEBUG_MEMORY_DUMP(const void *addr, U32 length) { (void)addr; (void)length; }
+void DEBUG_PRINTF(PU8 fmt, ...) { (void)fmt; }
+#else
 static inline U8 com1_lsr(void) {
     return _inb(COM1_BASE + 5);
 }
@@ -111,3 +120,4 @@ DEBUG_PRINTF(PU8 fmt, ...) {
     VFORMAT(debug_putch, NULL, fmt, args);
     va_end(args);
 }
+#endif
