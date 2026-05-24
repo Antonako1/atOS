@@ -29,7 +29,7 @@
 ; REMARKS
 ;     None
 
-; %define VBE_ACTIVATE 1
+%define VBE_ACTIVATE 1  
 [BITS 16]
 [ORG 0x2000]
 
