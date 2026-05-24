@@ -49,6 +49,8 @@ INPUT_ISO_DIR_PROGRAMS ?= $(INPUT_ISO_DIR)/PROGRAMS
 CMAKE_EXTRA_ARGS =
 ifneq ($(filter p4power,$(MAKECMDGOALS)),)
 CMAKE_EXTRA_ARGS += -Dp4pwr=1
+RTOSKRNLCompArgs += -Dp4pwr=1
+KRNLCompArgs += -Dp4pwr=1
 P4PWR=1
 else
 P4PWR=0
