@@ -360,6 +360,8 @@ void panic_reg(regs *r, const U8 *msg, U32 errmsg) {
 }
 
 void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
+    while (1){}
+    
     CLI;
     debug_vram_start();
     VBE_UPDATE_VRAM();
@@ -381,15 +383,15 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
     VBE_DRAW_STRING(0, rki_row, get_current_tcb()->info.name, fg, bg);
     INC_rki_row(rki_row);
     // --- Print to debug port ---
-    KDEBUG_PUTS("\n=== PANIC ===\n");
-    KDEBUG_PUTS("Message: ");
-    KDEBUG_PUTS(msg);
-    KDEBUG_PUTS("\nError Code: 0x");
-    KDEBUG_HEX32(errmsg);
-    KDEBUG_PUTS("\n");
-    KDEBUG_PUTS("\nCurrent PID: 0x");
-    KDEBUG_HEX32(get_current_tcb()->info.pid);
-    KDEBUG_PUTS("\n");
+    // KDEBUG_PUTS("\n=== PANIC ===\n");
+    // KDEBUG_PUTS("Message: ");
+    // KDEBUG_PUTS(msg);
+    // KDEBUG_PUTS("\nError Code: 0x");
+    // KDEBUG_HEX32(errmsg);
+    // KDEBUG_PUTS("\n");
+    // KDEBUG_PUTS("\nCurrent PID: 0x");
+    // KDEBUG_HEX32(get_current_tcb()->info.pid);
+    // KDEBUG_PUTS("\n");
     // Last error
     VBE_DRAW_STRING(0, rki_row, "Last error: 0x", fg, bg);
     ITOA_U(GET_LAST_ERROR(), buf, 16);
@@ -459,10 +461,10 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
         VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
         INC_rki_row(rki_row);
 
-        KDEBUG_PUTS("Heap: total=0x"); KDEBUG_HEX32(heap->totalSize);
-        KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(heap->usedSize);
-        KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(heap->freeSize);
-        KDEBUG_PUTS("\n");
+        // KDEBUG_PUTS("Heap: total=0x"); KDEBUG_HEX32(heap->totalSize);
+        // KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(heap->usedSize);
+        // KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(heap->freeSize);
+        // KDEBUG_PUTS("\n");
     }
 
     // 🔍 Pageframe Info
@@ -491,16 +493,16 @@ void PANIC_RAW(const U8 *msg, U32 errmsg, VBE_COLOUR fg, VBE_COLOUR bg) {
         VBE_DRAW_STRING(200, rki_row, buf, fg, bg);
         INC_rki_row(rki_row);
 
-            KDEBUG_PUTS("PF: total=0x"); KDEBUG_HEX32(pf->size);
-        KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(pf->usedMemory);
-        KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(pf->freeMemory);
-        KDEBUG_PUTS(" reserved=0x"); KDEBUG_HEX32(pf->reservedMemory);
-        KDEBUG_PUTS("\n");
+        // KDEBUG_PUTS("PF: total=0x"); KDEBUG_HEX32(pf->size);
+        // KDEBUG_PUTS(" used=0x"); KDEBUG_HEX32(pf->usedMemory);
+        // KDEBUG_PUTS(" free=0x"); KDEBUG_HEX32(pf->freeMemory);
+        // KDEBUG_PUTS(" reserved=0x"); KDEBUG_HEX32(pf->reservedMemory);
+        // KDEBUG_PUTS("\n");
     }
-    KDEBUG_PUTS("Failed on "); KDEBUG_HEX32(get_current_tcb()->info.pid);
-    KDEBUG_PUTS(" ");
-    KDEBUG_PUTS(get_current_tcb()->info.name);
-    KDEBUG_PUTS("\n");
+    // KDEBUG_PUTS("Failed on "); KDEBUG_HEX32(get_current_tcb()->info.pid);
+    // KDEBUG_PUTS(" ");
+    // KDEBUG_PUTS(get_current_tcb()->info.name);
+    // KDEBUG_PUTS("\n");
 
     VBE_UPDATE_VRAM();
     ASM_VOLATILE("cli; hlt");
@@ -618,8 +620,9 @@ void LOAD_AND_RUN_KERNEL_SHELL(VOID) {
 
 BOOL initialize_filestructure(VOID) {
     KDEBUG_PUTS("[atOS] Initializing filesystem structure on disk if not present...\n");
-    
+    strd("Initializing filesystem structure on disk if not present...");
     BOOL res = ENSURE_BPB_LOADED();
+    strd("ENSURE_BPB_LOADED returned ");
     DEBUG_PRINTF("[atOS] ENSURE_BPB_LOADED returned %d\n", res);
     if(res) {
         VBE_DRAW_STRING(0, rki_row, "FAT32 filesystem structure found on disk, skipping initialization.", VBE_WHITE, VBE_SEE_THROUGH);
@@ -629,6 +632,7 @@ BOOL initialize_filestructure(VOID) {
         VBE_DRAW_STRING(0, rki_row, "If you are seeing this message for more than a few seconds, please check your disk or re-partition it.", VBE_WHITE, VBE_SEE_THROUGH);
         return TRUE;
     } // Already initialized on disk
+    strd("FAT32 filesystem structure not found on disk, initializing...");
     VBE_DRAW_STRING(0, rki_row, "Initializing filesystem structure on disk since it was not found. This may take a few seconds...", VBE_WHITE, VBE_SEE_THROUGH);
     KDEBUG_PUTS("[atOS] Initializing FAT32 filesystem on disk...\n");
     VOIDPTR bin = NULLPTR;
@@ -652,7 +656,7 @@ BOOL initialize_filestructure(VOID) {
     // Reload BPB + FAT + root dir from disk so in-memory state is consistent
     KDEBUG_PUTS("[atOS] FAT32 initialized, reloading BPB and FAT from disk...\n");
     VBE_DRAW_STRING(0, rki_row, "FAT32 initialized, reloading BPB and FAT from disk...", VBE_WHITE, VBE_BLUE);
-    VBE_FLUSH_SCREEN();
+    VBE_STOP_DRAWING();
     return ENSURE_BPB_LOADED();
 }
 

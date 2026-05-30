@@ -51,9 +51,9 @@ ifneq ($(filter p4power,$(MAKECMDGOALS)),)
 CMAKE_EXTRA_ARGS += -Dp4pwr=1
 RTOSKRNLCompArgs += -Dp4pwr=1
 KRNLCompArgs += -Dp4pwr=1
-P4PWR=1
+p4pwr=1
 else
-P4PWR=0
+p4pwr=0
 endif
 
 BOOTLOADER_IMAGE := $(OUTPUT_BOOTLOADER_DIR)/BOOTLOADER.BIN

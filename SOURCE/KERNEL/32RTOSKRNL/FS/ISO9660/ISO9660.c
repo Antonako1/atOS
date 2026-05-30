@@ -21,12 +21,19 @@ BOOLEAN ISO9660_IMAGE_CHECK(PrimaryVolumeDescriptor *pvd) {
 }
 
 BOOLEAN ISO9660_READ_PVD(PrimaryVolumeDescriptor *descriptor, U32 size) {
-    if (!descriptor || size < sizeof(PrimaryVolumeDescriptor)) return FALSE;
+    strd("[ISO] READ_PVD: enter");
+    if (!descriptor || size < sizeof(PrimaryVolumeDescriptor)) { strd("[ISO] READ_PVD: bad args"); return FALSE; }
 
     U32 atapiStatus = INITIALIZE_ATAPI();
-    if (atapiStatus == ATA_FAILED) return FALSE;
-    if (READ_CDROM(atapiStatus, 16, 1, descriptor) == ATA_FAILED) return FALSE;
-
+    strd("[ISO] READ_PVD: ATAPI init done");
+    if (atapiStatus == ATA_FAILED) { strd("[ISO] READ_PVD: ATAPI FAILED"); return FALSE; }
+    U8 *bf[16];
+    ITOA_U(atapiStatus, (U8 *)bf, 16);
+    strd("[ISO] READ_PVD: ATAPI status:"); strd((CHAR *)bf);
+    strd("[ISO] READ_PVD: READ_CDROM LBA16");
+    if (READ_CDROM(atapiStatus, 16, 1, descriptor) == ATA_FAILED) { strd("[ISO] READ_PVD: READ_CDROM FAILED"); return FALSE; }
+    strd("[ISO] READ_PVD: ok");
+    pvd->unused1 = 0xF4;
     return TRUE;
 }
 
@@ -137,19 +144,23 @@ BOOLEAN ISO9660_READ_FROM_DIRECTORY(
     CHAR *original_target,
     IsoDirectoryRecord *output
 ) {
-    if (!target || !original_target || !output) return FALSE;
+    strd("[ISO] READ_FROM_DIR: enter, target:"); strd(target);
+    if (!target || !original_target || !output) { strd("[ISO] READ_FROM_DIR: null arg"); return FALSE; }
 
     U32 sectors = ISO9660_CALCULATE_SECTORS(size);
     if (sectors > (0xFFFFFFFFu / ISO9660_SECTOR_SIZE))
-        return FALSE;
+        { strd("[ISO] READ_FROM_DIR: sector overflow"); return FALSE; }
     U32 buf_sz = sectors * ISO9660_SECTOR_SIZE;
     U8 *buffer = KMALLOC(buf_sz);
-    if (!buffer) return FALSE;
+    if (!buffer) { strd("[ISO] READ_FROM_DIR: KMALLOC FAILED"); return FALSE; }
     MEMZERO(buffer, buf_sz);
+    strd("[ISO] READ_FROM_DIR: READ_CDROM");
     if (READ_CDROM(GET_ATAPI_INFO(), lba, sectors, buffer) == ATA_FAILED) {
+        strd("[ISO] READ_FROM_DIR: READ_CDROM FAILED");
         ISO9660_FREE_MEMORY_INTERNAL(&buffer);
         return FALSE;
     }
+    strd("[ISO] READ_FROM_DIR: READ_CDROM OK");
 
 
     U32 offset = 0;
@@ -158,15 +169,18 @@ BOOLEAN ISO9660_READ_FROM_DIRECTORY(
         IsoDirectoryRecord *record = (IsoDirectoryRecord *)(buffer + offset);
         if (record->length == 0) break;
         if (record->fileNameLength >= ISO9660_MAX_PATH) {
+            strd("[ISO] READ_FROM_DIR: filename too long");
             ISO9660_FREE_MEMORY_INTERNAL(&buffer);
             return FALSE;
         }
         CHAR record_name[ISO9660_MAX_PATH];
         STRNCPY(record_name, record->fileIdentifier, record->fileNameLength);
         record_name[record->fileNameLength] = '\0';
+        strd("[ISO] READ_FROM_DIR: record:"); strd(record_name);
 
         if (record->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) {
             if (STRCMP(record_name, target) == 0) {
+                strd("[ISO] READ_FROM_DIR: dir match, recurse");
                 CHAR *slash = STRCHR(original_target, '/');
                 if (slash) {
                     U32 remaining = STRLEN(slash + 1);
@@ -192,6 +206,7 @@ BOOLEAN ISO9660_READ_FROM_DIRECTORY(
             }
         } else {
             if (STRCMP(record_name, target) == 0) {
+                strd("[ISO] READ_FROM_DIR: file match found");
                 MEMCPY(output, record, sizeof(IsoDirectoryRecord));
                 ISO9660_FREE_MEMORY_INTERNAL(&buffer);
                 return TRUE;
@@ -200,6 +215,7 @@ BOOLEAN ISO9660_READ_FROM_DIRECTORY(
 
         offset += record->length;
     }
+    strd("[ISO] READ_FROM_DIR: target not found"); strd(target);
     ISO9660_FREE_MEMORY_INTERNAL(&buffer);
     return FALSE;
 }
@@ -294,20 +310,23 @@ BOOLEAN ISO9660_READ_DIRECTORY_RECORD(
     IsoDirectoryRecord *root_record,
     IsoDirectoryRecord *out_record
 ) {
-    if (!path || !root_record || !out_record) return FALSE;
+    strd("[ISO] READ_DIR_RECORD: path:"); strd(path);
+    if (!path || !root_record || !out_record) { strd("[ISO] READ_DIR_RECORD: null arg"); return FALSE; }
 
     U32 LBA = root_record->extentLocationLE_LBA;
     U32 size = root_record->extentLengthLE;
-    if (size == 0 || LBA == 0) return FALSE;
+    strd("[ISO] READ_DIR_RECORD: root LBA/size");
+    if (size == 0 || LBA == 0) { strd("[ISO] READ_DIR_RECORD: root LBA/size zero"); return FALSE; }
 
     U32 mod_path_len = STRLEN(path) + 1;
     U8 *modifiable_path = KMALLOC(mod_path_len);
-    if (!modifiable_path) return FALSE;
+    if (!modifiable_path) { strd("[ISO] READ_DIR_RECORD: KMALLOC FAILED"); return FALSE; }
     MEMZERO(modifiable_path, mod_path_len);
     STRCPY(modifiable_path, path);
 
     U8 *slash = (U8 *)STRCHR(modifiable_path, '/');
     if (slash) *slash = '\0';
+    strd("[ISO] READ_DIR_RECORD: first component:"); strd(modifiable_path);
 
     *out_record = *root_record;
 
@@ -318,71 +337,88 @@ BOOLEAN ISO9660_READ_DIRECTORY_RECORD(
         path,
         out_record
     );
+    strd(res ? "[ISO] READ_DIR_RECORD: OK" : "[ISO] READ_DIR_RECORD: FAILED");
     ISO9660_FREE_MEMORY_INTERNAL(&modifiable_path);
     return res;
 }
 
 IsoDirectoryRecord *ISO9660_FILERECORD_TO_MEMORY(CHAR *path) {
+    strd("[ISO] FILERECORD_TO_MEMORY: path:"); strd(path);
     CHAR *normPath = ISO9660_NORMALIZE_PATH(path);
-    if (!normPath) return NULLPTR;
-
+    if (!normPath) { strd("[ISO] FILERECORD_TO_MEMORY: NORMALIZE FAILED"); return NULLPTR; }
+    strd("[ISO] FILERECORD_TO_MEMORY: normPath:"); KDEBUG_PUTS(normPath);
     PrimaryVolumeDescriptor *_pvd = pvd ? pvd : KMALLOC(sizeof(PrimaryVolumeDescriptor));
-    if (!_pvd) { ISO9660_FREE_MEMORY_INTERNAL(&normPath); return NULLPTR; }
-    
+    if (!_pvd) { strd("[ISO] FILERECORD_TO_MEMORY: PVD alloc FAILED"); ISO9660_FREE_MEMORY_INTERNAL(&normPath); return NULLPTR; }
     if (!pvd) {
+        strd("[ISO] FILERECORD_TO_MEMORY: reading PVD");
         MEMZERO(_pvd, sizeof(PrimaryVolumeDescriptor));
         if (!ISO9660_READ_PVD(_pvd, sizeof(PrimaryVolumeDescriptor))) {
+            strd("[ISO] FILERECORD_TO_MEMORY: READ_PVD FAILED");
             ISO9660_FREE_MEMORY_INTERNAL(&normPath);
             ISO9660_FREE_MEMORY_INTERNAL(&_pvd);
             return NULLPTR;
         }
         SetGlobalPVD(_pvd);
+        strd("[ISO] FILERECORD_TO_MEMORY: PVD read OK");
+    } else {
+        strd("[ISO] FILERECORD_TO_MEMORY: using cached PVD");
     }
     if (!ISO9660_IMAGE_CHECK(_pvd)) {
+        strd("[ISO] FILERECORD_TO_MEMORY: IMAGE_CHECK FAILED");
         ISO9660_FREE_MEMORY_INTERNAL(&normPath);
         if (!pvd) ISO9660_FREE_MEMORY_INTERNAL(&_pvd);
         return NULLPTR;
     }
-
+    strd("[ISO] FILERECORD_TO_MEMORY: IMAGE_CHECK OK");
 
     IsoDirectoryRecord root; // root record
     IsoDirectoryRecord out; // output record
     ISO9660_EXTRACT_ROOT_FROM_PVD(_pvd, &root);
+    strd("[ISO] FILERECORD_TO_MEMORY: root extracted, calling READ_DIR_RECORD");
 
     if (!ISO9660_READ_DIRECTORY_RECORD(normPath, &root, &out)) {
+        strd("[ISO] FILERECORD_TO_MEMORY: READ_DIR_RECORD FAILED");
         ISO9660_FREE_MEMORY_INTERNAL(&normPath);
         if (!pvd) ISO9660_FREE_MEMORY_INTERNAL(&_pvd);
         return NULLPTR;
     }
+    strd("[ISO] FILERECORD_TO_MEMORY: READ_DIR_RECORD OK");
     ISO9660_FREE_MEMORY_INTERNAL(&normPath);
     IsoDirectoryRecord *retval = KMALLOC(sizeof(IsoDirectoryRecord));
     if (!retval) {
+        strd("[ISO] FILERECORD_TO_MEMORY: retval KMALLOC FAILED");
         if (!pvd) ISO9660_FREE_MEMORY_INTERNAL(&_pvd);
         return NULLPTR;
     }
     MEMZERO(retval, sizeof(IsoDirectoryRecord));
-
     MEMCPY(retval, &out, sizeof(IsoDirectoryRecord));
+    strd("[ISO] FILERECORD_TO_MEMORY: done");
     return retval;
 }
 
 VOIDPTR ISO9660_READ_FILEDATA_TO_MEMORY(IsoDirectoryRecord *fileptr) {
-    if (!fileptr) return NULLPTR;
+    strd("[ISO] READ_FILEDATA: enter");
+    if (!fileptr) { strd("[ISO] READ_FILEDATA: null fileptr"); return NULLPTR; }
     U32 size = fileptr->extentLengthLE;
     U32 lba = fileptr->extentLocationLE_LBA;
-    if (size == 0 || lba == 0) return NULLPTR;
+    strd("[ISO] READ_FILEDATA: lba/size");
+    if (size == 0 || lba == 0) { strd("[ISO] READ_FILEDATA: lba/size zero"); return NULLPTR; }
     U32 real_size = ISO9660_ROUND_UP_TO_SECTOR(size);
     U8 *buffer = KMALLOC(real_size);
-    if (!buffer) return NULLPTR;
+    if (!buffer) { strd("[ISO] READ_FILEDATA: KMALLOC FAILED"); return NULLPTR; }
     MEMZERO(buffer, real_size);
     U32 sectors = ISO9660_CALCULATE_SECTORS(real_size);
+    strd("[ISO] READ_FILEDATA: ATAPI init");
     U32 atapiStatus = INITIALIZE_ATAPI();
-    if (atapiStatus == ATA_FAILED) { ISO9660_FREE_MEMORY_INTERNAL(&buffer); return NULLPTR; }
+    if (atapiStatus == ATA_FAILED) { strd("[ISO] READ_FILEDATA: ATAPI INIT FAILED"); ISO9660_FREE_MEMORY_INTERNAL(&buffer); return NULLPTR; }
 
+    strd("[ISO] READ_FILEDATA: READ_CDROM");
     if (READ_CDROM(atapiStatus, lba, sectors, buffer) == ATA_FAILED) {
+        strd("[ISO] READ_FILEDATA: READ_CDROM FAILED");
         ISO9660_FREE_MEMORY_INTERNAL(&buffer);
         return NULLPTR;
     }
+    strd("[ISO] READ_FILEDATA: ok");
     return (VOIDPTR)buffer;
 }
 
@@ -425,7 +461,8 @@ U32 ISO9660_GET_TYPE(IsoDirectoryRecord *rec) {
 }
 
 IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN recursive, U32 *size_out, U8 *success) {
-    if (!dir || !size_out || !success) return NULLPTR;
+    strd("[ISO] GET_DIR_CONTENTS: enter");
+    if (!dir || !size_out || !success) { strd("[ISO] GET_DIR_CONTENTS: null arg"); return NULLPTR; }
 
     *size_out = 0;
     *success = FALSE;
@@ -433,17 +470,23 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
 
     U32 lba = dir->extentLocationLE_LBA;
     U32 size = dir->extentLengthLE;
-    if (lba == 0 || size == 0) return NULLPTR;
+    strd("[ISO] GET_DIR_CONTENTS: lba/size check");
+    if (lba == 0 || size == 0) { strd("[ISO] GET_DIR_CONTENTS: lba/size zero"); return NULLPTR; }
     
     U32 sectors = ISO9660_CALCULATE_SECTORS(size);
+    strd("[ISO] GET_DIR_CONTENTS: alloc buffer");
     U8 *buffer = KMALLOC(sectors * ISO9660_SECTOR_SIZE);
-    if (!buffer) return NULLPTR;
+    if (!buffer) { strd("[ISO] GET_DIR_CONTENTS: KMALLOC FAILED"); return NULLPTR; }
     MEMZERO(buffer, sectors * ISO9660_SECTOR_SIZE);
 
+    strd("[ISO] GET_DIR_CONTENTS: READ_CDROM");
     if (READ_CDROM(GET_ATAPI_INFO(), lba, sectors, buffer) == ATA_FAILED) {
+        strd("[ISO] GET_DIR_CONTENTS: READ_CDROM FAILED");
+
         ISO9660_FREE_MEMORY_INTERNAL(&buffer);
         return NULLPTR;
     }
+    strd("[ISO] GET_DIR_CONTENTS: READ_CDROM OK");
 
     U32 offset = 0;
     IsoDirectoryRecord **entries = NULL;
@@ -459,14 +502,21 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
         }
         if (record->fileNameLength >= ISO9660_MAX_PATH) 
         {
+            strd("[ISO] GET_DIR_CONTENTS: filename too long"); 
             ISO9660_FREE_MEMORY_INTERNAL(&buffer);
             return FALSE;
         }
         if(record->fileNameLength > 2 && record->fileIdentifier[0] != '.' && record->fileIdentifier[1] != '.') 
         {
-            // DUMP_STRINGN(record->fileIdentifier, record->fileNameLength);
+
+            U8 buf[ISO9660_MAX_PATH];
+            STRNCPY(buf, record->fileIdentifier, record->fileNameLength);
+            buf[record->fileNameLength] = '\0';
+            strd("Found entry: "); KDEBUG_PUTS(buf);
+            
             IsoDirectoryRecord *copy = KMALLOC(record->length);
             if (!copy) {
+                strd("[ISO] GET_DIR_CONTENTS: copy KMALLOC FAILED");
                 // Cleanup
                 ISO9660_FREE_LIST_INTERNAL(entries, count);
                 ISO9660_FREE_MEMORY_INTERNAL(&buffer);
@@ -479,6 +529,7 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
             if (entries == NULL) {
                 tmp = KMALLOC((count + 1) * sizeof(IsoDirectoryRecord *));
                 if (!tmp) {
+                    strd("[ISO] GET_DIR_CONTENTS: initial KMALLOC entries FAILED");
                     ISO9660_FREE_LIST_INTERNAL(entries, count);
                     ISO9660_FREE_MEMORY_INTERNAL(&copy);
                     ISO9660_FREE_MEMORY_INTERNAL(&buffer);
@@ -490,6 +541,7 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
                 // Use your KREALLOC correctly
                 tmp = (IsoDirectoryRecord **)KREALLOC(entries, (count + 1) * sizeof(IsoDirectoryRecord *));
                 if (!tmp) {
+                    strd("[ISO] GET_DIR_CONTENTS: KREALLOC entries FAILED");
                     ISO9660_FREE_LIST_INTERNAL(entries, count);
                     ISO9660_FREE_MEMORY_INTERNAL(&copy);
                     ISO9660_FREE_MEMORY_INTERNAL(&buffer);
@@ -504,7 +556,7 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
     ISO9660_FREE_MEMORY_INTERNAL(&buffer);
     *size_out = count;
     *success = TRUE;
-    // DUMP_INTNO(count);
+    strd("[ISO] GET_DIR_CONTENTS: done, count:");
     return entries;
 }
 
@@ -513,15 +565,18 @@ IsoDirectoryRecord **ISO9660_GET_DIR_CONTENTS(IsoDirectoryRecord *dir, BOOLEAN r
 VOIDPTR ISO9660_READ_FILEDATA_TO_MEMORY_QUICKLY(U8 *filename, U32 *filesize_out) {
     IsoDirectoryRecord *rec = NULLPTR;
     VOIDPTR bin = NULLPTR;
+    strd("Attempting quick read for file: "); KDEBUG_PUTS(filename);
     rec = ISO9660_FILERECORD_TO_MEMORY(filename);
     if(!rec) return NULLPTR;
+    strd("File record found. Size: ");
     *filesize_out = rec->extentLengthLE;
     bin = ISO9660_READ_FILEDATA_TO_MEMORY(rec);
+    strd("File data read to memory. Address: ");
     if(!bin) {
         ISO9660_FREE_MEMORY_INTERNAL(&rec);
         return NULLPTR;
     }
-
+    strd("File read successfully. Address: "); 
     ISO9660_FREE_MEMORY_INTERNAL(&rec);
 
     return bin;

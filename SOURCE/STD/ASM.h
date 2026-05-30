@@ -19,8 +19,8 @@
 
 #define HALT ASM_VOLATILE("hlt")
 #define NOP ASM_VOLATILE("nop")
-#define CLI ASM_VOLATILE("cli")
-#define STI ASM_VOLATILE("sti")
+#define CLI ASM_VOLATILE("cli") // Disable interrupts
+#define STI ASM_VOLATILE("sti") // Enable interrupts
 
 /* 
  * Port I/O macros (legacy, kept for compatibility)

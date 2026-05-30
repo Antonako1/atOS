@@ -9,8 +9,21 @@
 VOID KDEBUG_INIT(VOID){}
 VOID KDEBUG_PUTC(U8 c){}
 VOID KDEBUG_PUTSN(const U8 *s, U32 len){}
-VOID KDEBUG_HEX32(U32 v){}
-VOID KDEBUG_PUTS(const U8 *s){}
+VOID KDEBUG_HEX32(U32 v){
+    (void)v;
+    U8 str[11];
+    str[0] = '0';
+    str[1] = 'x';
+    for (int i = 7; i >= 0; --i) {
+        U8 nibble = (v >> (i * 4)) & 0xF;
+        str[2 + (7 - i)] = (nibble < 10) ? ('0' + nibble) : ('A' + (nibble - 10));
+    }
+    str[10] = '\0';
+    strd(str);
+}
+VOID KDEBUG_PUTS(const U8 *s){
+    strd((const char *)s);
+}
 
 #else
 #ifdef p4pwr

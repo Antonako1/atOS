@@ -68,22 +68,22 @@ BOOLEAN E820_INIT(void) {
 
     g_E820Info.RawEntryCount = 0;
     for (U32 i = 0; i < e820_entry_count; i++) {
-        E820_ENTRY *entry = &e820_entries[i];
-        VBE_DRAW_STRING(10, 10 + i * 20, "E820 Entry: Base=0x", VBE_RED,    VBE_BLACK);
-        U8 buffer[17];
-        ITOA_U(entry->BaseAddressLow, buffer, 16);
-        buffer[16] = '\0';
-        VBE_DRAW_STRING(200, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
-        VBE_DRAW_STRING(300, 10 + i * 20, " Length=0x", VBE_RED,    VBE_BLACK);
-        ITOA_U(entry->LengthLow, buffer, 16);
-        buffer[16] = '\0';
-        VBE_DRAW_STRING(400, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
-        VBE_DRAW_STRING(500, 10 + i * 20, " Type=", VBE_RED,    VBE_BLACK);
-        ITOA_U(entry->Type, buffer, 10);
-        buffer[16] = '\0';
-        VBE_DRAW_STRING(550, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
+        // E820_ENTRY *entry = &e820_entries[i];
+        // VBE_DRAW_STRING(10, 10 + i * 20, "E820 Entry: Base=0x", VBE_RED,    VBE_BLACK);
+        // U8 buffer[17];
+        // ITOA_U(entry->BaseAddressLow, buffer, 16);
+        // buffer[16] = '\0';
+        // VBE_DRAW_STRING(200, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
+        // VBE_DRAW_STRING(300, 10 + i * 20, " Length=0x", VBE_RED,    VBE_BLACK);
+        // ITOA_U(entry->LengthLow, buffer, 16);
+        // buffer[16] = '\0';
+        // VBE_DRAW_STRING(400, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
+        // VBE_DRAW_STRING(500, 10 + i * 20, " Type=", VBE_RED,    VBE_BLACK);
+        // ITOA_U(entry->Type, buffer, 10);
+        // buffer[16] = '\0';
+        // VBE_DRAW_STRING(550, 10 + i * 20, buffer, VBE_WHITE, VBE_BLACK);
 
-        VBE_UPDATE_VRAM();
+        // VBE_UPDATE_VRAM();
         if(e820_entries[i].Type == TYPE_E820_RAM ||
            e820_entries[i].Type == 3 /* ACPI_RECLAIMABLE — safe to use without ACPI */) {
             if (!fits_in_32(e820_entries[i].BaseAddressHigh) ||

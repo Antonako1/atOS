@@ -6,6 +6,10 @@
 static U32 atapi_drive_info __attribute__((section(".data"))) = 0;
 #endif // KERNEL_ENTRY
 
+#if defined(p4pwr) && defined(__RTOS__)
+static U32 MEMDISK_INIT(void);
+#endif // p4pwr
+
 // Check if ATAPI device exists on the given channel and drive (master/slave)
 BOOLEAN atapi_cdrom_exists(U16 base_port, U8 drive) {
     U8 status;
@@ -59,17 +63,57 @@ U32 ATAPI_CHECK() {
 
 #ifndef KERNEL_ENTRY
 U32 INITIALIZE_ATAPI() {
-    if(!atapi_drive_info) 
-        atapi_drive_info = ATAPI_CHECK();
+    if(!atapi_drive_info) {
+#if defined(p4pwr) && defined(__RTOS__)
+        atapi_drive_info = MEMDISK_INIT();
+        if(atapi_drive_info == ATA_FAILED)
+#endif // p4pwr
+            atapi_drive_info = ATAPI_CHECK();
+    }
     return atapi_drive_info;
 }
 U32 GET_ATAPI_INFO() {
+    U8 buf[16];
+    ITOA_U(atapi_drive_info, buf, 16);
+    strd("GET_ATAPI_INFO: atapi_drive_info="); strd(buf);
     return atapi_drive_info;
 }
 #endif // KERNEL_ENTRY
 
 
-int read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
+#if defined(p4pwr) && defined(__RTOS__)
+
+static U32 g_memdisk_iso_base __attribute__((section(".data"))) = 0;
+
+static U32 memdisk_find_iso(void) {
+    strd("memdisk_find_iso: scanning memory for ISO9660 PVD...");
+    const U32 pvd_off  = 16 * 2048;
+    const U32 scan_end = 0x40000000; /* scan up to 1 GB */
+    U32 base;
+    for (base = 0x100000; base < scan_end; base += 2048) {
+        U8 *pvd = (U8 *)(base + pvd_off);
+        if (pvd[0] == 1 &&
+            pvd[1] == 'C' && pvd[2] == 'D' &&
+            pvd[3] == '0' && pvd[4] == '0' && pvd[5] == '1' &&
+            pvd[6] == 1 && pvd[7] != 0xF4) {
+                strd("memdisk_find_iso: found ISO9660 PVD at base="); 
+                U8 dbg[16];
+                ITOA_U(base, dbg, 16);
+                strd(dbg);
+            return base;
+        }
+    }
+    return 0;
+}
+
+/* Call once internally via INITIALIZE_ATAPI. Returns ATAPI_MEMDISK if a RAM ISO is found, ATA_FAILED otherwise. */
+static U32 MEMDISK_INIT(void) {
+    g_memdisk_iso_base = memdisk_find_iso();
+    return g_memdisk_iso_base ? ATAPI_MEMDISK : ATA_FAILED;
+}
+#endif // p4pwr
+
+int __read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
     U16 port = 0;
     BOOLEAN slave = 0;
     switch (atapiWhere) {
@@ -151,10 +195,28 @@ int read_cdrom(U32 atapiWhere, U32 lba, U32 sectors, U16 *buffer) {
 
 
 U32 READ_CDROM(U32 atapiWhere, U32 lba, U32 sectors, U8 *buf) {
-    if (atapiWhere == ATA_FAILED || !buf)
-        return 0;
+    if (!buf) {
+        return ATA_FAILED;
+    }
+    
+#if defined(p4pwr) && defined(__RTOS__)
+    if (atapiWhere == ATAPI_MEMDISK) {
+        if (!g_memdisk_iso_base) { strd("READ_CDROM: MEMDISK base=0 FAILED"); return ATA_FAILED; }
+        U8 *src = (U8 *)(g_memdisk_iso_base + lba * 2048);
+        U32 n = sectors * 2048;
+        U8 dbg[16];
+        ITOA_U((U32)src, dbg, 16);
+        strd("READ_CDROM: MEMDISK src="); strd(dbg);
+        for (U32 i = 0; i < n; i++) buf[i] = src[i];
+        strd("READ_CDROM: MEMDISK copy OK");
+        return ATA_SUCCESS;
+    }
+#endif // p4pwr
 
-    return read_cdrom(atapiWhere, lba, sectors, (U16 *)buf);
+    if (atapiWhere == ATA_FAILED)
+        return ATA_FAILED;
+
+    return __read_cdrom(atapiWhere, lba, sectors, (U16 *)buf);
 }
 
 

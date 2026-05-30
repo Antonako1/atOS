@@ -32,7 +32,12 @@
 // Kernel Heap (128 MiB)
 // ----------------------------------------------------------
 // Leave 1 page (4 KiB) guard before stack base
+
+#ifdef p4pwr111
+#define MEM_RTOSKRNL_HEAP_AREA_BASE 0x01F00000 // on p4, we leave room for the iso ramdisk
+#else
 #define MEM_RTOSKRNL_HEAP_AREA_BASE 0x00550000
+#endif
 #define MEM_RTOSKRNL_HEAP_AREA_END  0x08550000   // 128 MiB heap
 
 // Derived aliases

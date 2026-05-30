@@ -160,27 +160,38 @@ void multitasking_shutdown(void) {
 
 void init_multitasking(void) {
     KDEBUG_PUTS("[proc] Starting up multitasking\n");
-    STI;
+    CLI;
+    strd("Initializing multitasking...");
     immediate_reschedule_val=FALSE;
     if (initialized) return;
+    strd("Multitasking not already initialized, proceeding with setup");
     init_master_tcb();
+    strd("Master TCB initialized");
 
     set_next_task_cr3_val((U32)master_tcb.pagedir);
+    strd("Next task CR3 set to master TCB's page directory");
     // Simple allocation test
     VOIDPTR page = KREQUEST_USER_PAGE();
+    strd("Requested a page for testing");
     VOIDPTR addr = phys_to_virt_pd(page);
+    strd("Translated physical page to virtual address");
     panic_if(!addr, PANIC_TEXT("PANIC: Unable to request page!"), PANIC_OUT_OF_MEMORY);
     MEMZERO(addr, PAGE_SIZE);
+    strd("Zeroed the page");
     KFREE_USER_PAGE(page);
+    strd("Freed the page");
 
     // current_tcb starts on master
     current_tcb = &master_tcb;
-
+    strd("Current TCB set to master TCB");
     // Now preemption can commence
     initialized = TRUE;
     last_fpu_user = NULL;
     KDEBUG_PUTS("[proc] Multitasking initialized\n");
+    strd("Multitasking initialized");
+    debug_vram_end(); // End early mode, now using task framebuffers
     PIT_INIT();
+    STI;
 }
 
 typedef struct {

@@ -114,26 +114,37 @@ VOID RTC_HANDLER(U32 vector, U32 errcode) {
 BOOLEAN INIT_RTC(VOID) {
     CLI;
     MEMZERO(&rtc, sizeof(RTC_REG));
+    strd("Initializing RTC...");
 
     NMI_disable();
+    strd("NMIs disabled during RTC initialization");
 
     U8 status_b = cmos_read_register(RTC_REG_B);
+    strd("Current RTC Register B value read: 0x");
+
     status_b |= (RTC_REG_B_24H | RTC_REG_B_DM | RTC_REG_B_PIE);
     status_b &= ~(RTC_REG_B_SET | RTC_REG_B_UIE | RTC_REG_B_SQWE); // Ensure SET, UIE, SQWE are clear
     cmos_write_register(RTC_REG_B, status_b);
+    strd("RTC Register B updated to: 0x");
     rtc.reg_b = status_b;
 
     U8 status_a = cmos_read_register(RTC_REG_A);
+    strd("Current RTC Register A value read: 0x");
     status_a = (status_a & (RTC_REG_A_UIP | 0xF0)) | 0x06; // Preserve UIP, other bits 4-7, set RS=0x06 (1024 Hz)
     cmos_write_register(RTC_REG_A, status_a);
+    strd("RTC Register A updated to: 0x");
     rtc.reg_a = status_a;
 
     cmos_read_register(RTC_REG_C);
+    strd("RTC initialization complete, enabling interrupts and registering handler");
 
     NMI_enable();
+    strd("NMIs re-enabled after RTC initialization");
     
     ISR_REGISTER_HANDLER(PIC_REMAP_OFFSET + 8, RTC_HANDLER);
+    strd("RTC interrupt handler registered");
     PIC_Unmask(8);
+    strd("RTC IRQ unmasked, RTC should now generate interrupts at ~1024Hz");
     STI;
     return TRUE;
 }
@@ -142,7 +153,7 @@ RTC_DATE_TIME GET_SYS_TIME() {
     RTC_DATE_TIME retval;
     CLI;
     MEMCPY(&retval, &rtc.t, sizeof(RTC_DATE_TIME));
-    // cmos_get_date_time(&retval);
+    cmos_get_date_time(&retval);
     STI;
     return retval;
 }

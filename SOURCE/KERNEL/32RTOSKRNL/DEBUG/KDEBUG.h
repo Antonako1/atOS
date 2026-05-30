@@ -17,7 +17,7 @@ VOID KDEBUG_HEX32(U32 v);
 #define KDEBUG_HEX32LN(x) KDEBUG_HEX32(x); KDEBUG_PUTC('\n')
 
 #ifdef p4pwr
-#define KDEBUG_STR_HEX_LN(str, x) do { (void)str; (void)x; } while(0)
+#define KDEBUG_STR_HEX_LN(str, x) KDEBUG_PUTS(str); KDEBUG_HEX32(x)
 #define KDEBUG_HEX32LN(x) do { (void)x; } while(0)
 #else
 #define KDEBUG_STR_HEX_LN(str, x) do { (void)str; (void)x; } while(0)

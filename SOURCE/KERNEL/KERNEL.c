@@ -416,6 +416,9 @@ U0 kernel_after_gdt(U0) {
     //     bios_vram[vbase + 4] = ' ';
     //     bios_vram[vbase + 5] = 0x1A;
     // }
+    for(U32 i = 0; i<sizeof(PrimaryVolumeDescriptor); i++) {
+        ((U8*)pvd)[i] = 0;
+    }
     void (*entry)(void) = (void(*)(void))MEM_RTOSKRNL_BASE;
     __asm__ volatile("jmp *%0" :: "r"(entry) : "memory");
 

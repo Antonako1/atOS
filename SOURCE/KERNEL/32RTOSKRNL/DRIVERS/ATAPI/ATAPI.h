@@ -15,6 +15,11 @@
 #define ATAPI_PRIMARY_SLAVE         'B'//2
 #define ATAPI_SECONDARY_MASTER      'C'//3
 #define ATAPI_SECONDARY_SLAVE       'D'//4
+
+//133c000 memdisk base
+//1D3C000 memdisk end
+// size ~10mb
+
 /*+++
 U32 ATAPI_CHECK(U0);
 
@@ -80,4 +85,18 @@ U32 GET_ATAPI_INFO();
 U32 ATAPI_CALC_SECTORS(U32 len);
 
 #endif // KERNEL_ENTRY
+
+#ifdef p4pwr
+/*+++
+ATAPI_MEMDISK sentinel value
+
+DESCRIPTION
+    Returned by INITIALIZE_ATAPI (and accepted by READ_CDROM) when a memdisk
+    RAM-backed ISO image is detected. No separate MEMDISK_INIT call is needed;
+    INITIALIZE_ATAPI tries the RAM path automatically before falling back to
+    a real ATAPI drive.
+---*/
+#define ATAPI_MEMDISK 'P'
+#endif // p4pwr
+
 #endif // ATA_ATAPI_DRIVER_H

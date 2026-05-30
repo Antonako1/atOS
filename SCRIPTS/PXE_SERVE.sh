@@ -64,7 +64,7 @@ if [ -z "$IFACE" ]; then
     echo ""
 
     # wait 5s, if no input, default to enp4s0 (common on many laptops)
-    read -rt 5 -rp "Enter Ethernet interface to use (e.g. enp3s0): Default: enp4s0 " IFACE
+    read -p "Enter Ethernet interface to use (e.g. enp3s0): Default: enp4s0 " IFACE
     IFACE="${IFACE:-enp4s0}"
 fi
 

@@ -85,6 +85,7 @@ BOOLEAN READ_FAT() {
 
     fat32 = (U32 *)KMALLOC(fat_size);
     if (!fat32) return FALSE;
+    KDEBUG_PUTS("[FAT] Allocated memory for FAT.\n");
 
     /* DMA is limited to 127 sectors (~64 KB) per transfer — read in chunks */
     #define FAT_READ_CHUNK 127
@@ -92,6 +93,7 @@ BOOLEAN READ_FAT() {
     U32 lba = fat_lba;
     U32 remaining = fat_sectors;
     while (remaining > 0) {
+        KDEBUG_PUTS("[FAT] Reading FAT chunk from disk...\n");
         U32 count = remaining > FAT_READ_CHUNK ? FAT_READ_CHUNK : remaining;
         if (!ATA_PIIX3_READ_SECTORS(lba, count, dst)) {
             KFREE(fat32);
@@ -102,6 +104,7 @@ BOOLEAN READ_FAT() {
         dst       += count * bpb.BYTES_PER_SECTOR;
         lba       += count;
         remaining -= count;
+        KDEBUG_STR_HEX_LN("FAT chunk count: ", count);
     }
     #undef FAT_READ_CHUNK
 
@@ -191,52 +194,75 @@ BOOLEAN VERIFY_BPB(){
     buf[0] = 0xEB;
     buf[1] = sizeof(BPB);
     buf[2] = 0x90;
+    strd("Verifying BPB contents...");
     if(MEMCMP(bpb.JMPSHORT, buf, 3) != 0) return FALSE;
+    strd("BPB JMP instruction valid");
     if (STRNCMP(bpb.OEM_IDENT, "MSWIN4.1", 8) != 0) return FALSE;
+    strd("BPB OEM identifier valid");
     if (bpb.BYTES_PER_SECTOR != 512) return FALSE;
+    strd("BPB bytes per sector valid");
     if (bpb.SECTORS_PER_CLUSTER == 0 || (bpb.SECTORS_PER_CLUSTER & (bpb.SECTORS_PER_CLUSTER - 1)) != 0) return FALSE;
+    strd("BPB sectors per cluster valid");
     if (bpb.NUM_OF_FAT == 0) return FALSE;
+    strd("BPB number of FATs valid");
     if (bpb.EXBR.BOOT_SIGNATURE != 0x29) return FALSE;
+    strd("BPB boot signature valid");
     if (STRNCMP(bpb.EXBR.FILE_SYSTEM_TYPE, "FAT32   ", 8) != 0) return FALSE;
+    strd("BPB file system type valid");
     return TRUE;
 }
 
 BOOLEAN LOAD_BPB() { 
+    strd("Loading BPB from disk...");
+    return FALSE; 
+    // Force reinitialization for now, since we don't have a way to recover if the BPB is corrupted on disk. We can add a fallback later where if the BPB fails verification, we reinitialize it instead of just failing.
     U8 *buf = KMALLOC(ATA_PIO_SECTOR_SIZE);
     if(!buf) return FALSE;
+    strd("Reading sector 0 for BPB...");
     if(!FAT_READ_SECTOR_FROM_DISK(0, buf)) {
         Free(buf);
         return FALSE;
     }
+    strd("Sector 0 read successfully, validating BPB...");
     MEMCPY(&bpb, buf, sizeof(BPB));
+    strd("BPB read into memory, verifying contents...");
     KDEBUG_PUTS("[FAT] BPB loaded from disk:\n");
     DEBUG_PRINTF("[FAT] OEM: %.8s, Bytes/Sector: %u, Sectors/Cluster: %u, Reserved Sectors: %u, FATs: %u, Total Sectors: %u\n",
         bpb.OEM_IDENT, bpb.BYTES_PER_SECTOR, bpb.SECTORS_PER_CLUSTER, bpb.RESERVED_SECTORS,
         bpb.NUM_OF_FAT, (bpb.TOTAL_SECTORS != 0) ? bpb.TOTAL_SECTORS : bpb.LARGE_SECTOR_COUNT);
-
+    strd("BPB loaded from disk:");
     Free(buf);
     if(!READ_FAT()) {
+        strd("Failed to read FAT from disk.");
         KDEBUG_PUTS("[FAT] Failed to read FAT from disk.\n");
         return FALSE;
     }
+    strd("BPB and FAT loaded successfully from disk.");
     if(!READ_ROOT_DIR()) {
+        strd("Failed to read root directory from disk.");
         KDEBUG_PUTS("[FAT] Failed to read root directory from disk.\n");
         return FALSE;
     }
+    strd("Root directory loaded successfully from disk.");
     bpb_loaded = TRUE;
     return TRUE;
 }
 
 BOOLEAN ENSURE_BPB_LOADED() {
     KDEBUG_STR_HEX_LN("[FAT] Ensuring BPB loaded... currently loaded: ", bpb_loaded);
+    return FALSE;
+    strd("Ensuring BPB loaded... currently loaded: ");
     if (!bpb_loaded) {
         if (!LOAD_BPB()) {
+            strd("Failed to load BPB from disk.");
             KDEBUG_PUTS("[FAT] Failed to load BPB from disk.\n");
             return FALSE;
         }
     }
+    strd("BPB is loaded and valid.");
     BOOLEAN res = VERIFY_BPB();
     KDEBUG_STR_HEX_LN("[FAT] BPB verification result: ", res);
+    strd("BPB verification result: ");
     if (!res) {
         bpb_loaded = FALSE;
         return FALSE;
@@ -1007,6 +1033,7 @@ BOOLEAN copy_iso_to_fat32(IsoDirectoryRecord *iso_dir, U32 parent_cluster) {
         U32 copy_len = rec->fileNameLength < ISO9660_MAX_PATH - 1 ? rec->fileNameLength : ISO9660_MAX_PATH - 1;
         MEMCPY(name, rec->fileIdentifier, copy_len);
         name[copy_len] = '\0';
+        strd(name); // Remove trailing spaces
         DEBUG_PRINTF("[FAT] Processing ISO entry: %s (isDir: %d, size: %u bytes)\n", name, (rec->fileFlags & ISO9660_FILE_FLAG_DIRECTORY) != 0, rec->extentLengthLE);
         for (U32 j = 0; j < copy_len; j++) {    
             if (name[j] == ';') {
@@ -1018,11 +1045,15 @@ BOOLEAN copy_iso_to_fat32(IsoDirectoryRecord *iso_dir, U32 parent_cluster) {
             // Create directory in FAT32
             U32 cluster_out = 0;
             if (!CREATE_CHILD_DIR(parent_cluster, (U8 *)name, FAT_ATTRB_DIR, &cluster_out)) {
+                // If directory creation fails, we should ideally clean up any previously created entries in FAT32. For simplicity, we just log and return failure here.
                 panic_debug(name, 0xAA);
                 ISO9660_FREE_LIST(dir_contents, count);
                 return FALSE;
             }
+            strd("[FAT] copy_iso_to_fat32: recurse into:"); strd(name);
             if (!copy_iso_to_fat32(rec, cluster_out)) {
+                strd("[FAT] copy_iso_to_fat32: recurse FAILED for:"); strd(name);
+                while(1);
                 panic_debug(name, 0xAB);
                 ISO9660_FREE_LIST(dir_contents, count);
                 return FALSE;
@@ -1067,15 +1098,15 @@ BOOLEAN COPY_ISO9660_CONTENTS_TO_FAT32() {
 
 BOOLEAN ZERO_INITIALIZE_FAT32(VOIDPTR BOOTLOADER_BIN, U32 sz) {
     if (!WRITE_DISK_BPB()) return FALSE;
-    DEBUG_PRINTF("[FAT] BPB written to disk.\n");
+    KDEBUG_PUTS("[FAT] BPB written to disk.\n");
     if (!POPULATE_BOOTLOADER(BOOTLOADER_BIN, sz)) return FALSE;
-    DEBUG_PRINTF("[FAT] Bootloader populated.\n");
+    KDEBUG_PUTS("[FAT] Bootloader populated.\n");
     if (!CREATE_FSINFO()) return FALSE;
-    DEBUG_PRINTF("[FAT] FSInfo sector created.\n");
+    KDEBUG_PUTS("[FAT] FSInfo sector created.\n");
     if (!INITIAL_WRITE_FAT()) return FALSE;
-    DEBUG_PRINTF("[FAT] FAT tables initialized.\n");
+    KDEBUG_PUTS("[FAT] FAT tables initialized.\n");
     if (!CREATE_ROOT_DIR(bpb.EXBR.ROOT_CLUSTER)) return FALSE;
-    DEBUG_PRINTF("[FAT] Root directory created.\n");
+    KDEBUG_PUTS("[FAT] Root directory created.\n");
     /* Defer FAT flushes during the ISO copy: instead of rewriting the entire
      * FAT table (8192 sectors, ~4 MB) on every cluster allocation, we batch
      * all in-memory FAT updates and write the table just once at the end. */
@@ -1084,10 +1115,10 @@ BOOLEAN ZERO_INITIALIZE_FAT32(VOIDPTR BOOTLOADER_BIN, U32 sz) {
         FAT_SET_DEFERRED_FLUSH(FALSE); /* make sure flag is cleared on failure */
         return FALSE;
     }
-    DEBUG_PRINTF("[FAT] ISO9660 contents copied to FAT32 (in-memory). Committing FAT to disk...\n");
+    KDEBUG_PUTS("[FAT] ISO9660 contents copied to FAT32 (in-memory). Committing FAT to disk...\n");
     /* Single flush of the entire FAT after all files are placed. */
     if (!FAT_COMMIT()) return FALSE;
-    DEBUG_PRINTF("[FAT] FAT committed to disk.\n");
+    KDEBUG_PUTS("[FAT] FAT committed to disk.\n");
     return TRUE;
 }
 

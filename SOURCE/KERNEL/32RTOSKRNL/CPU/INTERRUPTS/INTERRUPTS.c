@@ -115,6 +115,15 @@ EMPTY_ISR(30) // Reserved
 EMPTY_ISR(31) // Reserved
 #endif // __RTOS__
 
+
+/*
+p4pwr
+onboard usb controllers: 10, 11, 12
+onboard multimedia device: 10
+onboard ide: 14, 15
+agp display controller agp vga: 10
+onboard ethernet controller: 10
+*/
 // IRQs (32–47)
 IRQ_WRAPPER(32) // IRQ0 - Timer
 IRQ_WRAPPER(35) // IRQ3 - COM2
